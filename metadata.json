@@ -1,0 +1,7 @@
+{
+  "name": "Sales Performance Monitoring Control Tower",
+  "description": "Production-ready Business Intelligence and Management Control Tower for FMCG sales performance, target tracking, repeat order (RO) monitoring, and drop outlet analytics directly from raw office Excel files.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

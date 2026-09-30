@@ -1,0 +1,69 @@
+[
+  {
+    "id": "usr_edy_sutiady_01",
+    "username": "edy.sutiady",
+    "full_name": "Edy Sutiady",
+    "role": "ADMIN",
+    "status": "ACTIVE",
+    "password_hash": "f643b10e72a97ddce9e4afb2b57613c07ed7c69d5b2b53bb9dd4cb95225a5f9c8883319bcde3e7660e75f984211aa6e42cfba4396e83d69224aca6daf076facd",
+    "password_salt": "8547e111d0a4140f623803cd5a01b805",
+    "cabang": "BONE",
+    "created_at": "2026-09-30T07:24:24.913Z",
+    "updated_at": "2026-09-30T07:24:24.913Z",
+    "last_login": "2026-09-30T07:27:51.331Z"
+  },
+  {
+    "id": "usr_andi_sales_02",
+    "username": "andi.sales",
+    "full_name": "Andi Saputra",
+    "role": "SALESMAN",
+    "status": "ACTIVE",
+    "password_hash": "8cfb57502c9ffe72aeb588867cf074defb7be4c553a15eab677d6d8278caeb2bfd4f7e81ed21c3260cffb2db8c55c1f306494ed9fafc98fe80a1a3af80c1fa51",
+    "password_salt": "fad6c6880b327812e1cd03be2375a89f",
+    "cabang": "BONE",
+    "area": "BONE TIMUR",
+    "salesman_id": "101",
+    "created_at": "2026-09-30T07:24:24.913Z",
+    "updated_at": "2026-09-30T07:24:24.913Z"
+  },
+  {
+    "id": "usr_supervisor_bone_03",
+    "username": "supervisor_bone",
+    "full_name": "Budi Santoso",
+    "role": "SUPERVISOR",
+    "status": "ACTIVE",
+    "password_hash": "572ec8e93946133891fc5b17a9acdf165965f8104b4a3fec73b4e1f156dbbce5f05d95251875ee7dbef36cd1a1f00c6c9cac9746fd68f20541dc4c195fd2989b",
+    "password_salt": "ddd1f373fe26aad5c24088a41eab0830",
+    "cabang": "BONE",
+    "area": "BONE TIMUR",
+    "created_at": "2026-09-30T07:24:24.913Z",
+    "updated_at": "2026-09-30T07:24:24.913Z"
+  },
+  {
+    "id": "usr_manager_bone_04",
+    "username": "manager.bone",
+    "full_name": "Rahmat Hidayat",
+    "role": "MANAGER",
+    "status": "ACTIVE",
+    "password_hash": "42bd22830ec82ebc501485168e7898630fb17805f165123f171ab4bd654c51537795aa8d838b91241a9568852d9bfb42c8891cebda890dff054ba0b9e4917f54",
+    "password_salt": "bc96c5f4fd722ef2b714fa817a07e679",
+    "cabang": "BONE",
+    "created_at": "2026-09-30T07:24:24.913Z",
+    "updated_at": "2026-09-30T07:24:24.913Z"
+  },
+  {
+    "id": "usr_rini.sales_1790753321812",
+    "username": "rini.sales",
+    "full_name": "Rini Safitri",
+    "role": "SALESMAN",
+    "status": "ACTIVE",
+    "password_hash": "e30509ea2fa1be1c5b7b9686baa7274378bb6f71231fea8bc95a88bc25f9c73eef606538da595a9f0464dfed1acaef6b247ab3bc1901b2178a9a4b8931697a81",
+    "password_salt": "82199bc9a47912ab855c11e2697a7821",
+    "cabang": "BONE",
+    "area": "BONE BARAT",
+    "salesman_id": "102",
+    "created_at": "2026-09-30T07:28:41.812Z",
+    "updated_at": "2026-09-30T07:28:41.812Z",
+    "last_login": "2026-09-30T07:28:50.838Z"
+  }
+]
