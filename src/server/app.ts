@@ -2,38 +2,9 @@ import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Data store path - handle both standard Node environment and Vercel serverless environment (/tmp)
-const isVercel = !!process.env.VERCEL;
-const BUNDLED_DATA_DIR = path.resolve(process.cwd(), 'data');
-const DATA_DIR = isVercel ? path.resolve('/tmp', 'data') : BUNDLED_DATA_DIR;
-const USERS_FILE = path.resolve(DATA_DIR, 'users.json');
-const SESSIONS_FILE = path.resolve(DATA_DIR, 'sessions.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  } catch (err) {
-    console.error('Failed to create data directory:', err);
-  }
-}
-
-// Copy initial bundled seed files to /tmp in Vercel if needed
-if (isVercel && !fs.existsSync(USERS_FILE)) {
-  const bundledUsers = path.resolve(BUNDLED_DATA_DIR, 'users.json');
-  if (fs.existsSync(bundledUsers)) {
-    try {
-      fs.copyFileSync(bundledUsers, USERS_FILE);
-    } catch (e) {
-      console.warn('Could not copy bundled users to /tmp:', e);
-    }
-  }
-}
+// Stable Secret for session signing
+const SESSION_SECRET = process.env.SESSION_SECRET || 'scc_secret_key_2026_enterprise_elite_auth';
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'SUPERVISOR' | 'SALESMAN';
 export type UserStatus = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'DISABLED';
@@ -85,117 +56,145 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
   }
 }
 
-// Default Seed Users
-function getInitialSeedUsers(): StoredUser[] {
-  const now = new Date().toISOString();
-  
-  const adminCred = hashPassword('password123');
-  const salesCred = hashPassword('password123');
-  const spvCred = hashPassword('password123');
-  const mgrCred = hashPassword('password123');
-
-  return [
-    {
-      id: 'usr_edy_sutiady_01',
-      username: 'edy.sutiady',
-      full_name: 'Edy Sutiady',
-      role: 'ADMIN',
-      status: 'ACTIVE',
-      password_hash: adminCred.hash,
-      password_salt: adminCred.salt,
-      cabang: 'BONE',
-      created_at: now,
-      updated_at: now,
-      last_login: now,
-    },
-    {
-      id: 'usr_andi_sales_02',
-      username: 'andi.sales',
-      full_name: 'Andi Saputra',
-      role: 'SALESMAN',
-      status: 'ACTIVE',
-      password_hash: salesCred.hash,
-      password_salt: salesCred.salt,
-      cabang: 'BONE',
-      area: 'BONE TIMUR',
-      salesman_id: '101',
-      created_at: now,
-      updated_at: now,
-    },
-    {
-      id: 'usr_supervisor_bone_03',
-      username: 'supervisor_bone',
-      full_name: 'Budi Santoso',
-      role: 'SUPERVISOR',
-      status: 'ACTIVE',
-      password_hash: spvCred.hash,
-      password_salt: spvCred.salt,
-      cabang: 'BONE',
-      area: 'BONE TIMUR',
-      created_at: now,
-      updated_at: now,
-    },
-    {
-      id: 'usr_manager_bone_04',
-      username: 'manager.bone',
-      full_name: 'Rahmat Hidayat',
-      role: 'MANAGER',
-      status: 'ACTIVE',
-      password_hash: mgrCred.hash,
-      password_salt: mgrCred.salt,
-      cabang: 'BONE',
-      created_at: now,
-      updated_at: now,
-    },
-  ];
+// Stateless HMAC Signed Session Token creation & verification
+export function createSignedToken(userId: string, expiresAt: number): string {
+  const payload = `${userId}.${expiresAt}`;
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(payload).digest('hex');
+  return `${payload}.${sig}`;
 }
 
-let usersCache: StoredUser[] = [];
-let sessionsCache: StoredSession[] = [];
+export function verifySignedToken(token: string): { valid: boolean; userId?: string; expiresAt?: number } {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) return { valid: false };
+    const [userId, expStr, sig] = parts;
+    const expiresAt = Number(expStr);
+    if (isNaN(expiresAt) || Date.now() > expiresAt) return { valid: false };
+
+    const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(`${userId}.${expiresAt}`).digest('hex');
+    const sigBuffer = Buffer.from(sig, 'hex');
+    const expectedBuffer = Buffer.from(expectedSig, 'hex');
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+      return { valid: false };
+    }
+
+    return { valid: true, userId, expiresAt };
+  } catch {
+    return { valid: false };
+  }
+}
+
+// Pre-seeded users with verified password hashes for 'password123'
+const INITIAL_SEED_USERS: StoredUser[] = [
+  {
+    id: 'usr_edy_sutiady_01',
+    username: 'edy.sutiady',
+    full_name: 'Edy Sutiady',
+    role: 'ADMIN',
+    status: 'ACTIVE',
+    password_hash: 'f643b10e72a97ddce9e4afb2b57613c07ed7c69d5b2b53bb9dd4cb95225a5f9c8883319bcde3e7660e75f984211aa6e42cfba4396e83d69224aca6daf076facd',
+    password_salt: '8547e111d0a4140f623803cd5a01b805',
+    cabang: 'BONE',
+    created_at: '2026-09-30T07:24:24.913Z',
+    updated_at: '2026-09-30T07:24:24.913Z',
+    last_login: '2026-09-30T07:32:32.043Z',
+  },
+  {
+    id: 'usr_andi_sales_02',
+    username: 'andi.sales',
+    full_name: 'Andi Saputra',
+    role: 'SALESMAN',
+    status: 'ACTIVE',
+    password_hash: '8cfb57502c9ffe72aeb588867cf074defb7be4c553a15eab677d6d8278caeb2bfd4f7e81ed21c3260cffb2db8c55c1f306494ed9fafc98fe80a1a3af80c1fa51',
+    password_salt: 'fad6c6880b327812e1cd03be2375a89f',
+    cabang: 'BONE',
+    area: 'BONE TIMUR',
+    salesman_id: '101',
+    created_at: '2026-09-30T07:24:24.913Z',
+    updated_at: '2026-09-30T07:24:24.913Z',
+  },
+  {
+    id: 'usr_supervisor_bone_03',
+    username: 'supervisor_bone',
+    full_name: 'Budi Santoso',
+    role: 'SUPERVISOR',
+    status: 'ACTIVE',
+    password_hash: '572ec8e93946133891fc5b17a9acdf165965f8104b4a3fec73b4e1f156dbbce5f05d95251875ee7dbef36cd1a1f00c6c9cac9746fd68f20541dc4c195fd2989b',
+    password_salt: 'ddd1f373fe26aad5c24088a41eab0830',
+    cabang: 'BONE',
+    area: 'BONE TIMUR',
+    created_at: '2026-09-30T07:24:24.913Z',
+    updated_at: '2026-09-30T07:24:24.913Z',
+  },
+  {
+    id: 'usr_manager_bone_04',
+    username: 'manager.bone',
+    full_name: 'Rahmat Hidayat',
+    role: 'MANAGER',
+    status: 'ACTIVE',
+    password_hash: '42bd22830ec82ebc501485168e7898630fb17805f165123f171ab4bd654c51537795aa8d838b91241a9568852d9bfb42c8891cebda890dff054ba0b9e4917f54',
+    password_salt: 'bc96c5f4fd722ef2b714fa817a07e679',
+    cabang: 'BONE',
+    created_at: '2026-09-30T07:24:24.913Z',
+    updated_at: '2026-09-30T07:24:24.913Z',
+  },
+  {
+    id: 'usr_rini.sales_1790753321812',
+    username: 'rini.sales',
+    full_name: 'Rini Safitri',
+    role: 'SALESMAN',
+    status: 'ACTIVE',
+    password_hash: 'e30509ea2fa1be1c5b7b9686baa7274378bb6f71231fea8bc95a88bc25f9c73eef606538da595a9f0464dfed1acaef6b247ab3bc1901b2178a9a4b8931697a81',
+    password_salt: '82199bc9a47912ab855c11e2697a7821',
+    cabang: 'BONE',
+    area: 'BONE BARAT',
+    salesman_id: '102',
+    created_at: '2026-09-30T07:28:41.812Z',
+    updated_at: '2026-09-30T07:28:41.812Z',
+    last_login: '2026-09-30T07:28:50.838Z',
+  },
+];
+
+// Persistent storage path helper with fallback
+function getDataFilePath(): string | null {
+  try {
+    const isVercel = !!process.env.VERCEL;
+    const baseDir = isVercel ? '/tmp/scc_data' : path.resolve(process.cwd(), 'data');
+    if (!fs.existsSync(baseDir)) {
+      fs.mkdirSync(baseDir, { recursive: true });
+    }
+    return path.resolve(baseDir, 'users.json');
+  } catch {
+    return null;
+  }
+}
+
+let usersCache: StoredUser[] = [...INITIAL_SEED_USERS];
 
 function loadData() {
   try {
-    if (fs.existsSync(USERS_FILE)) {
-      const data = fs.readFileSync(USERS_FILE, 'utf-8');
-      usersCache = JSON.parse(data);
-    } else {
-      usersCache = getInitialSeedUsers();
-      saveUsers();
+    const filePath = getDataFilePath();
+    if (filePath && fs.existsSync(filePath)) {
+      const data = fs.readFileSync(filePath, 'utf-8');
+      const loaded = JSON.parse(data);
+      if (Array.isArray(loaded) && loaded.length > 0) {
+        usersCache = loaded;
+      }
     }
-  } catch (err) {
-    console.error('Error loading users:', err);
-    usersCache = getInitialSeedUsers();
-  }
-
-  try {
-    if (fs.existsSync(SESSIONS_FILE)) {
-      const data = fs.readFileSync(SESSIONS_FILE, 'utf-8');
-      sessionsCache = JSON.parse(data);
-      const now = Date.now();
-      sessionsCache = sessionsCache.filter(s => s.expires_at > now);
-    } else {
-      sessionsCache = [];
-      saveSessions();
-    }
-  } catch (err) {
-    console.error('Error loading sessions:', err);
-    sessionsCache = [];
+  } catch {
+    // Fall back to in-memory seed list
+    usersCache = [...INITIAL_SEED_USERS];
   }
 }
 
 function saveUsers() {
   try {
-    fs.writeFileSync(USERS_FILE, JSON.stringify(usersCache, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Error saving users file:', err);
-  }
-}
-
-function saveSessions() {
-  try {
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessionsCache, null, 2), 'utf-8');
-  } catch (err) {
-    console.error('Error saving sessions file:', err);
+    const filePath = getDataFilePath();
+    if (filePath) {
+      fs.writeFileSync(filePath, JSON.stringify(usersCache, null, 2), 'utf-8');
+    }
+  } catch {
+    // Non-fatal if filesystem is read-only
   }
 }
 
@@ -228,13 +227,13 @@ export function authMiddleware(req: express.Request, res: express.Response, next
   }
 
   const token = authHeader.substring(7).trim();
-  const session = sessionsCache.find(s => s.token === token);
+  const verified = verifySignedToken(token);
 
-  if (!session || session.expires_at < Date.now()) {
+  if (!verified.valid || !verified.userId) {
     return res.status(401).json({ error: 'Sesi tidak valid atau telah kedaluwarsa. Silakan masuk kembali.' });
   }
 
-  const user = usersCache.find(u => u.id === session.user_id);
+  const user = usersCache.find(u => u.id === verified.userId);
   if (!user) {
     return res.status(401).json({ error: 'Pengguna tidak ditemukan.' });
   }
@@ -247,7 +246,7 @@ export function authMiddleware(req: express.Request, res: express.Response, next
   }
 
   (req as any).user = user;
-  (req as any).session = session;
+  (req as any).session = { token, expiresAt: verified.expiresAt };
   next();
 }
 
@@ -265,84 +264,72 @@ export function createApiRouter(): express.Router {
 
   // 1. POST /auth/login
   router.post('/auth/login', (req, res) => {
-    const { username, password, rememberMe } = req.body;
+    try {
+      const { username, password, rememberMe } = req.body;
 
-    if (!username || typeof username !== 'string' || !username.trim()) {
-      return res.status(400).json({ error: 'Username atau password salah.' });
+      if (!username || typeof username !== 'string' || !username.trim()) {
+        return res.status(400).json({ error: 'Username atau password salah.' });
+      }
+      if (!password || typeof password !== 'string' || !password.trim()) {
+        return res.status(400).json({ error: 'Username atau password salah.' });
+      }
+
+      const cleanUsername = username.trim().toLowerCase();
+      const user = usersCache.find(u => u.username.toLowerCase() === cleanUsername);
+
+      if (!user) {
+        return res.status(401).json({ error: 'Username atau password salah.' });
+      }
+
+      const isValid = verifyPassword(password, user.password_hash, user.password_salt);
+      if (!isValid) {
+        return res.status(401).json({ error: 'Username atau password salah.' });
+      }
+
+      if (user.status === 'SUSPENDED') {
+        return res.status(403).json({ error: 'Akun Anda sedang ditangguhkan (SUSPENDED). Hubungi Administrator.' });
+      }
+      if (user.status === 'DISABLED') {
+        return res.status(403).json({ error: 'Akun Anda telah dinonaktifkan (DISABLED). Hubungi Administrator.' });
+      }
+      if (user.status === 'PENDING') {
+        return res.status(403).json({ error: 'Akun Anda masih dalam status menunggu persetujuan (PENDING).' });
+      }
+
+      const now = Date.now();
+      const duration = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+      const expiresAt = now + duration;
+      const token = createSignedToken(user.id, expiresAt);
+
+      user.last_login = new Date().toISOString();
+      saveUsers();
+
+      return res.json({
+        success: true,
+        token,
+        expiresAt,
+        user: sanitizeUser(user),
+      });
+    } catch (err: any) {
+      console.error('Error during login handler:', err);
+      return res.status(500).json({ error: 'Terjadi kesalahan sistem saat memproses login.' });
     }
-    if (!password || typeof password !== 'string' || !password.trim()) {
-      return res.status(400).json({ error: 'Username atau password salah.' });
-    }
-
-    const cleanUsername = username.trim().toLowerCase();
-    const user = usersCache.find(u => u.username.toLowerCase() === cleanUsername);
-
-    if (!user) {
-      return res.status(401).json({ error: 'Username atau password salah.' });
-    }
-
-    const isValid = verifyPassword(password, user.password_hash, user.password_salt);
-    if (!isValid) {
-      return res.status(401).json({ error: 'Username atau password salah.' });
-    }
-
-    if (user.status === 'SUSPENDED') {
-      return res.status(403).json({ error: 'Akun Anda sedang ditangguhkan (SUSPENDED). Hubungi Administrator.' });
-    }
-    if (user.status === 'DISABLED') {
-      return res.status(403).json({ error: 'Akun Anda telah dinonaktifkan (DISABLED). Hubungi Administrator.' });
-    }
-    if (user.status === 'PENDING') {
-      return res.status(403).json({ error: 'Akun Anda masih dalam status menunggu persetujuan (PENDING).' });
-    }
-
-    const token = crypto.randomBytes(32).toString('hex');
-    const now = Date.now();
-    const duration = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
-    const expiresAt = now + duration;
-
-    const session: StoredSession = {
-      token,
-      user_id: user.id,
-      created_at: new Date().toISOString(),
-      expires_at: expiresAt,
-      remember_me: !!rememberMe,
-    };
-
-    sessionsCache.push(session);
-    saveSessions();
-
-    user.last_login = new Date().toISOString();
-    saveUsers();
-
-    return res.json({
-      success: true,
-      token,
-      expiresAt,
-      user: sanitizeUser(user),
-    });
   });
 
   // 2. GET /auth/session
   router.get('/auth/session', authMiddleware, (req, res) => {
     const user = (req as any).user as StoredUser;
-    const session = (req as any).session as StoredSession;
+    const session = (req as any).session;
     return res.json({
       success: true,
       user: sanitizeUser(user),
       token: session.token,
-      expiresAt: session.expires_at,
+      expiresAt: session.expiresAt,
     });
   });
 
   // 3. POST /auth/logout
-  router.post('/auth/logout', (req, res) => {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.substring(7).trim();
-      sessionsCache = sessionsCache.filter(s => s.token !== token);
-      saveSessions();
-    }
+  router.post('/auth/logout', (_req, res) => {
     return res.json({ success: true, message: 'Berhasil keluar.' });
   });
 
@@ -470,18 +457,12 @@ export function createApiRouter(): express.Router {
 
     if (status && ['ACTIVE', 'PENDING', 'SUSPENDED', 'DISABLED'].includes(status)) {
       user.status = status as UserStatus;
-      if (['SUSPENDED', 'DISABLED'].includes(status)) {
-        sessionsCache = sessionsCache.filter(s => s.user_id !== user.id);
-        saveSessions();
-      }
     }
 
     if (password && typeof password === 'string' && password.trim()) {
       const cred = hashPassword(password.trim());
       user.password_hash = cred.hash;
       user.password_salt = cred.salt;
-      sessionsCache = sessionsCache.filter(s => s.user_id !== user.id);
-      saveSessions();
     }
 
     if (cabang !== undefined) user.cabang = cabang ? String(cabang).trim() : undefined;
@@ -515,9 +496,6 @@ export function createApiRouter(): express.Router {
     usersCache.splice(index, 1);
     saveUsers();
 
-    sessionsCache = sessionsCache.filter(s => s.user_id !== id);
-    saveSessions();
-
     return res.json({
       success: true,
       message: 'User berhasil dihapus.',
@@ -529,10 +507,22 @@ export function createApiRouter(): express.Router {
 
 export function createApp(): express.Express {
   const app = express();
+  
+  // CORS middleware for Vercel Serverless & local
+  app.use((_req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    if (_req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
+    next();
+  });
+
   app.use(express.json());
 
   const apiRouter = createApiRouter();
-  // Mount on both /api and root so both standard paths and rewrites work
+  // Mount on both /api and root
   app.use('/api', apiRouter);
   app.use('/', apiRouter);
 

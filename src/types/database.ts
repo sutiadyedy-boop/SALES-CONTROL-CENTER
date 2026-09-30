@@ -185,6 +185,7 @@ export interface CreateUserData {
 }
 
 export interface UpdateUserData {
+  username?: string;
   name?: string;
   role?: UserRole;
   status?: UserStatus;
