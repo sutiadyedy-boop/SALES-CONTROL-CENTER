@@ -1,6 +1,6 @@
 import React from 'react';
-import { ShieldCheck, CheckCircle2, AlertTriangle, AlertCircle, Users, Store, CopyCheck, RefreshCw } from 'lucide-react';
-import { DatabaseCategory, RawUploadedFile } from '../../types/database';
+import { ShieldCheck, CheckCircle2, AlertTriangle, AlertCircle, Users, Store, CopyCheck, RefreshCw, ShieldAlert, Lock } from 'lucide-react';
+import { DatabaseCategory, RawUploadedFile, UserProfile } from '../../types/database';
 import { ReconciliationDetail } from '../../services/reconciliationEngine';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
@@ -8,6 +8,7 @@ interface ValidationCenterViewProps {
   uploadedFiles: Record<DatabaseCategory, RawUploadedFile[]>;
   categoryMappings: Record<DatabaseCategory, Record<string, string>>;
   reconciliation: ReconciliationDetail | null;
+  userProfile?: UserProfile;
   onNavigateToUpload: () => void;
 }
 
@@ -15,8 +16,10 @@ export function ValidationCenterView({
   uploadedFiles,
   categoryMappings,
   reconciliation,
+  userProfile,
   onNavigateToUpload,
 }: ValidationCenterViewProps) {
+  const isAdmin = userProfile?.role === 'ADMIN';
   const categories: {
     category: DatabaseCategory;
     name: string;
@@ -73,6 +76,20 @@ export function ValidationCenterView({
           />
         </div>
       </div>
+
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile?.role || 'USER'}]</span>. Anda dapat melihat status integritas dan validasi data. Modifikasi atau perubahan dataset hanya dapat dilakukan oleh peran <strong className="text-amber-200">ADMIN</strong>.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
 
       {/* 4 Database Readiness Checklist Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { loginWithCredentials, requestPasswordRecovery } from '../../services/authService';
 import { UserProfile } from '../../types/database';
+import { ThemeToggle } from '../common/ThemeToggle';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -87,7 +88,12 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden selection:bg-cyan-500/20 selection:text-cyan-300">
+    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-center items-center p-4 relative overflow-hidden selection:bg-cyan-500/20 selection:text-cyan-300">
+      {/* Top right Theme Toggle */}
+      <div className="absolute top-4 right-4 z-30">
+        <ThemeToggle showLabel={true} />
+      </div>
+
       {/* Background ambient lighting effects */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-cyan-500/10 blur-[130px] rounded-full pointer-events-none" />
       <div className="absolute bottom-10 right-10 w-[300px] h-[300px] bg-blue-600/10 blur-[110px] rounded-full pointer-events-none" />

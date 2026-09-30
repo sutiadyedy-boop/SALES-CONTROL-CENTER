@@ -8,15 +8,18 @@ import {
   AlertTriangle, 
   ShieldCheck, 
   CopyCheck, 
-  Calendar 
+  Calendar,
+  ShieldAlert,
+  Lock
 } from 'lucide-react';
-import { DatabaseCategory, RawUploadedFile, UploadSession } from '../../types/database';
+import { DatabaseCategory, RawUploadedFile, UploadSession, UserProfile } from '../../types/database';
 import { VersionConflictModal } from './VersionConflictModal';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
 interface VersionControlCenterViewProps {
   session: UploadSession;
   uploadedFiles: Record<DatabaseCategory, RawUploadedFile[]>;
+  userProfile?: UserProfile;
   onTriggerConflictTest: (category: DatabaseCategory) => void;
   onClearCategory: (category: DatabaseCategory) => void;
 }
@@ -24,9 +27,11 @@ interface VersionControlCenterViewProps {
 export function VersionControlCenterView({
   session,
   uploadedFiles,
+  userProfile,
   onTriggerConflictTest,
   onClearCategory,
 }: VersionControlCenterViewProps) {
+  const isAdmin = userProfile?.role === 'ADMIN';
   const [activeConflictModal, setActiveConflictModal] = useState<{
     fileName: string;
     categoryTitle: string;
@@ -85,6 +90,12 @@ export function VersionControlCenterView({
 
   const handleConflictChoice = (choice: 'replace' | 'add' | 'keep' | 'cancel') => {
     if (!activeConflictModal) return;
+    if (!isAdmin) {
+      setNotification(`[MODE BACA SAJA] Anda login sebagai ${userProfile?.role || 'USER'}. Simulasi selesai tanpa mengubah dataset tersimpan.`);
+      setActiveConflictModal(null);
+      setTimeout(() => setNotification(null), 4000);
+      return;
+    }
     if (choice === 'replace') {
       setNotification(`[REPLACE] Berhasil menggantikan seluruh data ${activeConflictModal.categoryTitle} dengan file baru.`);
     } else if (choice === 'add') {
@@ -123,6 +134,20 @@ export function VersionControlCenterView({
           label="Capture JPG"
         />
       </div>
+
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile?.role || 'USER'}]</span>. Kontrol versi dan penghapusan dataset terkunci. Hanya peran <strong className="text-amber-200">ADMIN</strong> yang diizinkan memodifikasi atau menghapus versi data.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
 
       {notification && (
         <div className="p-3.5 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 flex items-center gap-2 font-mono">
@@ -230,10 +255,10 @@ export function VersionControlCenterView({
                     className="flex-1 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 text-xs font-semibold border border-slate-700 transition-colors flex items-center justify-center gap-1.5"
                   >
                     <CopyCheck className="w-3.5 h-3.5" />
-                    <span>Uji Dialog Konflik Versi (Upload Ulang)</span>
+                    <span>{isAdmin ? 'Uji Dialog Konflik Versi (Upload Ulang)' : 'Lihat Simulasi Dialog Versi (Read-Only)'}</span>
                   </button>
 
-                  {isLoaded && (
+                  {isLoaded && isAdmin && (
                     <button
                       onClick={() => onClearCategory(cat.key)}
                       className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-rose-950/40 text-rose-400 hover:border-rose-500/40 text-xs font-medium border border-slate-800 transition-colors"

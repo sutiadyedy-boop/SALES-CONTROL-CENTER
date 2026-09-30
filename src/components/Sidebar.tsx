@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   Target,
   TrendingUp,
+  BarChart3,
   Zap,
   AlertOctagon,
   Sparkles,
@@ -23,7 +24,8 @@ import {
   ClipboardCheck,
   PanelLeftClose,
   PanelLeftOpen,
-  UserCheck
+  UserCheck,
+  Lock
 } from 'lucide-react';
 import { ControlTowerKPIs } from '../types/analytics';
 import { UserProfile } from '../types/database';
@@ -125,6 +127,13 @@ export function Sidebar({
       badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono'
     },
     { 
+      id: 'ebp_monitoring', 
+      label: 'EBP Monitoring', 
+      icon: BarChart3, 
+      badge: 'MARK NEW',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono'
+    },
+    { 
       id: 'drop_outlets', 
       label: 'Drop Outlets', 
       icon: AlertOctagon, 
@@ -175,10 +184,12 @@ export function Sidebar({
     },
   ];
 
+  const isNonAdmin = userProfile?.role !== 'ADMIN';
+
   const databaseItems = [
     { 
       id: 'database', 
-      label: 'Database Center', 
+      label: 'Upload Database', 
       icon: Database, 
       badge: totalFiles > 0 ? `${totalFiles} file` : null,
       badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
@@ -187,47 +198,64 @@ export function Sidebar({
       id: 'mapping', 
       label: 'Auto Column Mapping', 
       icon: SlidersHorizontal, 
-      badge: null 
+      badge: isNonAdmin ? 'Lihat Saja' : null,
+      badgeColor: 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
     },
     { 
       id: 'validation', 
       label: 'Data Validation', 
       icon: ShieldCheck, 
-      badge: validationIssuesCount > 0 ? `${validationIssuesCount} alert` : 'Valid',
-      badgeColor: validationIssuesCount > 0 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+      badge: validationIssuesCount > 0 
+        ? `${validationIssuesCount} alert` 
+        : (isNonAdmin ? 'Lihat Saja' : 'Valid'),
+      badgeColor: validationIssuesCount > 0 
+        ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' 
+        : (isNonAdmin ? 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30')
     },
     { 
       id: 'reconciliation', 
       label: 'Reconciliation Report', 
       icon: FileCheck2, 
-      badge: matchedCount > 0 ? `${matchedCount} match` : null,
-      badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
+      badge: matchedCount > 0 
+        ? `${matchedCount} match` 
+        : (isNonAdmin ? 'Lihat Saja' : null),
+      badgeColor: matchedCount > 0 
+        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono' 
+        : 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
     },
     { 
       id: 'version', 
       label: 'Version Control & Dedup', 
       icon: GitBranch, 
-      badge: 'Dedup OK',
-      badgeColor: 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+      badge: isNonAdmin ? 'Lihat Saja' : 'Dedup OK',
+      badgeColor: isNonAdmin 
+        ? 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono' 
+        : 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
     },
     { 
       id: 'inspector', 
       label: 'Raw Data Inspector', 
       icon: Table, 
-      badge: totalRows > 0 ? `${totalRows.toLocaleString('id-ID')} rows` : null,
-      badgeColor: 'bg-slate-800 text-slate-300 border border-slate-700'
+      badge: totalRows > 0 
+        ? `${totalRows.toLocaleString('id-ID')} rows` 
+        : (isNonAdmin ? 'Lihat Saja' : null),
+      badgeColor: isNonAdmin && totalRows === 0
+        ? 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
+        : 'bg-slate-800 text-slate-300 border border-slate-700'
     },
     { 
       id: 'session', 
       label: 'Upload Session & Logs', 
       icon: History, 
-      badge: null 
+      badge: isNonAdmin ? 'Lihat Saja' : null,
+      badgeColor: 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
     },
     { 
       id: 'settings', 
       label: 'Settings & Rules', 
       icon: Settings, 
-      badge: null 
+      badge: isNonAdmin ? 'Lihat Saja' : null,
+      badgeColor: 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
     },
     ...(userProfile?.role === 'ADMIN' ? [{
       id: 'users',
@@ -367,10 +395,17 @@ export function Sidebar({
           {!isCollapsed ? (
             <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 px-3 py-1 flex items-center justify-between">
               <span>Database & ETL Center</span>
-              <span className="text-[9px] text-emerald-400 font-mono">PHASE 1-2</span>
+              {isNonAdmin ? (
+                <span className="text-[9px] text-amber-400 font-mono flex items-center gap-1 font-semibold">
+                  <Lock className="w-2.5 h-2.5" />
+                  HANYA LIHAT
+                </span>
+              ) : (
+                <span className="text-[9px] text-emerald-400 font-mono">PHASE 1-2</span>
+              )}
             </div>
           ) : (
-            <div className="py-1 flex justify-center" title="Database & ETL Center">
+            <div className="py-1 flex justify-center" title={isNonAdmin ? "Database & ETL Center (Hanya Lihat / Read-Only)" : "Database & ETL Center"}>
               <div className="w-6 h-[1px] bg-slate-800" />
             </div>
           )}
@@ -378,6 +413,7 @@ export function Sidebar({
           {databaseItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
+            const isReadOnlyItem = isNonAdmin && item.id !== 'database';
 
             return (
               <div key={item.id} className="relative group">
@@ -392,11 +428,20 @@ export function Sidebar({
                       ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/30 font-semibold'
                       : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/80'
                   }`}
-                  title={isCollapsed ? item.label : undefined}
+                  title={isCollapsed ? (isReadOnlyItem ? `${item.label} (Hanya Lihat - Read Only)` : item.label) : undefined}
                 >
                   <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                     <Icon className={`w-4 h-4 transition-colors shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
-                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    {!isCollapsed && (
+                      <div className="flex items-center gap-1.5 truncate">
+                        <span className="truncate">{item.label}</span>
+                        {isReadOnlyItem && (
+                          <span title="Mode Hanya Lihat (Read-Only)">
+                            <Lock className="w-3 h-3 text-amber-400/80 shrink-0" />
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {!isCollapsed ? (
@@ -409,7 +454,7 @@ export function Sidebar({
                     )
                   ) : (
                     item.badge && (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-slate-950" />
+                      <span className={`absolute top-1.5 right-1.5 w-2 h-2 rounded-full ring-2 ring-slate-950 ${isReadOnlyItem ? 'bg-amber-400' : 'bg-emerald-400'}`} />
                     )
                   )}
                 </button>
@@ -418,6 +463,11 @@ export function Sidebar({
                 {isCollapsed && (
                   <div className="absolute left-[64px] top-1/2 -translate-y-1/2 px-3 py-1.5 bg-slate-900 text-slate-100 rounded-xl shadow-2xl border border-slate-700/90 text-xs font-semibold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-all duration-150 z-50 flex items-center gap-2">
                     <span>{item.label}</span>
+                    {isReadOnlyItem && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5" /> Hanya Lihat
+                      </span>
+                    )}
                     {item.badge && (
                       <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full ${item.badgeColor || 'bg-slate-800 text-slate-300'}`}>
                         {item.badge}

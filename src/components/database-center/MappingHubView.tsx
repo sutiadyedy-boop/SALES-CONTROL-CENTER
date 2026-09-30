@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { SlidersHorizontal, CheckCircle2, AlertTriangle, AlertCircle, Edit, Eye, Database } from 'lucide-react';
-import { DatabaseCategory, RawUploadedFile } from '../../types/database';
+import { SlidersHorizontal, CheckCircle2, AlertTriangle, AlertCircle, Edit, Eye, Database, ShieldAlert, Lock } from 'lucide-react';
+import { DatabaseCategory, RawUploadedFile, UserProfile } from '../../types/database';
 import { autoDetectMappings, MAPPING_DICTIONARY } from '../../services/columnMapper';
 import { AutoMappingModal } from './AutoMappingModal';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
@@ -8,6 +8,7 @@ import { CaptureJpgButton } from '../common/CaptureJpgButton';
 interface MappingHubViewProps {
   uploadedFiles: Record<DatabaseCategory, RawUploadedFile[]>;
   categoryMappings: Record<DatabaseCategory, Record<string, string>>;
+  userProfile?: UserProfile;
   onUpdateMappings: (category: DatabaseCategory, mappings: Record<string, string>) => void;
   onConfirmMapping: (category: DatabaseCategory, fileId: string) => void;
 }
@@ -15,9 +16,11 @@ interface MappingHubViewProps {
 export function MappingHubView({
   uploadedFiles,
   categoryMappings,
+  userProfile,
   onUpdateMappings,
   onConfirmMapping,
 }: MappingHubViewProps) {
+  const isAdmin = userProfile?.role === 'ADMIN';
   const [activeModalCategory, setActiveModalCategory] = useState<{
     category: DatabaseCategory;
     title: string;
@@ -74,6 +77,20 @@ export function MappingHubView({
         />
       </div>
 
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile?.role || 'USER'}]</span>. Seluruh kolom mapping terkunci. Hanya peran <strong className="text-amber-200">ADMIN</strong> yang diizinkan mengubah konfigurasi mapping.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
+
       {/* Categories Mapping Cards */}
       <div className="space-y-6">
         {categories.map(cat => {
@@ -109,10 +126,24 @@ export function MappingHubView({
                           sampleRows: activeFile.sampleRows,
                         });
                       }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold transition-colors shadow-sm"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm ${
+                        isAdmin
+                          ? 'bg-cyan-600 hover:bg-cyan-500 text-slate-950'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      }`}
+                      title={isAdmin ? 'Ubah pemetaan kolom' : 'Lihat pemetaan kolom (Read Only)'}
                     >
-                      <Edit className="w-3.5 h-3.5" />
-                      <span>Ubah / Kustomisasi Mapping</span>
+                      {isAdmin ? (
+                        <>
+                          <Edit className="w-3.5 h-3.5" />
+                          <span>Ubah / Kustomisasi Mapping</span>
+                        </>
+                      ) : (
+                        <>
+                          <Eye className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Lihat Detail Mapping</span>
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -216,10 +247,13 @@ export function MappingHubView({
           headers={activeModalCategory.headers}
           currentMappings={categoryMappings[activeModalCategory.category] || {}}
           sampleRows={activeModalCategory.sampleRows}
+          readOnly={!isAdmin}
           onClose={() => setActiveModalCategory(null)}
           onSaveMappings={mappings => {
-            onUpdateMappings(activeModalCategory.category, mappings);
-            onConfirmMapping(activeModalCategory.category, activeModalCategory.fileId);
+            if (isAdmin) {
+              onUpdateMappings(activeModalCategory.category, mappings);
+              onConfirmMapping(activeModalCategory.category, activeModalCategory.fileId);
+            }
           }}
         />
       )}

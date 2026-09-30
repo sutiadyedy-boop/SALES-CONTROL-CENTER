@@ -16,16 +16,21 @@ import { formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { exportTableToExcel } from '../../services/exportEngine';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { UserProfile } from '../../types/database';
+import { ShieldAlert, Lock } from 'lucide-react';
 
 interface ReconciliationReportViewProps {
   reconciliation: DetailedReconciliationReport | null;
+  userProfile?: UserProfile;
   onNavigateToUpload: () => void;
 }
 
 export function ReconciliationReportView({
   reconciliation,
+  userProfile,
   onNavigateToUpload,
 }: ReconciliationReportViewProps) {
+  const isAdmin = userProfile?.role === 'ADMIN';
   const [activeTab, setActiveTab] = useState<'matched_outlets' | 'unmatched_outlets' | 'salesmen' | 'duplicates'>('matched_outlets');
 
   if (!reconciliation) {
@@ -277,6 +282,20 @@ export function ReconciliationReportView({
           </button>
         </div>
       </div>
+
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile?.role || 'USER'}]</span>. Menampilkan laporan hasil rekonsiliasi dan pencocokan data. Seluruh dataset terlindungi dan tidak dapat diubah oleh pengguna non-admin.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
 
       {/* Top 4 Reconciliation KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

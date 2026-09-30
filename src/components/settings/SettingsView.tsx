@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Settings, Save, Shield, Database, Key, CheckCircle2, RotateCcw, SlidersHorizontal, AlertTriangle } from 'lucide-react';
+import { Settings, Save, Shield, Database, Key, CheckCircle2, RotateCcw, SlidersHorizontal, AlertTriangle, ShieldAlert, Lock, Sun, Moon } from 'lucide-react';
 import { AppSettings, UserProfile, UserRole, InsightThresholds } from '../../types/database';
 import { DEFAULT_THRESHOLDS } from '../../services/storageService';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { useTheme } from '../../context/ThemeContext';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -21,6 +22,8 @@ export function SettingsView({
   onUpdateUser,
   onResetToDefaults,
 }: SettingsViewProps) {
+  const isAdmin = userProfile.role === 'ADMIN';
+  const { theme, setTheme } = useTheme();
   const [formSettings, setFormSettings] = useState<AppSettings>({
     ...settings,
     thresholds: settings.thresholds || DEFAULT_THRESHOLDS,
@@ -32,6 +35,7 @@ export function SettingsView({
   const thresholds: InsightThresholds = formSettings.thresholds || DEFAULT_THRESHOLDS;
 
   const updateThreshold = <K extends keyof InsightThresholds>(key: K, val: number) => {
+    if (!isAdmin) return;
     setFormSettings(prev => ({
       ...prev,
       thresholds: {
@@ -43,6 +47,7 @@ export function SettingsView({
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) return;
     onSaveSettings(formSettings);
     onUpdateUser({
       ...userProfile,
@@ -74,15 +79,39 @@ export function SettingsView({
             label="Capture JPG"
           />
 
-          <button
-            type="submit"
-            className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold rounded-lg transition-colors shadow-sm"
-          >
-            <Save className="w-4 h-4" />
-            <span>Simpan Konfigurasi</span>
-          </button>
+          {isAdmin ? (
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold rounded-lg transition-colors shadow-sm"
+            >
+              <Save className="w-4 h-4" />
+              <span>Simpan Konfigurasi</span>
+            </button>
+          ) : (
+            <div 
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs font-medium border border-slate-700 cursor-not-allowed shadow-sm"
+              title="Hanya peran ADMIN yang dapat menyimpan perubahan konfigurasi"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Terkunci (Hanya Admin)</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile.role}]</span>. Parameter aturan bisnis, formula, toleransi, dan hak akses dikunci. Hanya pengguna peran <strong className="text-amber-200">ADMIN</strong> yang diizinkan mengubah konfigurasi.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
 
       {savedSuccess && (
         <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl text-xs text-emerald-300 flex items-center gap-2">
@@ -91,7 +120,65 @@ export function SettingsView({
         </div>
       )}
 
-      {/* Card 1: Role Based Access Control */}
+      {/* Theme Preference Card (Accessible to all users) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+          {theme === 'dark' ? (
+            <Moon className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Sun className="w-4 h-4 text-indigo-500" />
+          )}
+          <h3 className="text-sm font-bold text-slate-100">
+            Tema Tampilan Antarmuka (Dark / Light Mode)
+          </h3>
+        </div>
+
+        <div className="text-xs">
+          <p className="text-slate-400 mb-3">
+            Pilih mode tema yang paling nyaman untuk Anda. Kontras teks dan palet warna diatur presisi agar seluruh tabel metrik, chart BI, dan laporan audit terbaca tajam dan jelas.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setTheme('dark')}
+              className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
+                theme === 'dark'
+                  ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500'
+                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-400 shrink-0">
+                <Moon className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-slate-100 block">Tema Gelap (Dark Mode)</span>
+                <span className="text-[11px] text-slate-400 mt-0.5 block">Kontras tinggi ala ruang kontrol data (default).</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setTheme('light')}
+              className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
+                theme === 'light'
+                  ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500'
+                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shrink-0">
+                <Sun className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-bold text-slate-100 block">Tema Terang (Light Mode)</span>
+                <span className="text-[11px] text-slate-400 mt-0.5 block">Latar bersih putih & teks arang pekat beresolusi tinggi.</span>
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <fieldset disabled={!isAdmin} className="space-y-6 disabled:opacity-85">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
         <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
           <Shield className="w-4 h-4 text-cyan-400" />
@@ -476,18 +563,21 @@ export function SettingsView({
           </div>
         </div>
       </div>
+      </fieldset>
 
       {/* Reset Defaults */}
-      <div className="flex justify-end pt-2">
-        <button
-          type="button"
-          onClick={onResetToDefaults}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
-        >
-          <RotateCcw className="w-3.5 h-3.5" />
-          <span>Kembalikan ke Nilai Default Kantor</span>
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="flex justify-end pt-2">
+          <button
+            type="button"
+            onClick={onResetToDefaults}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Kembalikan ke Nilai Default Kantor</span>
+          </button>
+        </div>
+      )}
     </form>
   );
 }

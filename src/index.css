@@ -1,5 +1,129 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: dark;
+}
+
+html.light {
+  color-scheme: light;
+
+  /* Inverted slate scale for crisp enterprise light theme */
+  --color-slate-950: #f8fafc;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #e2e8f0;
+  --color-slate-700: #cbd5e1;
+  --color-slate-600: #64748b;
+  --color-slate-500: #475569;
+  --color-slate-400: #334155;
+  --color-slate-300: #1e293b;
+  --color-slate-200: #0f172a;
+  --color-slate-100: #020617;
+  --color-slate-50: #000000;
+
+  /* High-contrast accessible accents for light theme */
+  --color-cyan-400: #0891b2;
+  --color-cyan-300: #0e7490;
+  --color-cyan-500: #06b6d4;
+  --color-emerald-400: #059669;
+  --color-emerald-300: #047857;
+  --color-amber-400: #d97706;
+  --color-amber-300: #b45309;
+  --color-rose-400: #e11d48;
+  --color-rose-300: #be123c;
+  --color-purple-400: #7c3aed;
+  --color-purple-300: #6d28d9;
+}
+
+/* Light mode specific enhancements for extra contrast and legibility */
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/90 {
+  background-color: #f1f5f9;
+}
+
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/80,
+html.light .bg-slate-900\/95 {
+  background-color: #ffffff;
+}
+
+html.light .bg-cyan-950\/70,
+html.light .bg-cyan-950\/60,
+html.light .bg-cyan-950\/50,
+html.light .bg-cyan-950 {
+  background-color: #e0f2fe;
+}
+
+html.light .text-cyan-200 {
+  color: #0369a1;
+}
+
+html.light .text-cyan-300 {
+  color: #0284c7;
+}
+
+html.light .text-emerald-300 {
+  color: #047857;
+}
+
+html.light .text-amber-300 {
+  color: #b45309;
+}
+
+html.light .text-rose-300 {
+  color: #be123c;
+}
+
+html.light .bg-emerald-950\/30,
+html.light .bg-emerald-950\/40,
+html.light .bg-emerald-950\/60,
+html.light .bg-emerald-950\/70 {
+  background-color: #ecfdf5;
+}
+
+html.light .bg-amber-950\/30,
+html.light .bg-amber-950\/40,
+html.light .bg-amber-950\/60,
+html.light .bg-amber-950\/70 {
+  background-color: #fffbeb;
+}
+
+html.light .bg-rose-950\/30,
+html.light .bg-rose-950\/40,
+html.light .bg-rose-950\/60,
+html.light .bg-rose-950\/70 {
+  background-color: #fff1f2;
+}
+
+html.light .bg-purple-950\/30,
+html.light .bg-purple-950\/40,
+html.light .bg-purple-950\/60,
+html.light .bg-purple-950\/70 {
+  background-color: #faf5ff;
+}
+
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+html.light ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+}
+
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;

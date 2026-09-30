@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { Table, FileSpreadsheet, Search, Eye, Filter } from 'lucide-react';
-import { DatabaseCategory, RawUploadedFile } from '../../types/database';
+import { Table, FileSpreadsheet, Search, Eye, Filter, ShieldAlert, Lock } from 'lucide-react';
+import { DatabaseCategory, RawUploadedFile, UserProfile } from '../../types/database';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
 interface RawDataInspectorViewProps {
   uploadedFiles: Record<DatabaseCategory, RawUploadedFile[]>;
+  userProfile?: UserProfile;
   onSelectSheet: (category: DatabaseCategory, fileId: string, sheetName: string) => void;
   onNavigateToUpload: () => void;
   onLoadSampleData: () => void;
@@ -14,10 +15,12 @@ interface RawDataInspectorViewProps {
 
 export function RawDataInspectorView({
   uploadedFiles,
+  userProfile,
   onSelectSheet,
   onNavigateToUpload,
   onLoadSampleData,
 }: RawDataInspectorViewProps) {
+  const isAdmin = userProfile?.role === 'ADMIN';
   // Flatten all uploaded files
   const allFiles: RawUploadedFile[] = [];
   Object.values(uploadedFiles).forEach(files => allFiles.push(...files));
@@ -78,6 +81,20 @@ export function RawDataInspectorView({
           </select>
         </div>
       </div>
+
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile?.role || 'USER'}]</span>. Anda dapat memeriksa baris data mentah dan sheet tanpa mengubah struktur database.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
 
       {/* File Metadata Overview Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 grid grid-cols-2 sm:grid-cols-5 gap-3 text-center text-xs">

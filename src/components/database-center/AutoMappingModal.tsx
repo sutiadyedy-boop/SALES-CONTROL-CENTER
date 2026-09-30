@@ -9,6 +9,7 @@ interface AutoMappingModalProps {
   headers: string[];
   currentMappings: Record<string, string>;
   sampleRows?: Record<string, any>[];
+  readOnly?: boolean;
   onClose: () => void;
   onSaveMappings: (mappings: Record<string, string>) => void;
 }
@@ -19,6 +20,7 @@ export function AutoMappingModal({
   headers,
   currentMappings,
   sampleRows = [],
+  readOnly = false,
   onClose,
   onSaveMappings,
 }: AutoMappingModalProps) {
@@ -71,18 +73,22 @@ export function AutoMappingModal({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-base font-bold text-slate-100">
-                Konfirmasi Auto Column Mapping: {categoryTitle}
+                {readOnly ? 'Detail Kolom Mapping' : 'Konfirmasi Auto Column Mapping'}: {categoryTitle}
               </h3>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-semibold ${
-                allRequiredMapped
+                readOnly
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                  : allRequiredMapped
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                   : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
               }`}>
-                {mappedRequired} / {totalRequired} Kolom Wajib Terpetakan
+                {readOnly ? 'READ ONLY' : `${mappedRequired} / ${totalRequired} Kolom Wajib Terpetakan`}
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">
-              Periksa kecocokan kolom Excel aktual dengan Canonical Key sistem sebelum data diproses.
+              {readOnly 
+                ? 'Melihat hasil pemetaan kolom Excel kantor ke Canonical Key sistem.'
+                : 'Periksa kecocokan kolom Excel aktual dengan Canonical Key sistem sebelum data diproses.'}
             </p>
           </div>
           <button
@@ -92,6 +98,13 @@ export function AutoMappingModal({
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {readOnly && (
+          <div className="px-5 py-2.5 bg-amber-500/10 border-b border-amber-500/20 text-xs text-amber-300 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Mode Baca Saja (Read-Only) — Anda hanya dapat melihat pemetaan kolom saat ini. Perubahan pemetaan hanya dapat dilakukan oleh peran ADMIN.</span>
+          </div>
+        )}
 
         {/* Column Mapping Rows */}
         <div className="p-5 overflow-y-auto space-y-3.5 divide-y divide-slate-800/60">
@@ -120,9 +133,10 @@ export function AutoMappingModal({
                   <div className="sm:w-7/12 flex items-center gap-2">
                     <div className="relative flex-1">
                       <select
+                        disabled={readOnly}
                         value={def.selectedHeader || ''}
                         onChange={e => handleHeaderSelect(canonical, e.target.value)}
-                        className={`w-full bg-slate-950 border rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors ${
+                        className={`w-full bg-slate-950 border rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none transition-colors disabled:opacity-75 disabled:cursor-not-allowed ${
                           isConfidenceLow
                             ? 'border-amber-500/70 focus:border-amber-400'
                             : hasMatch
@@ -181,22 +195,35 @@ export function AutoMappingModal({
         {/* Footer */}
         <div className="p-4 border-t border-slate-800 bg-slate-950/60 flex flex-wrap items-center justify-between gap-3">
           <span className="text-xs text-slate-400">
-            Mapping ini disimpan otomatis ke memori browser untuk upload berikutnya.
+            {readOnly
+              ? 'Tampilan pratinjau pemetaan kolom aktif sistem (terkunci untuk user non-admin).'
+              : 'Mapping ini disimpan otomatis ke memori browser untuk upload berikutnya.'}
           </span>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
-            >
-              Batal
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold transition-colors shadow-sm"
-            >
-              <Check className="w-4 h-4" />
-              <span>Konfirmasi & Kunci Mapping</span>
-            </button>
+            {readOnly ? (
+              <button
+                onClick={onClose}
+                className="px-5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition-colors"
+              >
+                Tutup (Mode Baca Saja)
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={onClose}
+                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition-colors"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="flex items-center gap-1.5 px-5 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold transition-colors shadow-sm"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Konfirmasi & Kunci Mapping</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { History, PlusCircle, RotateCcw, CheckCircle2, FileSpreadsheet, Clock, User } from 'lucide-react';
+import { History, PlusCircle, RotateCcw, CheckCircle2, FileSpreadsheet, Clock, User, ShieldAlert, Lock } from 'lucide-react';
 import { DatabaseCategory, RawUploadedFile, UploadSession, UserProfile } from '../../types/database';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
@@ -18,6 +18,7 @@ export function SessionManagerView({
   onNewSession,
   onClearSession,
 }: SessionManagerViewProps) {
+  const isAdmin = userProfile.role === 'ADMIN';
   const allFiles: RawUploadedFile[] = [];
   Object.values(uploadedFiles).forEach(files => allFiles.push(...files));
 
@@ -44,23 +45,49 @@ export function SessionManagerView({
             label="Capture JPG"
           />
 
-          <button
-            onClick={onNewSession}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold transition-colors shadow-sm"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            <span>Mulai Sesi Baru</span>
-          </button>
+          {isAdmin ? (
+            <>
+              <button
+                onClick={onNewSession}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-slate-950 text-xs font-bold transition-colors shadow-sm"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Mulai Sesi Baru</span>
+              </button>
 
-          <button
-            onClick={onClearSession}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Reset Data Sesi Ini</span>
-          </button>
+              <button
+                onClick={onClearSession}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Data Sesi Ini</span>
+              </button>
+            </>
+          ) : (
+            <div 
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 text-slate-400 text-xs font-medium border border-slate-700 cursor-not-allowed shadow-sm"
+              title="Hanya peran ADMIN yang dapat mengelola atau mereset sesi"
+            >
+              <Lock className="w-3.5 h-3.5 text-amber-400" />
+              <span>Tindakan Sesi Terkunci (Hanya Admin)</span>
+            </div>
+          )}
         </div>
       </div>
+
+      {!isAdmin && (
+        <div className="p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Mode Baca Saja (Read-Only):</strong> Anda masuk sebagai <span className="font-mono font-bold text-amber-200">[{userProfile.role}]</span>. Inisiasi sesi baru atau reset sesi hanya dapat dilakukan oleh peran <strong className="text-amber-200">ADMIN</strong>.
+            </span>
+          </div>
+          <span className="text-[10px] font-mono px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold shrink-0">
+            READ ONLY
+          </span>
+        </div>
+      )}
 
       {/* Session Metadata Card */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">

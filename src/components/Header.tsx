@@ -12,10 +12,14 @@ import {
   Settings,
   UserCheck,
   ChevronDown,
-  Building2
+  Building2,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { UserProfile } from '../types/database';
 import { CaptureJpgButton } from './common/CaptureJpgButton';
+import { ThemeToggle } from './common/ThemeToggle';
+import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
   sessionId: string;
@@ -39,6 +43,7 @@ const tabLabels: Record<string, string> = {
   target_realisasi: 'Target_vs_Realisasi',
   month_comparison: 'Perbandingan_Bulan_Agus_Sept',
   ro_monitoring: 'RO_Monitoring_Penetrasi_Outlet',
+  ebp_monitoring: 'EBP_Monitoring',
   drop_outlets: 'Drop_Outlets',
   new_outlets: 'New_Active_Outlets',
   salesman_performance: 'Performa_Salesman',
@@ -46,7 +51,7 @@ const tabLabels: Record<string, string> = {
   smart_insight: 'Smart_Insights',
   action_monitoring: 'Action_Monitoring',
   reports: 'Laporan_Eksekutif',
-  database: 'Database_Center',
+  database: 'Upload_Database',
   mapping: 'Column_Mapping',
   validation: 'Data_Validation',
   reconciliation: 'Reconciliation_Report',
@@ -74,6 +79,7 @@ export function Header({
   onLogout,
 }: HeaderProps) {
   const activeMenuLabel = tabLabels[currentTab] || currentTab;
+  const { isDark, toggleTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -170,14 +176,19 @@ export function Header({
           <span className="hidden sm:inline">Muat Demo Data</span>
         </button>
 
-        {/* Reset / Clear Data */}
-        <button
-          onClick={onClearAllData}
-          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors"
-          title="Reset semua data upload"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </button>
+        {/* Reset / Clear Data (Admin Only) */}
+        {userProfile.role === 'ADMIN' && (
+          <button
+            onClick={onClearAllData}
+            className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-slate-900 border border-transparent hover:border-slate-800 transition-colors"
+            title="Reset semua data upload (Khusus Admin)"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        )}
+
+        {/* Theme Toggle Button */}
+        <ThemeToggle showLabel={true} />
 
         {/* User Profile & Role Dropdown Menu */}
         <div className="relative" ref={dropdownRef}>
@@ -255,6 +266,26 @@ export function Header({
                 >
                   <Settings className="w-4 h-4 text-slate-400" />
                   <span>Pengaturan & Profil</span>
+                </button>
+
+                {/* Theme Toggle in Dropdown */}
+                <button
+                  onClick={() => {
+                    toggleTheme();
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-slate-800/80 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2.5">
+                    {isDark ? (
+                      <Sun className="w-4 h-4 text-amber-400" />
+                    ) : (
+                      <Moon className="w-4 h-4 text-indigo-400" />
+                    )}
+                    <span>Tema Tampilan</span>
+                  </div>
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+                    {isDark ? 'Gelap' : 'Terang'}
+                  </span>
                 </button>
               </div>
 

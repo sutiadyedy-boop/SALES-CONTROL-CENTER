@@ -6,6 +6,7 @@ import { DashboardView } from './components/dashboard/DashboardView';
 import { TargetRealisasiView } from './components/analytics/TargetRealisasiView';
 import { MonthComparisonView } from './components/analytics/MonthComparisonView';
 import { RoMonitoringView } from './components/analytics/RoMonitoringView';
+import { EbpMonitoringView } from './components/analytics/EbpMonitoringView';
 import { DropOutletView } from './components/analytics/DropOutletView';
 import { NewOutletView } from './components/analytics/NewOutletView';
 import { SalesmanPerformanceView } from './components/analytics/SalesmanPerformanceView';
@@ -515,16 +516,18 @@ export default function App() {
 
   // Confirm mapping
   const handleConfirmMapping = useCallback((category: DatabaseCategory, fileId: string) => {
+    if (userProfile.role !== 'ADMIN') return;
     setUploadedFiles(prev => ({
       ...prev,
       [category]: prev[category].map(f =>
         f.id === fileId ? { ...f, mappingConfirmed: true, status: 'ready' } : f
       ),
     }));
-  }, []);
+  }, [userProfile.role]);
 
   // Update mappings
   const handleUpdateMappings = useCallback((category: DatabaseCategory, newMappings: Record<string, string>) => {
+    if (userProfile.role !== 'ADMIN') return;
     setCategoryMappings(prev => {
       const updated = { ...prev, [category]: newMappings };
       saveCategoryMapping(category, newMappings);
@@ -533,10 +536,11 @@ export default function App() {
 
     const currentFiles = uploadedFiles[category] || [];
     renormalizeCategory(category, currentFiles, newMappings, settings);
-  }, [uploadedFiles, settings, renormalizeCategory]);
+  }, [userProfile.role, uploadedFiles, settings, renormalizeCategory]);
 
   // Reset all session data
   const handleClearSession = useCallback(() => {
+    if (userProfile.role !== 'ADMIN') return;
     setPrevTransactions([]);
     setCurrTransactions([]);
     setTargets([]);
@@ -547,10 +551,11 @@ export default function App() {
       target_salesman: [],
       master_cb: [],
     });
-  }, []);
+  }, [userProfile.role]);
 
   // Start new session
   const handleNewSession = useCallback(() => {
+    if (userProfile.role !== 'ADMIN') return;
     const rand = Math.floor(100 + Math.random() * 900);
     setSession({
       sessionId: `SES-202609-${rand}`,
@@ -569,7 +574,7 @@ export default function App() {
       status: 'ready',
     });
     handleClearSession();
-  }, [userProfile.name, handleClearSession]);
+  }, [userProfile.role, userProfile.name, handleClearSession]);
 
   // Reconciliation check
   const reconciliation = useMemo(() => {
@@ -701,13 +706,14 @@ export default function App() {
   }, []);
 
   const handleUpdateSettings = useCallback((newSettings: AppSettings) => {
+    if (userProfile.role !== 'ADMIN') return;
     setSettings(newSettings);
     saveSettings(newSettings);
 
     renormalizeCategory('previous_month', uploadedFiles.previous_month || [], categoryMappings.previous_month || {}, newSettings);
     renormalizeCategory('current_month', uploadedFiles.current_month || [], categoryMappings.current_month || {}, newSettings);
     renormalizeCategory('master_cb', uploadedFiles.master_cb || [], categoryMappings.master_cb || {}, newSettings);
-  }, [uploadedFiles, categoryMappings, renormalizeCategory]);
+  }, [userProfile.role, uploadedFiles, categoryMappings, renormalizeCategory]);
 
   const handleUpdateUser = useCallback((newUser: UserProfile) => {
     setUserProfile(newUser);
@@ -715,9 +721,10 @@ export default function App() {
   }, []);
 
   const handleResetSettings = useCallback(() => {
+    if (userProfile.role !== 'ADMIN') return;
     setSettings(DEFAULT_SETTINGS);
     saveSettings(DEFAULT_SETTINGS);
-  }, []);
+  }, [userProfile.role]);
 
   // Total metrics for Phase 1 sidebar
   const allFilesList = useMemo(() => {
@@ -754,6 +761,7 @@ export default function App() {
     'target_realisasi',
     'month_comparison',
     'ro_monitoring',
+    'ebp_monitoring',
     'drop_outlets',
     'new_outlets',
     'salesman_performance',
@@ -893,6 +901,20 @@ export default function App() {
               />
             )}
 
+            {currentTab === 'ebp_monitoring' && (
+              <EbpMonitoringView
+                masterOutlets={masterOutlets}
+                currTransactions={currTransactions}
+                prevTransactions={prevTransactions}
+                uploadedFiles={uploadedFiles}
+                settings={settings}
+                filters={filters}
+                onFilterChange={setFilters}
+                onNavigateToUpload={() => setCurrentTab('database')}
+                onLoadSampleData={populateSampleFiles}
+              />
+            )}
+
             {currentTab === 'drop_outlets' && (
               <DropOutletView
                 calculation={analytics}
@@ -1019,6 +1041,7 @@ export default function App() {
               <MappingHubView
                 uploadedFiles={uploadedFiles}
                 categoryMappings={categoryMappings}
+                userProfile={userProfile}
                 onUpdateMappings={handleUpdateMappings}
                 onConfirmMapping={handleConfirmMapping}
               />
@@ -1029,6 +1052,7 @@ export default function App() {
                 uploadedFiles={uploadedFiles}
                 categoryMappings={categoryMappings}
                 reconciliation={reconciliation}
+                userProfile={userProfile}
                 onNavigateToUpload={() => setCurrentTab('database')}
               />
             )}
@@ -1036,6 +1060,7 @@ export default function App() {
             {currentTab === 'reconciliation' && (
               <ReconciliationReportView
                 reconciliation={reconciliation}
+                userProfile={userProfile}
                 onNavigateToUpload={() => setCurrentTab('database')}
               />
             )}
@@ -1044,6 +1069,7 @@ export default function App() {
               <VersionControlCenterView
                 session={session}
                 uploadedFiles={uploadedFiles}
+                userProfile={userProfile}
                 onTriggerConflictTest={() => {}}
                 onClearCategory={(cat) => handleRemoveFile(cat, uploadedFiles[cat]?.[0]?.id || '')}
               />
@@ -1052,6 +1078,7 @@ export default function App() {
             {currentTab === 'inspector' && (
               <RawDataInspectorView
                 uploadedFiles={uploadedFiles}
+                userProfile={userProfile}
                 onSelectSheet={handleSelectSheet}
                 onNavigateToUpload={() => setCurrentTab('database')}
                 onLoadSampleData={populateSampleFiles}
