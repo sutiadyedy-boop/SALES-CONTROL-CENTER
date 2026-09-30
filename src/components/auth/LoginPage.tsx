@@ -8,11 +8,7 @@ import {
   Loader2, 
   AlertCircle, 
   CheckCircle2, 
-  KeyRound, 
-  Building2,
-  Sparkles,
-  ChevronRight,
-  HelpCircle
+  KeyRound
 } from 'lucide-react';
 import { loginWithCredentials, requestPasswordRecovery } from '../../services/authService';
 import { UserProfile } from '../../types/database';
@@ -88,13 +84,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
     } finally {
       setForgotLoading(false);
     }
-  };
-
-  // Quick helper to fill demo credentials
-  const fillCredential = (user: string, pass: string) => {
-    setUsername(user);
-    setPassword(pass);
-    setErrorMessage(null);
   };
 
   return (
@@ -236,54 +225,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
               )}
             </button>
           </form>
-
-          {/* Quick Demo Credentials Assistant */}
-          <div className="mt-8 pt-6 border-t border-slate-800/80">
-            <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5 font-mono">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span>Akun Demo / Quick Login:</span>
-            </p>
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <button
-                type="button"
-                onClick={() => fillCredential('edy.sutiady', 'password123')}
-                className="text-left p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/40 transition-all text-slate-300"
-              >
-                <div className="font-semibold text-cyan-300 font-mono">edy.sutiady</div>
-                <div className="text-[10px] text-slate-400">ADMIN (Full Access)</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillCredential('manager.bone', 'password123')}
-                className="text-left p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/40 transition-all text-slate-300"
-              >
-                <div className="font-semibold text-emerald-300 font-mono">manager.bone</div>
-                <div className="text-[10px] text-slate-400">MANAGER (Branch)</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillCredential('supervisor_bone', 'password123')}
-                className="text-left p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/40 transition-all text-slate-300"
-              >
-                <div className="font-semibold text-indigo-300 font-mono">supervisor_bone</div>
-                <div className="text-[10px] text-slate-400">SUPERVISOR (Area)</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => fillCredential('andi.sales', 'password123')}
-                className="text-left p-2 rounded-lg bg-slate-950/60 hover:bg-slate-800/80 border border-slate-800 hover:border-cyan-500/40 transition-all text-slate-300"
-              >
-                <div className="font-semibold text-amber-300 font-mono">andi.sales</div>
-                <div className="text-[10px] text-slate-400">SALESMAN (Individual)</div>
-              </button>
-            </div>
-            <p className="text-[10px] text-slate-500 text-center mt-2.5 font-mono">
-              Password default demo: <span className="text-slate-400 font-semibold">password123</span>
-            </p>
-          </div>
         </div>
 
         {/* Security Footer Notice */}
@@ -293,7 +234,7 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
             <span>Sistem Otentikasi Terenkripsi & Terlindungi (RLS Enabled)</span>
           </p>
           <p className="text-[11px] text-slate-600 mt-1">
-            PT Pinus Merah Abadi © {new Date().getFullYear()} · All rights reserved
+            Dibuat Oleh : Edy Sutiady M. © {new Date().getFullYear()} · All rights reserved
           </p>
         </div>
       </div>
