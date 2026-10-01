@@ -233,38 +233,6 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
                 <span>MASUK</span>
               )}
             </button>
-
-            {/* Quick Access Account Selector */}
-            <div className="pt-4 border-t border-slate-800/80">
-              <div className="text-[11px] text-slate-400 font-mono mb-2 flex items-center justify-between">
-                <span>PILIH AKUN LOGIN CEPAT:</span>
-                <span className="text-[10px] text-cyan-400">PW: password123 / 12345</span>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { name: 'dias', label: 'dias', role: 'ADMIN' },
-                  { name: 'edy.sutiady', label: 'edy.sutiady', role: 'ADMIN' },
-                  { name: 'andi.sales', label: 'andi.sales', role: 'SALES' },
-                  { name: 'supervisor_bone', label: 'supervisor', role: 'SPV' },
-                  { name: 'manager.bone', label: 'manager', role: 'MGR' },
-                  { name: 'rini.sales', label: 'rini.sales', role: 'SALES' },
-                ].map(acc => (
-                  <button
-                    key={acc.name}
-                    type="button"
-                    onClick={() => {
-                      setUsername(acc.name);
-                      setPassword('password123');
-                      setErrorMessage(null);
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-slate-950 hover:bg-slate-800 text-[11px] font-mono text-cyan-300 border border-slate-800 hover:border-cyan-500/40 transition-all flex items-center gap-1.5"
-                  >
-                    <span>{acc.label}</span>
-                    <span className="text-slate-500 text-[9px] bg-slate-900 px-1 rounded">({acc.role})</span>
-                  </button>
-                ))}
-              </div>
-            </div>
           </form>
         </div>
 
