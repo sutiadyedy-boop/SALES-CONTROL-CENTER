@@ -129,7 +129,7 @@ export function Sidebar({
     },
     { 
       id: 'ebp_monitoring', 
-      label: 'EPB Monitoring', 
+      label: 'Monitoring EPB', 
       icon: BarChart3, 
       badge: 'MARK NEW',
       badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono'

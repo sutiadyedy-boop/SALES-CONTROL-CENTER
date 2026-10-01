@@ -737,7 +737,7 @@ export function EbpMonitoringView({
             </div>
             <div>
               <h1 className="text-xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2">
-                <span>EPB MONITORING</span>
+                <span>MONITORING EPB</span>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                   REAL 100% KOLOM MARK NEW
                 </span>
@@ -752,7 +752,7 @@ export function EbpMonitoringView({
         <div className="flex flex-wrap items-center gap-2.5">
           <CaptureJpgButton
             targetId="main-capture-area"
-            fileName={`EPB_Monitoring_${new Date().toISOString().split('T')[0]}.jpg`}
+            fileName={`Monitoring_EPB_${new Date().toISOString().split('T')[0]}.jpg`}
             label="Capture JPG"
           />
 

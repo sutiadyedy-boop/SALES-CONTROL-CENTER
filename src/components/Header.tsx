@@ -44,7 +44,7 @@ const tabLabels: Record<string, string> = {
   target_realisasi: 'Target_vs_Realisasi',
   month_comparison: 'Perbandingan_Bulan_Agus_Sept',
   ro_monitoring: 'RO_Monitoring_Penetrasi_Outlet',
-  ebp_monitoring: 'EPB_Monitoring',
+  ebp_monitoring: 'Monitoring_EPB',
   monitoring_ec: 'Monitoring_EC_Toko_Transaksi',
   drop_outlets: 'Drop_Outlets',
   new_outlets: 'New_Active_Outlets',
