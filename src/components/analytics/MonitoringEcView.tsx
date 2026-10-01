@@ -89,6 +89,17 @@ export interface SummaryEcSalesRow {
   status: EcStatus;
 }
 
+export interface DailyEcSummaryRow {
+  id: string;
+  day: number;
+  dateLabel: string;
+  ecPrev: number;
+  ecCurr: number;
+  diff: number;
+  growthPercent: number | null;
+  status: EcStatus;
+}
+
 export interface DailyTrendItem {
   day: number;
   dateLabel: string;
@@ -134,8 +145,8 @@ export function MonitoringEcView({
   const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
   const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
 
-  // Navigation tab within the Monitoring EC view
-  const [activeTab, setActiveTab] = useState<'pma' | 'sales' | 'trend'>('pma');
+  // Navigation tab within the Monitoring EC view (Default: Daily Vertical Date Summary)
+  const [activeTab, setActiveTab] = useState<'daily' | 'pma' | 'sales'>('daily');
 
   // Interactive Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -344,6 +355,51 @@ export function MonitoringEcView({
       dailyOverallCurr: dayCurrSetMap
     };
   }, [enrichedPrevTxs, enrichedCurrTxs]);
+
+  // =========================================================================
+  // 1B. RINGKASAN PERFORMA EC / TOKO TRANSAKSI PER TANGGAL (VERTIKAL)
+  // =========================================================================
+  const dailySummaryList = useMemo<DailyEcSummaryRow[]>(() => {
+    const list: DailyEcSummaryRow[] = [];
+
+    for (let d = 1; d <= 31; d++) {
+      let ecPrev = 0;
+      let ecCurr = 0;
+
+      if (selectedPma !== 'ALL') {
+        const pKey = `${d}_${selectedPma}`;
+        ecPrev = ecPerDayPmaPrev.get(pKey)?.size || 0;
+        ecCurr = ecPerDayPmaCurr.get(pKey)?.size || 0;
+      } else if (selectedSalesman !== 'ALL') {
+        const sKey = `${d}_${selectedSalesman}`;
+        ecPrev = ecPerDaySalesPrev.get(sKey)?.size || 0;
+        ecCurr = ecPerDaySalesCurr.get(sKey)?.size || 0;
+      } else {
+        ecPrev = dailyOverallPrev.get(d)?.size || 0;
+        ecCurr = dailyOverallCurr.get(d)?.size || 0;
+      }
+
+      const diff = ecCurr - ecPrev;
+      const growthPercent = ecPrev > 0 ? (diff / ecPrev) * 100 : (ecCurr > 0 ? null : 0);
+
+      let status: EcStatus = 'STABIL';
+      if (ecCurr > ecPrev) status = 'GROWTH';
+      else if (ecCurr < ecPrev) status = 'DECLINE';
+
+      list.push({
+        id: `daily_summary_${d}`,
+        day: d,
+        dateLabel: `Tgl ${String(d).padStart(2, '0')}`,
+        ecPrev,
+        ecCurr,
+        diff,
+        growthPercent,
+        status,
+      });
+    }
+
+    return list;
+  }, [selectedPma, selectedSalesman, ecPerDayPmaPrev, ecPerDayPmaCurr, ecPerDaySalesPrev, ecPerDaySalesCurr, dailyOverallPrev, dailyOverallCurr]);
 
   // =========================================================================
   // 2. BAGIAN 1: MONITORING EC PER PMA
@@ -606,6 +662,18 @@ export function MonitoringEcView({
   // =========================================================================
   // 7. FILTERED LISTS
   // =========================================================================
+  const filteredDailySummary = useMemo(() => {
+    return dailySummaryList.filter(item => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        if (!item.dateLabel.toLowerCase().includes(q) && !String(item.day).includes(q)) return false;
+      }
+      if (selectedDay !== 'ALL' && item.day !== parseInt(selectedDay, 10)) return false;
+      if (selectedStatus !== 'ALL' && item.status !== selectedStatus) return false;
+      return true;
+    });
+  }, [dailySummaryList, searchQuery, selectedDay, selectedStatus]);
+
   const filteredSummaryPma = useMemo(() => {
     return summaryPmaList.filter(item => {
       if (searchQuery.trim()) {
@@ -686,6 +754,138 @@ export function MonitoringEcView({
   // =========================================================================
   // 8. TABLE COLUMN DEFINITIONS
   // =========================================================================
+
+  // Columns for Ringkasan Performa EC / Toko Transaksi Per Tanggal (Vertikal)
+  const dailySummaryColumns: ColumnDef<DailyEcSummaryRow>[] = [
+    {
+      key: 'dateLabel',
+      header: 'Tanggal (Vertikal)',
+      accessor: (row) => row.day,
+      render: (row) => (
+        <div className="flex items-center gap-2 py-0.5">
+          <div className="p-1 rounded bg-amber-500/10 text-amber-400">
+            <CalendarDays className="w-3.5 h-3.5 shrink-0" />
+          </div>
+          <div>
+            <div className="font-mono font-bold text-slate-100 text-xs">
+              {row.dateLabel}
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono">
+              Hari ke-{row.day}
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'ecPrev',
+      header: `EC Bulan Lalu (${prevLabel})`,
+      align: 'right',
+      accessor: (row) => row.ecPrev,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-slate-300 font-semibold text-xs">
+            {row.ecPrev.toLocaleString('id-ID')} Toko
+          </span>
+          <div className="text-[10px] text-slate-500">Bulan Lalu</div>
+        </div>
+      ),
+    },
+    {
+      key: 'ecCurr',
+      header: `EC Bulan Ini (${currLabel})`,
+      align: 'right',
+      accessor: (row) => row.ecCurr,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-amber-300 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+            {row.ecCurr.toLocaleString('id-ID')} Toko
+          </span>
+          <div className="text-[10px] text-amber-400/80 font-mono mt-0.5">Bulan Ini</div>
+        </div>
+      ),
+    },
+    {
+      key: 'diff',
+      header: 'Selisih',
+      align: 'right',
+      accessor: (row) => row.diff,
+      render: (row) => (
+        <span className={`font-mono text-xs font-bold inline-flex items-center gap-0.5 ${
+          row.diff > 0 ? 'text-emerald-400' : row.diff < 0 ? 'text-rose-400' : 'text-slate-400'
+        }`}>
+          {row.diff > 0 && <ArrowUpRight className="w-3 h-3" />}
+          {row.diff < 0 && <ArrowDownRight className="w-3 h-3" />}
+          {!row.diff && <Minus className="w-3 h-3" />}
+          <span>{row.diff > 0 ? `+${row.diff}` : row.diff}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'growthPercent',
+      header: 'Growth %',
+      align: 'right',
+      accessor: (row) => row.growthPercent ?? 0,
+      render: (row) => {
+        if (row.growthPercent === null) {
+          return <span className="font-mono text-xs text-cyan-300 font-semibold">NEW</span>;
+        }
+        return (
+          <span className={`font-mono text-xs font-bold ${
+            row.growthPercent > 0 ? 'text-emerald-400' : row.growthPercent < 0 ? 'text-rose-400' : 'text-slate-400'
+          }`}>
+            {row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'visual',
+      header: 'Komparasi Visual (Lalu vs Ini)',
+      render: (row) => {
+        const maxVal = Math.max(row.ecPrev, row.ecCurr, 1);
+        const prevWidth = Math.round((row.ecPrev / maxVal) * 100);
+        const currWidth = Math.round((row.ecCurr / maxVal) * 100);
+        return (
+          <div className="w-36 space-y-1 py-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400">
+              <span className="w-2 h-2 rounded bg-indigo-500 shrink-0" />
+              <div className="flex-1 bg-slate-950 rounded h-1.5 overflow-hidden">
+                <div className="bg-indigo-500 h-full rounded" style={{ width: `${prevWidth}%` }} />
+              </div>
+              <span className="w-6 text-right text-slate-300">{row.ecPrev}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-mono text-amber-300">
+              <span className="w-2 h-2 rounded bg-amber-400 shrink-0" />
+              <div className="flex-1 bg-slate-950 rounded h-1.5 overflow-hidden">
+                <div className="bg-amber-400 h-full rounded" style={{ width: `${currWidth}%` }} />
+              </div>
+              <span className="w-6 text-right font-bold text-amber-300">{row.ecCurr}</span>
+            </div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      align: 'center',
+      render: (row) => (
+        <span className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold inline-flex items-center gap-1.5 whitespace-nowrap ${
+          row.status === 'GROWTH'
+            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+            : row.status === 'DECLINE'
+            ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+        }`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${
+            row.status === 'GROWTH' ? 'bg-emerald-400 animate-pulse' : row.status === 'DECLINE' ? 'bg-rose-400' : 'bg-amber-400'
+          }`} />
+          <span>{row.status}</span>
+        </span>
+      ),
+    },
+  ];
 
   // Columns for Summary PMA Table
   const summaryPmaColumns: ColumnDef<SummaryEcPmaRow>[] = [
@@ -1522,10 +1722,22 @@ export function MonitoringEcView({
         </div>
 
         {/* Tab Selection */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-800">
+        <div className="flex items-center gap-2 pt-2 border-t border-slate-800 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('daily')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'daily'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            }`}
+          >
+            <CalendarDays className="w-3.5 h-3.5 text-amber-400" />
+            <span>📅 Ringkasan EC Harian (Tanggal Vertikal)</span>
+          </button>
+
           <button
             onClick={() => setActiveTab('pma')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'pma'
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -1537,7 +1749,7 @@ export function MonitoringEcView({
 
           <button
             onClick={() => setActiveTab('sales')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'sales'
                 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
@@ -1550,6 +1762,23 @@ export function MonitoringEcView({
       </div>
 
       {/* 6. Main Tables Viewport */}
+      {activeTab === 'daily' && (
+        <div className="space-y-6">
+          {/* Table: Ringkasan Performa EC / Toko Transaksi Per Tanggal (Vertikal Tgl 01 s/d 31) */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <DataTable<DailyEcSummaryRow>
+              title="Ringkasan Performa EC / Toko Transaksi Per Tanggal (Vertikal Tgl 01 s/d 31)"
+              columns={dailySummaryColumns}
+              data={filteredDailySummary}
+              searchPlaceholder="Cari tanggal..."
+              pageSizeDefault={31}
+              exportFileName={`Ringkasan_Performa_EC_Harian_Vertikal_${prevLabel}_vs_${currLabel}.xlsx`}
+              emptyMessage="Tidak ada data tanggal yang sesuai filter."
+            />
+          </div>
+        </div>
+      )}
+
       {activeTab === 'pma' && (
         <div className="space-y-6">
           {/* Table A: Ringkasan EC Per PMA */}

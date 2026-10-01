@@ -17,7 +17,6 @@ import {
   Building2, 
   Layers, 
   Lightbulb,
-  Award,
   ChevronRight,
   Info
 } from 'lucide-react';
@@ -189,7 +188,6 @@ export function EbpMonitoringView({
   const [selectedDepo, setSelectedDepo] = useState<string>('ALL');
   const [selectedEpbCurrFilter, setSelectedEpbCurrFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
   const [selectedEpbPrevFilter, setSelectedEpbPrevFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
-  const [activeRankingTab, setActiveRankingTab] = useState<'growth' | 'decline' | 'top_epb'>('growth');
 
   const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
   const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
@@ -528,29 +526,7 @@ export function EbpMonitoringView({
     };
   }, [numberedFilteredItems]);
 
-  // 8. Rankings
-  const top10Growth = useMemo(() => {
-    return numberedFilteredItems
-      .filter(i => i.diff > 0)
-      .sort((a, b) => b.diff - a.diff)
-      .slice(0, 10);
-  }, [numberedFilteredItems]);
-
-  const top10Decline = useMemo(() => {
-    return numberedFilteredItems
-      .filter(i => i.diff < 0)
-      .sort((a, b) => a.diff - b.diff)
-      .slice(0, 10);
-  }, [numberedFilteredItems]);
-
-  const top10Epb = useMemo(() => {
-    return numberedFilteredItems
-      .filter(i => i.epbCurr > 0)
-      .sort((a, b) => b.epbCurr - a.epbCurr)
-      .slice(0, 10);
-  }, [numberedFilteredItems]);
-
-  // 9. Aggregation for visual comparisons (Top Salesman EPB comparison)
+  // 8. Aggregation for visual comparisons (Top Salesman EPB comparison)
   const salesmanAggregates = useMemo(() => {
     const map = new Map<string, { name: string; prev: number; curr: number; stores: number }>();
     numberedFilteredItems.forEach(item => {
@@ -1357,146 +1333,7 @@ export function EbpMonitoringView({
         </div>
       </div>
 
-      {/* 5. Ranking Section (TOP 10 GROWTH, TOP 10 DECLINE, TOP 10 EPB) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-indigo-500/10 text-indigo-400">
-              <Award className="w-4 h-4" />
-            </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-100">
-                Peringkat Toko EPB (Top 10 Rankings)
-              </h3>
-              <p className="text-[11px] text-slate-400">
-                Ranking dinamis berbasis pergerakan dan akumulasi EPB bulan berjalan
-              </p>
-            </div>
-          </div>
-
-          {/* Ranking Tab Switcher */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
-            <button
-              onClick={() => setActiveRankingTab('growth')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeRankingTab === 'growth'
-                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🟢 Top 10 Growth
-            </button>
-            <button
-              onClick={() => setActiveRankingTab('decline')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeRankingTab === 'decline'
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              🔴 Top 10 Decline
-            </button>
-            <button
-              onClick={() => setActiveRankingTab('top_epb')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                activeRankingTab === 'top_epb'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              ⭐ Top 10 EPB Tertinggi
-            </button>
-          </div>
-        </div>
-
-        {/* Ranking List Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-slate-800 text-[11px] uppercase tracking-wider text-slate-400 bg-slate-950/40">
-                <th className="py-2.5 px-3 w-12 text-center">Rank</th>
-                <th className="py-2.5 px-3">Nama Toko</th>
-                <th className="py-2.5 px-3">Salesman</th>
-                <th className="py-2.5 px-3">Depo</th>
-                <th className="py-2.5 px-3 text-right">EPB Lalu</th>
-                <th className="py-2.5 px-3 text-right">EPB Ini</th>
-                <th className="py-2.5 px-3 text-right">Selisih</th>
-                <th className="py-2.5 px-3 text-right">Growth %</th>
-                <th className="py-2.5 px-3 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {(() => {
-                const list = 
-                  activeRankingTab === 'growth' ? top10Growth :
-                  activeRankingTab === 'decline' ? top10Decline : top10Epb;
-
-                if (list.length === 0) {
-                  return (
-                    <tr>
-                      <td colSpan={9} className="py-6 text-center text-slate-500 italic">
-                        Tidak ada data toko untuk kategori ranking ini.
-                      </td>
-                    </tr>
-                  );
-                }
-
-                return list.map((item, idx) => {
-                  const isFirst = idx === 0;
-                  const isSecond = idx === 1;
-                  const isThird = idx === 2;
-
-                  return (
-                    <tr key={item.outletId} className="hover:bg-slate-800/40 transition-colors">
-                      <td className="py-2 px-3 text-center font-mono">
-                        {isFirst ? (
-                          <span className="w-5 h-5 rounded-full bg-amber-400 text-slate-950 font-bold inline-flex items-center justify-center text-[10px]">1</span>
-                        ) : isSecond ? (
-                          <span className="w-5 h-5 rounded-full bg-slate-300 text-slate-950 font-bold inline-flex items-center justify-center text-[10px]">2</span>
-                        ) : isThird ? (
-                          <span className="w-5 h-5 rounded-full bg-amber-700 text-amber-100 font-bold inline-flex items-center justify-center text-[10px]">3</span>
-                        ) : (
-                          <span className="text-slate-500">{idx + 1}</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3">
-                        <div className="font-semibold text-slate-200">{item.outletName}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{item.outletId}</div>
-                      </td>
-                      <td className="py-2 px-3 text-slate-400">{item.salesmanName}</td>
-                      <td className="py-2 px-3 text-slate-400">{item.depo}</td>
-                      <td className="py-2 px-3 text-right font-mono text-slate-300">{item.epbPrev}</td>
-                      <td className="py-2 px-3 text-right font-mono text-amber-300 font-bold">{item.epbCurr}</td>
-                      <td className="py-2 px-3 text-right font-mono font-bold">
-                        <span className={item.diff > 0 ? 'text-emerald-400' : item.diff < 0 ? 'text-rose-400' : 'text-slate-400'}>
-                          {item.diff > 0 ? `+${item.diff}` : item.diff}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-right font-mono font-bold">
-                        <span className={item.diff > 0 ? 'text-emerald-400' : item.diff < 0 ? 'text-rose-400' : 'text-slate-400'}>
-                          {item.status === 'NEW' ? 'NEW (+100%)' : `${item.growthPercent >= 0 ? '+' : ''}${item.growthPercent.toFixed(1)}%`}
-                        </span>
-                      </td>
-                      <td className="py-2 px-3 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                          item.status === 'GROWTH' ? 'bg-emerald-500/20 text-emerald-300' :
-                          item.status === 'DECLINE' ? 'bg-rose-500/20 text-rose-300' :
-                          item.status === 'NEW' ? 'bg-cyan-500/20 text-cyan-300' :
-                          'bg-amber-500/20 text-amber-300'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* 6. Filter Toolbar Section */}
+      {/* 5. Filter Toolbar Section */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Box (Real-time) */}
