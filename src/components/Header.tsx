@@ -19,6 +19,7 @@ import {
 import { UserProfile } from '../types/database';
 import { CaptureJpgButton } from './common/CaptureJpgButton';
 import { ThemeToggle } from './common/ThemeToggle';
+import { SoundToggle } from './common/SoundToggle';
 import { useTheme } from '../context/ThemeContext';
 
 interface HeaderProps {
@@ -43,7 +44,8 @@ const tabLabels: Record<string, string> = {
   target_realisasi: 'Target_vs_Realisasi',
   month_comparison: 'Perbandingan_Bulan_Agus_Sept',
   ro_monitoring: 'RO_Monitoring_Penetrasi_Outlet',
-  ebp_monitoring: 'EBP_Monitoring',
+  ebp_monitoring: 'EPB_Monitoring',
+  monitoring_ec: 'Monitoring_EC_Toko_Transaksi',
   drop_outlets: 'Drop_Outlets',
   new_outlets: 'New_Active_Outlets',
   salesman_performance: 'Performa_Salesman',
@@ -189,6 +191,9 @@ export function Header({
 
         {/* Theme Toggle Button */}
         <ThemeToggle showLabel={true} />
+
+        {/* Sound Effect Toggle Button */}
+        <SoundToggle />
 
         {/* User Profile & Role Dropdown Menu */}
         <div className="relative" ref={dropdownRef}>

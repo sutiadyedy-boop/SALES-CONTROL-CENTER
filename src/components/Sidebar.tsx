@@ -14,6 +14,7 @@ import {
   Target,
   TrendingUp,
   BarChart3,
+  Activity,
   Zap,
   AlertOctagon,
   Sparkles,
@@ -128,10 +129,17 @@ export function Sidebar({
     },
     { 
       id: 'ebp_monitoring', 
-      label: 'EBP Monitoring', 
+      label: 'EPB Monitoring', 
       icon: BarChart3, 
       badge: 'MARK NEW',
       badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono'
+    },
+    { 
+      id: 'monitoring_ec', 
+      label: 'Monitoring EC', 
+      icon: Activity, 
+      badge: 'PMA & Sales',
+      badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono'
     },
     { 
       id: 'drop_outlets', 

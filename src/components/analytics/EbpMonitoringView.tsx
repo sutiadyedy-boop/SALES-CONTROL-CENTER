@@ -60,44 +60,122 @@ export interface EbpOutletItem {
 }
 
 /**
- * Extracts EPB from a collection of transactions for an outlet.
- * Inspects the 'markNew' field (from column MARK NEW in raw uploaded data).
- * If values are numeric, sums them; if text flags/categories, counts records where MARK NEW is present.
+ * Cleans string for robust header and alias matching
  */
-function calculateOutletEpb(txs: TransactionRecord[]): number {
-  if (!txs || txs.length === 0) return 0;
+function cleanHeaderString(str: any): string {
+  if (!str) return '';
+  return String(str).toUpperCase().trim().replace(/[_\s]+/g, ' ');
+}
 
-  let numericSum = 0;
-  let hasNumeric = false;
-  let markNewCount = 0;
+/**
+ * Parses raw MARK NEW cell values from Excel or transaction records.
+ * Only returns isPresent=true if the value is non-empty, non-zero, and not a null/dash flag.
+ * If numeric (e.g. 20, 12, 18), returns the exact numeric value.
+ * If text category (e.g. "ECERAN KIOS", "ECERAN WARUNG", "Y", "NEW"), returns 1.
+ */
+function parseMarkNewValue(val: any): { isNumeric: boolean; numVal: number; isPresent: boolean } {
+  if (val === undefined || val === null) {
+    return { isNumeric: false, numVal: 0, isPresent: false };
+  }
 
-  for (const t of txs) {
-    if (t.markNew !== undefined && t.markNew !== null) {
-      const strVal = String(t.markNew).trim();
-      if (strVal !== '' && strVal !== '-' && strVal !== '0') {
-        const num = parseFloat(strVal.replace(/,/g, ''));
-        if (!isNaN(num) && isFinite(num) && num > 0) {
-          numericSum += num;
-          hasNumeric = true;
-        } else {
-          markNewCount += 1;
-        }
-      }
+  if (typeof val === 'number') {
+    if (!isNaN(val) && isFinite(val) && val > 0) {
+      return { isNumeric: true, numVal: val, isPresent: true };
+    }
+    return { isNumeric: false, numVal: 0, isPresent: false };
+  }
+
+  const str = String(val).trim();
+  if (
+    str === '' ||
+    str === '-' ||
+    str === '0' ||
+    str.toUpperCase() === 'NONE' ||
+    str.toUpperCase() === 'NULL' ||
+    str.toUpperCase() === 'N/A' ||
+    str.toUpperCase() === 'TIDAK' ||
+    str.toUpperCase() === 'FALSE'
+  ) {
+    return { isNumeric: false, numVal: 0, isPresent: false };
+  }
+
+  // Check if string contains a positive number (e.g. "12", "20", "5.5", "1,500")
+  const cleanNumStr = str.replace(/,/g, '');
+  if (/^\d+(\.\d+)?$/.test(cleanNumStr)) {
+    const parsed = parseFloat(cleanNumStr);
+    if (!isNaN(parsed) && isFinite(parsed) && parsed > 0) {
+      return { isNumeric: true, numVal: parsed, isPresent: true };
     }
   }
 
-  if (hasNumeric && numericSum > 0) {
-    return Math.round(numericSum);
-  }
+  // Non-numeric category text (e.g. "ECERAN KIOS", "ECERAN WARUNG", "Y", "NEW", etc.)
+  // Each record where MARK NEW is filled counts as 1 eceran occurrence
+  return { isNumeric: false, numVal: 1, isPresent: true };
+}
 
-  // If text categories like "ECERAN KIOS" or count of records
-  return markNewCount > 0 ? markNewCount : (txs.length > 0 ? txs.length : 0);
+function findMarkNewHeader(headers: string[], sampleRow?: any): string | null {
+  const aliases = ['MARK NEW', 'MARK_NEW', 'MARKNEW', 'BY ECERAN', 'ECERAN', 'KATEGORI ECERAN', 'TIPE ECERAN', 'MARK', 'MARKING'];
+  for (const alias of aliases) {
+    const target = alias.replace(/[_\s]+/g, ' ');
+    const found = headers.find(h => cleanHeaderString(h) === target);
+    if (found) return found;
+  }
+  if (sampleRow) {
+    for (const k of Object.keys(sampleRow)) {
+      const cleanK = cleanHeaderString(k);
+      for (const alias of aliases) {
+        if (cleanK === alias.replace(/[_\s]+/g, ' ')) return k;
+      }
+    }
+  }
+  return null;
+}
+
+function findOutletIdHeader(headers: string[], sampleRow?: any): string | null {
+  const aliases = ['KODE OUTLET', 'KD OUTLET', 'KODE_OUTLET', 'KD_OUTLET', 'KODE TOKO', 'KD TOKO', 'OUTLET ID', 'OUTLET_ID', 'ID OUTLET'];
+  for (const alias of aliases) {
+    const target = alias.replace(/[_\s]+/g, ' ');
+    const found = headers.find(h => cleanHeaderString(h) === target);
+    if (found) return found;
+  }
+  if (sampleRow) {
+    for (const k of Object.keys(sampleRow)) {
+      const cleanK = cleanHeaderString(k);
+      for (const alias of aliases) {
+        if (cleanK === alias.replace(/[_\s]+/g, ' ')) return k;
+      }
+    }
+  }
+  const generic = headers.find(h => {
+    const ch = cleanHeaderString(h);
+    return ch.includes('OUTLET') || ch.includes('TOKO');
+  });
+  return generic || null;
+}
+
+function findOutletNameHeader(headers: string[], sampleRow?: any): string | null {
+  const aliases = ['NAMA OUTLET', 'NM OUTLET', 'NAMA_OUTLET', 'NM_OUTLET', 'NAMA TOKO', 'NM TOKO', 'OUTLET NAME', 'OUTLET_NAME'];
+  for (const alias of aliases) {
+    const target = alias.replace(/[_\s]+/g, ' ');
+    const found = headers.find(h => cleanHeaderString(h) === target);
+    if (found) return found;
+  }
+  if (sampleRow) {
+    for (const k of Object.keys(sampleRow)) {
+      const cleanK = cleanHeaderString(k);
+      for (const alias of aliases) {
+        if (cleanK === alias.replace(/[_\s]+/g, ' ')) return k;
+      }
+    }
+  }
+  return null;
 }
 
 export function EbpMonitoringView({
   masterOutlets = [],
   currTransactions = [],
   prevTransactions = [],
+  uploadedFiles,
   settings,
   filters = {},
   onFilterChange,
@@ -113,81 +191,140 @@ export function EbpMonitoringView({
   const [selectedEpbPrevFilter, setSelectedEpbPrevFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
   const [activeRankingTab, setActiveRankingTab] = useState<'growth' | 'decline' | 'top_epb'>('growth');
 
-  const prevLabel = settings.previousMonthLabel || 'BULAN LALU';
-  const currLabel = settings.currentMonthLabel || 'BULAN INI';
+  const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
+  const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
 
   // 1. Check if Master CB is available
   if (!masterOutlets || masterOutlets.length === 0) {
     return (
       <EmptyState
         title="MASTER CB BELUM TERSEDIA"
-        description="Upload Database Master CB (Database 4) sebagai sumber utama daftar toko untuk mengaktifkan EBP Monitoring (Monitoring Eceran Per Bulan)."
+        description="Upload Database Master CB (Database 4) sebagai sumber utama daftar toko untuk mengaktifkan EPB Monitoring (Monitoring Eceran Per Bulan)."
         onNavigateToUpload={onNavigateToUpload}
         onLoadSampleData={onLoadSampleData}
       />
     );
   }
 
-  // 2. Pre-index transactions by outletId and outletName for fast lookup
-  const { prevTxsByOutletId, prevTxsByName } = useMemo(() => {
-    const byId = new Map<string, TransactionRecord[]>();
-    const byName = new Map<string, TransactionRecord[]>();
-    for (const t of prevTransactions) {
-      if (t.outletId) {
-        const list = byId.get(t.outletId) || [];
-        list.push(t);
-        byId.set(t.outletId, list);
-      }
-      if (t.outletName) {
-        const clean = t.outletName.toLowerCase().trim();
-        const list = byName.get(clean) || [];
-        list.push(t);
-        byName.set(clean, list);
+  // 2. Strict 100% extraction from MARK NEW column for Bulan Agustus (Previous Month)
+  const epbPrevMap = useMemo(() => {
+    const byId = new Map<string, number>();
+    const byName = new Map<string, number>();
+    let usedRaw = false;
+
+    // Direct read from raw files if present in uploadedFiles.previous_month
+    if (uploadedFiles?.previous_month && uploadedFiles.previous_month.length > 0) {
+      for (const file of uploadedFiles.previous_month) {
+        const rows = file.allRows && file.allRows.length > 0 ? file.allRows : file.sampleRows;
+        if (!rows || rows.length === 0) continue;
+
+        const headers = file.headers || Object.keys(rows[0] || {});
+        const markCol = findMarkNewHeader(headers, rows[0]);
+        const idCol = findOutletIdHeader(headers, rows[0]);
+        const nameCol = findOutletNameHeader(headers, rows[0]);
+
+        if (markCol) {
+          usedRaw = true;
+          for (const row of rows) {
+            const parsed = parseMarkNewValue(row[markCol]);
+            if (parsed.isPresent) {
+              const oId = idCol ? String(row[idCol] || '').trim() : '';
+              const oName = nameCol ? String(row[nameCol] || '').trim().toLowerCase() : '';
+              if (oId) byId.set(oId, (byId.get(oId) || 0) + parsed.numVal);
+              if (oName) byName.set(oName, (byName.get(oName) || 0) + parsed.numVal);
+            }
+          }
+        }
       }
     }
-    return { prevTxsByOutletId: byId, prevTxsByName: byName };
-  }, [prevTransactions]);
 
-  const { currTxsByOutletId, currTxsByName } = useMemo(() => {
-    const byId = new Map<string, TransactionRecord[]>();
-    const byName = new Map<string, TransactionRecord[]>();
-    for (const t of currTransactions) {
-      if (t.outletId) {
-        const list = byId.get(t.outletId) || [];
-        list.push(t);
-        byId.set(t.outletId, list);
-      }
-      if (t.outletName) {
-        const clean = t.outletName.toLowerCase().trim();
-        const list = byName.get(clean) || [];
-        list.push(t);
-        byName.set(clean, list);
+    // Direct read from prevTransactions (which was parsed directly from the MARK NEW column)
+    if (!usedRaw && prevTransactions && prevTransactions.length > 0) {
+      for (const t of prevTransactions) {
+        const parsed = parseMarkNewValue(t.markNew);
+        if (parsed.isPresent) {
+          const oId = t.outletId ? String(t.outletId).trim() : '';
+          const oName = t.outletName ? String(t.outletName).trim().toLowerCase() : '';
+          if (oId) byId.set(oId, (byId.get(oId) || 0) + parsed.numVal);
+          if (oName) byName.set(oName, (byName.get(oName) || 0) + parsed.numVal);
+        }
       }
     }
-    return { currTxsByOutletId: byId, currTxsByName: byName };
-  }, [currTransactions]);
 
-  // 3. Build complete EBP dataset strictly from Master CB
+    return { byId, byName };
+  }, [uploadedFiles?.previous_month, prevTransactions]);
+
+  // 3. Strict 100% extraction from MARK NEW column for Bulan September (Current Month)
+  const epbCurrMap = useMemo(() => {
+    const byId = new Map<string, number>();
+    const byName = new Map<string, number>();
+    let usedRaw = false;
+
+    // Direct read from raw files if present in uploadedFiles.current_month
+    if (uploadedFiles?.current_month && uploadedFiles.current_month.length > 0) {
+      for (const file of uploadedFiles.current_month) {
+        const rows = file.allRows && file.allRows.length > 0 ? file.allRows : file.sampleRows;
+        if (!rows || rows.length === 0) continue;
+
+        const headers = file.headers || Object.keys(rows[0] || {});
+        const markCol = findMarkNewHeader(headers, rows[0]);
+        const idCol = findOutletIdHeader(headers, rows[0]);
+        const nameCol = findOutletNameHeader(headers, rows[0]);
+
+        if (markCol) {
+          usedRaw = true;
+          for (const row of rows) {
+            const parsed = parseMarkNewValue(row[markCol]);
+            if (parsed.isPresent) {
+              const oId = idCol ? String(row[idCol] || '').trim() : '';
+              const oName = nameCol ? String(row[nameCol] || '').trim().toLowerCase() : '';
+              if (oId) byId.set(oId, (byId.get(oId) || 0) + parsed.numVal);
+              if (oName) byName.set(oName, (byName.get(oName) || 0) + parsed.numVal);
+            }
+          }
+        }
+      }
+    }
+
+    // Direct read from currTransactions (which was parsed directly from the MARK NEW column)
+    if (!usedRaw && currTransactions && currTransactions.length > 0) {
+      for (const t of currTransactions) {
+        const parsed = parseMarkNewValue(t.markNew);
+        if (parsed.isPresent) {
+          const oId = t.outletId ? String(t.outletId).trim() : '';
+          const oName = t.outletName ? String(t.outletName).trim().toLowerCase() : '';
+          if (oId) byId.set(oId, (byId.get(oId) || 0) + parsed.numVal);
+          if (oName) byName.set(oName, (byName.get(oName) || 0) + parsed.numVal);
+        }
+      }
+    }
+
+    return { byId, byName };
+  }, [uploadedFiles?.current_month, currTransactions]);
+
+  // 4. Build complete EPB dataset strictly from Master CB (Toko Master CB = 100% Acuan)
   const allEbpItems = useMemo<EbpOutletItem[]>(() => {
     return masterOutlets.map((m, index) => {
-      // Find previous month transactions
-      let pTxs = m.outletId ? prevTxsByOutletId.get(m.outletId) : undefined;
-      if (!pTxs && m.outletName) {
-        pTxs = prevTxsByName.get(m.outletName.toLowerCase().trim());
+      // Look up Bulan Agustus (Bulan Lalu) strictly from MARK NEW
+      let epbPrev = 0;
+      if (m.outletId && epbPrevMap.byId.has(m.outletId)) {
+        epbPrev = Math.round(epbPrevMap.byId.get(m.outletId)!);
+      } else if (m.outletName && epbPrevMap.byName.has(m.outletName.trim().toLowerCase())) {
+        epbPrev = Math.round(epbPrevMap.byName.get(m.outletName.trim().toLowerCase())!);
       }
-      const epbPrev = pTxs ? calculateOutletEpb(pTxs) : 0;
 
-      // Find current month transactions
-      let cTxs = m.outletId ? currTxsByOutletId.get(m.outletId) : undefined;
-      if (!cTxs && m.outletName) {
-        cTxs = currTxsByName.get(m.outletName.toLowerCase().trim());
+      // Look up Bulan September (Bulan Ini) strictly from MARK NEW
+      let epbCurr = 0;
+      if (m.outletId && epbCurrMap.byId.has(m.outletId)) {
+        epbCurr = Math.round(epbCurrMap.byId.get(m.outletId)!);
+      } else if (m.outletName && epbCurrMap.byName.has(m.outletName.trim().toLowerCase())) {
+        epbCurr = Math.round(epbCurrMap.byName.get(m.outletName.trim().toLowerCase())!);
       }
-      const epbCurr = cTxs ? calculateOutletEpb(cTxs) : 0;
 
       const diff = epbCurr - epbPrev;
 
       // Growth %: (Bulan Ini - Bulan Lalu) / Bulan Lalu * 100%
-      // If EPB Bulan Lalu = 0: Bulan Ini > 0 -> NEW, Bulan Ini = 0 -> STABIL (no DIV/0!)
+      // If EPB Bulan Lalu = 0: Bulan Ini > 0 -> NEW (+100%), Bulan Ini = 0 -> STABIL (0.0%, no DIV/0!)
       let growthPercent = 0;
       if (epbPrev > 0) {
         growthPercent = ((epbCurr - epbPrev) / epbPrev) * 100;
@@ -227,7 +364,7 @@ export function EbpMonitoringView({
         status,
       };
     });
-  }, [masterOutlets, prevTxsByOutletId, prevTxsByName, currTxsByOutletId, currTxsByName]);
+  }, [masterOutlets, epbPrevMap, epbCurrMap]);
 
   // 4. Dropdown options for filters
   const uniqueSalesmen = useMemo(() => {
@@ -490,7 +627,7 @@ export function EbpMonitoringView({
     },
     {
       key: 'epbPrev',
-      header: `EPB ${prevLabel}`,
+      header: `EPB Bulan Agustus (${prevLabel})`,
       align: 'right',
       accessor: (row) => row.epbPrev,
       render: (row) => (
@@ -498,13 +635,13 @@ export function EbpMonitoringView({
           <span className="font-mono text-slate-300 font-semibold text-xs">
             {row.epbPrev.toLocaleString('id-ID')}
           </span>
-          <div className="text-[10px] text-slate-500">EPB</div>
+          <div className="text-[10px] text-cyan-400 font-mono mt-0.5">Kolom MARK NEW</div>
         </div>
       ),
     },
     {
       key: 'epbCurr',
-      header: `EPB ${currLabel}`,
+      header: `EPB Bulan September (${currLabel})`,
       align: 'right',
       accessor: (row) => row.epbCurr,
       render: (row) => (
@@ -512,7 +649,7 @@ export function EbpMonitoringView({
           <span className="font-mono text-amber-300 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
             {row.epbCurr.toLocaleString('id-ID')}
           </span>
-          <div className="text-[10px] text-slate-500 mt-0.5">EPB</div>
+          <div className="text-[10px] text-amber-400 font-mono mt-0.5">Kolom MARK NEW</div>
         </div>
       ),
     },
@@ -624,13 +761,13 @@ export function EbpMonitoringView({
             </div>
             <div>
               <h1 className="text-xl font-extrabold text-slate-100 tracking-tight flex items-center gap-2">
-                <span>EBP MONITORING</span>
+                <span>EPB MONITORING</span>
                 <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                  MARK NEW
+                  REAL 100% KOLOM MARK NEW
                 </span>
               </h1>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Monitoring Eceran Per Bulan &bull; Sumber Utama Toko: <strong className="text-slate-200">Master CB</strong> &bull; Metrik: <strong className="text-amber-300 font-mono">MARK NEW</strong>
+                Monitoring Eceran Per Bulan &bull; Sumber Data Real 100% dari Database Bulan Lalu (Agustus) &amp; Bulan Ini (September) pada kolom <strong className="text-amber-300 font-mono">MARK NEW</strong> &bull; Master Toko: <strong className="text-slate-200">Master CB</strong>
               </p>
             </div>
           </div>
@@ -639,7 +776,7 @@ export function EbpMonitoringView({
         <div className="flex flex-wrap items-center gap-2.5">
           <CaptureJpgButton
             targetId="main-capture-area"
-            fileName={`EBP_Monitoring_${new Date().toISOString().split('T')[0]}.jpg`}
+            fileName={`EPB_Monitoring_${new Date().toISOString().split('T')[0]}.jpg`}
             label="Capture JPG"
           />
 
@@ -669,28 +806,28 @@ export function EbpMonitoringView({
           <div className="text-[10px] text-slate-500 mt-0.5 truncate">Daftar Master CB</div>
         </div>
 
-        {/* KPI 2: EPB BULAN LALU */}
+        {/* KPI 2: EPB BULAN AGUSTUS */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>EPB BLN LALU</span>
+            <span>EPB AGUSTUS</span>
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
           </div>
           <div className="text-lg font-bold font-mono text-slate-200 mt-1.5">
             {kpis.epbBulanLalu.toLocaleString('id-ID')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">{prevLabel}</div>
+          <div className="text-[10px] text-cyan-400 font-mono mt-0.5 truncate">Real Kolom MARK NEW</div>
         </div>
 
-        {/* KPI 3: EPB BULAN INI */}
+        {/* KPI 3: EPB BULAN SEPTEMBER */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-amber-500/30 transition-all border-l-2 border-l-amber-500">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span className="text-amber-300 font-semibold">EPB BLN INI</span>
+            <span className="text-amber-300 font-semibold">EPB SEPTEMBER</span>
             <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-lg font-bold font-mono text-amber-300 mt-1.5">
             {kpis.epbBulanIni.toLocaleString('id-ID')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">{currLabel}</div>
+          <div className="text-[10px] text-amber-400 font-mono mt-0.5 truncate">Real Kolom MARK NEW</div>
         </div>
 
         {/* KPI 4: PERUBAHAN EPB */}
@@ -821,7 +958,7 @@ export function EbpMonitoringView({
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-cyan-400" />
-              <span>Distribusi Status Toko EBP</span>
+              <span>Distribusi Status Toko EPB</span>
             </h3>
             <span className="text-xs font-mono text-slate-400">
               Total {kpis.totalToko} Toko
@@ -1036,7 +1173,7 @@ export function EbpMonitoringView({
         </div>
       </div>
 
-      {/* 4. Automated Insights Section (🔎 INSIGHT EBP) */}
+      {/* 4. Automated Insights Section (🔎 INSIGHT EPB) */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -1045,7 +1182,7 @@ export function EbpMonitoringView({
             </div>
             <div>
               <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                <span>🔎 INSIGHT EBP</span>
+                <span>🔎 INSIGHT EPB</span>
               </h2>
               <p className="text-[11px] text-slate-400">
                 Analisa otomatis berbasis data aktual pergerakan EPB (kolom MARK NEW)
@@ -1229,7 +1366,7 @@ export function EbpMonitoringView({
             </div>
             <div>
               <h3 className="text-sm font-bold text-slate-100">
-                Peringkat Toko EBP (Top 10 Rankings)
+                Peringkat Toko EPB (Top 10 Rankings)
               </h3>
               <p className="text-[11px] text-slate-400">
                 Ranking dinamis berbasis pergerakan dan akumulasi EPB bulan berjalan
@@ -1531,7 +1668,7 @@ export function EbpMonitoringView({
           columns={columns}
           data={numberedFilteredItems}
           searchPlaceholder="Cari toko pada tabel..."
-          exportFileName={`EBP_Monitoring_Master_CB_${prevLabel}_vs_${currLabel}.xlsx`}
+          exportFileName={`EPB_Monitoring_Master_CB_${prevLabel}_vs_${currLabel}.xlsx`}
           emptyMessage="Tidak ada toko yang cocok dengan kriteria filter."
         />
       </div>
@@ -1541,11 +1678,11 @@ export function EbpMonitoringView({
         <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
           <div className="font-semibold text-slate-200">
-            Validasi Data & Integritas Master CB:
+            Validasi Data &amp; Integritas Real 100% Kolom MARK NEW:
           </div>
           <div>
-            Daftar toko diambil 100% dari <strong>Master CB</strong> dengan pencocokan <strong>Kode Toko</strong> sebagai primary key.
-            Jika toko di Master CB belum memiliki transaksi eceran (kolom <code className="text-amber-300">MARK NEW</code>) pada periode tertentu, sistem secara otomatis menetapkan <code className="text-slate-300">EPB = 0</code> tanpa menghapus toko dari monitoring.
+            Data EPB Bulan Agustus dan Bulan September diambil <strong>Real 100% dari kolom MARK NEW</strong> file Database bulan lalu dan bulan berjalan.
+            Daftar toko berpegang pada <strong>Master CB</strong> dengan pencocokan <strong>Kode Toko</strong> sebagai primary key. Jika suatu toko tidak memiliki catatan pada kolom <code className="text-amber-300">MARK NEW</code> pada bulan tersebut, sistem menetapkan nilai aktual <code className="text-slate-300">EPB = 0</code> tanpa rekayasa data.
           </div>
         </div>
       </div>

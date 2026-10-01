@@ -7,6 +7,7 @@ import { TargetRealisasiView } from './components/analytics/TargetRealisasiView'
 import { MonthComparisonView } from './components/analytics/MonthComparisonView';
 import { RoMonitoringView } from './components/analytics/RoMonitoringView';
 import { EbpMonitoringView } from './components/analytics/EbpMonitoringView';
+import { MonitoringEcView } from './components/analytics/MonitoringEcView';
 import { DropOutletView } from './components/analytics/DropOutletView';
 import { NewOutletView } from './components/analytics/NewOutletView';
 import { SalesmanPerformanceView } from './components/analytics/SalesmanPerformanceView';
@@ -68,6 +69,7 @@ import {
   saveSettings, 
   saveUser 
 } from './services/storageService';
+import { soundManager, initGlobalSoundListener } from './services/soundManager';
 
 export default function App() {
   // Navigation for Phase 1, 2, and 3
@@ -106,6 +108,16 @@ export default function App() {
     return () => {
       isMounted = false;
     };
+  }, []);
+
+  // Initialize centralized sound system on user interactions
+  useEffect(() => {
+    initGlobalSoundListener();
+  }, []);
+
+  const handleSelectTab = useCallback((tab: string) => {
+    soundManager.playNavigation();
+    setCurrentTab(tab);
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -317,6 +329,12 @@ export default function App() {
     populateSampleFiles();
   }, [populateSampleFiles]);
 
+  // User-triggered load demo data with success sound
+  const handleUserLoadSampleData = useCallback(() => {
+    populateSampleFiles();
+    soundManager.playSuccess();
+  }, [populateSampleFiles]);
+
   // Helper to re-normalize records for a category from its uploaded files
   const renormalizeCategory = useCallback((
     category: DatabaseCategory,
@@ -444,8 +462,13 @@ export default function App() {
         }
       } catch (err: any) {
         console.error('Error processing file:', err);
+        soundManager.playError();
         alert(`Gagal membaca file Excel ${file.name}: ${err.message}`);
       }
+    }
+
+    if (updatedFilesForCat.length > 0) {
+      soundManager.playSuccess();
     }
 
     // Save updated uploaded files state
@@ -709,6 +732,7 @@ export default function App() {
     if (userProfile.role !== 'ADMIN') return;
     setSettings(newSettings);
     saveSettings(newSettings);
+    soundManager.playSuccess();
 
     renormalizeCategory('previous_month', uploadedFiles.previous_month || [], categoryMappings.previous_month || {}, newSettings);
     renormalizeCategory('current_month', uploadedFiles.current_month || [], categoryMappings.current_month || {}, newSettings);
@@ -718,12 +742,14 @@ export default function App() {
   const handleUpdateUser = useCallback((newUser: UserProfile) => {
     setUserProfile(newUser);
     saveUser(newUser);
+    soundManager.playSuccess();
   }, []);
 
   const handleResetSettings = useCallback(() => {
     if (userProfile.role !== 'ADMIN') return;
     setSettings(DEFAULT_SETTINGS);
     saveSettings(DEFAULT_SETTINGS);
+    soundManager.playSuccess();
   }, [userProfile.role]);
 
   // Total metrics for Phase 1 sidebar
@@ -762,6 +788,7 @@ export default function App() {
     'month_comparison',
     'ro_monitoring',
     'ebp_monitoring',
+    'monitoring_ec',
     'drop_outlets',
     'new_outlets',
     'salesman_performance',
@@ -806,7 +833,7 @@ export default function App() {
       {/* Sidebar dedicated to Phase 1, 2, 3, 4, and 5 */}
       <Sidebar
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         totalFiles={totalFilesCount}
         totalRows={totalRowsCount}
         validationIssuesCount={validationIssuesCount}
@@ -831,10 +858,10 @@ export default function App() {
           hasMaster={(uploadedFiles.master_cb || []).length > 0}
           sidebarCollapsed={sidebarCollapsed}
           onToggleSidebar={handleToggleSidebar}
-          onLoadSampleData={populateSampleFiles}
+          onLoadSampleData={handleUserLoadSampleData}
           onClearAllData={handleClearSession}
-          onNavigateToSettings={() => setCurrentTab('settings')}
-          onNavigateToUsers={() => setCurrentTab('users')}
+          onNavigateToSettings={() => handleSelectTab('settings')}
+          onNavigateToUsers={() => handleSelectTab('users')}
           onLogout={handleLogout}
         />
 
@@ -857,8 +884,8 @@ export default function App() {
                 calculation={analytics}
                 opportunities={opportunities}
                 settings={settings}
-                onNavigate={(tab) => setCurrentTab(tab)}
-                onLoadSampleData={populateSampleFiles}
+                onNavigate={(tab) => handleSelectTab(tab)}
+                onLoadSampleData={handleUserLoadSampleData}
               />
             )}
 
@@ -907,6 +934,19 @@ export default function App() {
                 currTransactions={currTransactions}
                 prevTransactions={prevTransactions}
                 uploadedFiles={uploadedFiles}
+                settings={settings}
+                filters={filters}
+                onFilterChange={setFilters}
+                onNavigateToUpload={() => setCurrentTab('database')}
+                onLoadSampleData={populateSampleFiles}
+              />
+            )}
+
+            {currentTab === 'monitoring_ec' && (
+              <MonitoringEcView
+                masterOutlets={masterOutlets}
+                currTransactions={currTransactions}
+                prevTransactions={prevTransactions}
                 settings={settings}
                 filters={filters}
                 onFilterChange={setFilters}
