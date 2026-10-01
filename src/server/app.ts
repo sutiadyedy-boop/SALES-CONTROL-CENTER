@@ -90,7 +90,7 @@ const INITIAL_SEED_USERS: StoredUser[] = [
     id: 'usr_dias_00',
     username: 'dias',
     full_name: 'Dias',
-    role: 'ADMIN',
+    role: 'SALESMAN',
     status: 'ACTIVE',
     password_hash: 'f643b10e72a97ddce9e4afb2b57613c07ed7c69d5b2b53bb9dd4cb95225a5f9c8883319bcde3e7660e75f984211aa6e42cfba4396e83d69224aca6daf076facd',
     password_salt: '8547e111d0a4140f623803cd5a01b805',
@@ -205,6 +205,10 @@ function loadData() {
       if (Array.isArray(loaded) && loaded.length > 0) {
         // Ensure all seed users (like dias) are present even if file was written earlier
         const loadedMap = new Map(loaded.map((u: StoredUser) => [u.username.toLowerCase().replace(/^@+/, ''), u]));
+        const diasInFile = loadedMap.get('dias');
+        if (diasInFile && diasInFile.role !== 'SALESMAN') {
+          diasInFile.role = 'SALESMAN';
+        }
         for (const seed of INITIAL_SEED_USERS) {
           const cleanSeed = seed.username.toLowerCase().replace(/^@+/, '');
           if (!loadedMap.has(cleanSeed)) {
@@ -331,7 +335,7 @@ export function createApiRouter(): express.Router {
             id: `usr_${cleanUsername}_${Date.now()}`,
             username: cleanUsername,
             full_name: cleanUsername === 'dias' ? 'Dias' : cleanUsername.charAt(0).toUpperCase() + cleanUsername.slice(1),
-            role: cleanUsername === 'dias' || cleanUsername.includes('admin') ? 'ADMIN' : 'SALESMAN',
+            role: cleanUsername === 'dias' ? 'SALESMAN' : (cleanUsername.includes('admin') ? 'ADMIN' : 'SALESMAN'),
             status: 'ACTIVE',
             password_hash: '',
             password_salt: '',

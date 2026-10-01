@@ -20,13 +20,41 @@ import {
   Sparkles,
   BarChart3,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  LineChart
 } from 'lucide-react';
 import { MasterOutletRecord, TransactionRecord, AppSettings } from '../../types/database';
 import { GlobalFilterState } from '../../types/analytics';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+
+/**
+ * Generates a smooth cubic Bezier SVG path through the given coordinates
+ */
+function getSmoothLinePath(points: { x: number; y: number }[]): string {
+  if (points.length === 0) return '';
+  if (points.length < 3) {
+    return points.reduce((acc, p, i) => `${acc} ${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)},${p.y.toFixed(1)}`, '');
+  }
+
+  let d = `M ${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i === 0 ? i : i - 1];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] || p2;
+
+    const tension = 0.2;
+    const cp1x = p1.x + (p2.x - p0.x) * tension;
+    const cp1y = p1.y + (p2.y - p0.y) * tension;
+    const cp2x = p2.x - (p3.x - p1.x) * tension;
+    const cp2y = p2.y - (p3.y - p1.y) * tension;
+
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
 
 export interface MonitoringEcViewProps {
   masterOutlets: MasterOutletRecord[];
@@ -154,6 +182,10 @@ export function MonitoringEcView({
   const [selectedSalesman, setSelectedSalesman] = useState<string>('ALL');
   const [selectedDay, setSelectedDay] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+
+  // Chart visual type: 'line' (Grafik Line default) or 'bar'
+  const [chartType, setChartType] = useState<'line' | 'bar'>('line');
+  const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
   // Master outlet map for enrichment
   const masterMap = useMemo(() => {
@@ -1416,95 +1448,446 @@ export function MonitoringEcView({
         </div>
       </div>
 
-      {/* 3. Trend EC Harian Chart Visual */}
+      {/* 3. Trend EC Harian Chart Visual (Grafik Line) */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
-              <BarChart3 className="w-4 h-4" />
+              <LineChart className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                <span>TREND EC HARIAN (TOKO TRANSAKSI PER TANGGAL)</span>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 flex-wrap">
+                <span>GRAFIK LINE TREND EC HARIAN (HARI KE-1 S/D 31)</span>
                 {selectedPma !== 'ALL' && (
-                  <span className="text-[10px] bg-cyan-950/60 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/40">
+                  <span className="text-[10px] bg-cyan-950/60 text-cyan-300 px-2 py-0.5 rounded border border-cyan-800/40 font-mono">
                     PMA: {selectedPma}
                   </span>
                 )}
                 {selectedSalesman !== 'ALL' && (
-                  <span className="text-[10px] bg-amber-950/60 text-amber-300 px-2 py-0.5 rounded border border-amber-800/40">
+                  <span className="text-[10px] bg-amber-950/60 text-amber-300 px-2 py-0.5 rounded border border-amber-800/40 font-mono">
                     Sales: {allSalesmen.find(s => s.id === selectedSalesman)?.name || selectedSalesman}
                   </span>
                 )}
+                {selectedDay !== 'ALL' && (
+                  <button
+                    onClick={() => setSelectedDay('ALL')}
+                    className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded border border-amber-500/40 hover:bg-amber-500/30 font-mono transition-colors flex items-center gap-1"
+                    title="Klik untuk reset filter tanggal"
+                  >
+                    <span>Filter: Tgl {selectedDay}</span>
+                    <span className="text-amber-400 font-bold">✕</span>
+                  </button>
+                )}
               </h3>
               <p className="text-[11px] text-slate-400">
-                Perbandingan jumlah toko unik bertransaksi per hari kalender berjalan ({prevLabel} vs {currLabel})
+                Visualisasi kurva garis (line chart) tren toko transaksi aktif per tanggal antara {prevLabel} (Ungu) vs {currLabel} (Kuning Amber)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5 text-slate-400">
-              <span className="w-2.5 h-2.5 rounded bg-indigo-500" />
-              <span>{prevLabel}</span>
+          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            {/* Legend */}
+            <div className="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+              <div className="flex items-center gap-1.5 text-slate-300">
+                <span className="w-3 h-1 bg-indigo-500 rounded" />
+                <span className="text-[11px]">{prevLabel}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-amber-300 font-bold">
+                <span className="w-3 h-1.5 bg-amber-400 rounded" />
+                <span className="text-[11px]">{currLabel}</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-amber-400">
-              <span className="w-2.5 h-2.5 rounded bg-amber-400" />
-              <span>{currLabel}</span>
+
+            {/* View Switcher: Line (Default) vs Bar */}
+            <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setChartType('line')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  chartType === 'line'
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tampilkan Grafik Line"
+              >
+                <LineChart className="w-3.5 h-3.5" />
+                <span>Line</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartType('bar')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                  chartType === 'bar'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+                title="Tampilkan Grafik Batang"
+              >
+                <BarChart3 className="w-3.5 h-3.5" />
+                <span>Batang</span>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Visual Daily Curve / Bars (Day 1..31) */}
-        <div className="pt-2">
-          {(() => {
-            const maxDaily = Math.max(...dailyTrendData.map(d => Math.max(d.ecPrev, d.ecCurr)), 1);
+        {/* Dynamic Chart Display: LINE or BAR */}
+        {chartType === 'line' ? (
+          <div className="pt-1">
+            {(() => {
+              const maxValRaw = Math.max(...dailyTrendData.map(d => Math.max(d.ecPrev, d.ecCurr)), 1);
+              const maxDaily = Math.ceil(maxValRaw * 1.15); // Headroom for aesthetics
+              const svgW = 1000;
+              const svgH = 260;
+              const padLeft = 45;
+              const padRight = 25;
+              const padTop = 25;
+              const padBottom = 40;
+              const plotW = svgW - padLeft - padRight;
+              const plotH = svgH - padTop - padBottom;
 
-            return (
-              <div className="space-y-2">
-                <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-16 lg:grid-cols-31 gap-1">
-                  {dailyTrendData.map(item => {
-                    const prevH = (item.ecPrev / maxDaily) * 100;
-                    const currH = (item.ecCurr / maxDaily) * 100;
-                    const isSelected = selectedDay === String(item.day);
+              const pointsPrev = dailyTrendData.map((d, i) => ({
+                x: padLeft + (i / 30) * plotW,
+                y: padTop + plotH - (d.ecPrev / maxDaily) * plotH,
+                d,
+              }));
 
-                    return (
-                      <div
-                        key={item.day}
-                        onClick={() => setSelectedDay(selectedDay === String(item.day) ? 'ALL' : String(item.day))}
-                        className={`flex flex-col items-center p-1 rounded-lg cursor-pointer transition-all ${
-                          isSelected
-                            ? 'bg-cyan-950/60 border border-cyan-500/60 ring-1 ring-cyan-500/40'
-                            : 'hover:bg-slate-800/60 border border-transparent'
-                        }`}
-                        title={`Tgl ${item.day}: Lalu=${item.ecPrev} EC, Ini=${item.ecCurr} EC (Selisih: ${item.diff >= 0 ? '+' : ''}${item.diff})`}
-                      >
-                        <div className="h-20 w-full flex items-end justify-center gap-0.5 bg-slate-950/40 rounded p-0.5">
-                          <div
-                            className="w-1.5 bg-indigo-500/80 rounded-t transition-all"
-                            style={{ height: `${Math.max(4, prevH)}%` }}
-                          />
-                          <div
-                            className="w-1.5 bg-amber-400 rounded-t transition-all"
-                            style={{ height: `${Math.max(4, currH)}%` }}
-                          />
-                        </div>
-                        <span className={`text-[10px] font-mono mt-1 ${
-                          isSelected ? 'font-bold text-cyan-300' : 'text-slate-500'
-                        }`}>
-                          {item.day}
+              const pointsCurr = dailyTrendData.map((d, i) => ({
+                x: padLeft + (i / 30) * plotW,
+                y: padTop + plotH - (d.ecCurr / maxDaily) * plotH,
+                d,
+              }));
+
+              const pathPrev = getSmoothLinePath(pointsPrev);
+              const pathCurr = getSmoothLinePath(pointsCurr);
+
+              const areaPrev = `${pathPrev} L ${pointsPrev[pointsPrev.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L ${pointsPrev[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
+              const areaCurr = `${pathCurr} L ${pointsCurr[pointsCurr.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L ${pointsCurr[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
+
+              // Determine current inspection item
+              const activeDayNum = hoveredDay || (selectedDay !== 'ALL' ? parseInt(selectedDay, 10) : null);
+              const activeItem = dailyTrendData.find(d => d.day === activeDayNum);
+              const activeCurrPoint = pointsCurr.find(p => p.d.day === activeDayNum);
+
+              const gridSteps = [0, 0.25, 0.5, 0.75, 1.0];
+
+              return (
+                <div className="space-y-2">
+                  {/* Interactive Status Tooltip Banner */}
+                  <div className="flex items-center justify-between min-h-[38px] px-3.5 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs transition-all">
+                    {activeItem ? (
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <span className="font-mono font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                          {activeItem.dateLabel}
                         </span>
-                        <span className="text-[9px] font-mono font-bold text-amber-300">
-                          {item.ecCurr > 0 ? item.ecCurr : '-'}
+                        <div className="flex items-center gap-1.5 text-slate-300">
+                          <span className="w-2 h-2 rounded bg-indigo-500" />
+                          <span className="text-slate-400">{prevLabel}:</span>
+                          <strong className="font-mono text-slate-200">{activeItem.ecPrev} Toko</strong>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-amber-300">
+                          <span className="w-2 h-2 rounded bg-amber-400" />
+                          <span className="text-amber-400/80">{currLabel}:</span>
+                          <strong className="font-mono text-amber-300">{activeItem.ecCurr} Toko</strong>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs">
+                          <span className="text-slate-400">Selisih:</span>
+                          <span className={`font-mono font-bold inline-flex items-center ${
+                            activeItem.diff > 0 ? 'text-emerald-400' : activeItem.diff < 0 ? 'text-rose-400' : 'text-slate-400'
+                          }`}>
+                            {activeItem.diff > 0 ? `+${activeItem.diff}` : activeItem.diff} Toko
+                            {activeItem.growthPercent !== null && ` (${activeItem.growthPercent >= 0 ? '+' : ''}${activeItem.growthPercent.toFixed(1)}%)`}
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
+                          activeItem.diff > 0
+                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                            : activeItem.diff < 0
+                            ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
+                            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                        }`}>
+                          {activeItem.diff > 0 ? '🟢 GROWTH' : activeItem.diff < 0 ? '🔴 DECLINE' : '🟡 STABIL'}
                         </span>
                       </div>
-                    );
-                  })}
+                    ) : (
+                      <div className="text-slate-400 text-xs flex items-center gap-2">
+                        <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Arahkan kursor / tap pada titik garis untuk melihat detail performa harian. Klik titik tanggal untuk memfilter tabel di bawah.</span>
+                      </div>
+                    )}
+
+                    {selectedDay !== 'ALL' && (
+                      <span className="text-[11px] font-mono text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded border border-cyan-800/60 shrink-0">
+                        Filter Aktif: Tgl {selectedDay}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* SVG Line Chart Container */}
+                  <div className="relative bg-slate-950/60 p-3 sm:p-4 rounded-xl border border-slate-800/80 overflow-hidden">
+                    <svg
+                      viewBox={`0 0 ${svgW} ${svgH}`}
+                      className="w-full h-64 sm:h-72 select-none overflow-visible"
+                    >
+                      <defs>
+                        {/* Area Gradients */}
+                        <linearGradient id="ecGradCurr" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.30" />
+                          <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.08" />
+                          <stop offset="100%" stopColor="#fbbf24" stopOpacity="0.00" />
+                        </linearGradient>
+                        <linearGradient id="ecGradPrev" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="0%" stopColor="#6366f1" stopOpacity="0.15" />
+                          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.00" />
+                        </linearGradient>
+
+                        {/* Line Stroke Gradients */}
+                        <linearGradient id="strokeCurr" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#f59e0b" />
+                          <stop offset="100%" stopColor="#fbbf24" />
+                        </linearGradient>
+                      </defs>
+
+                      {/* Horizontal Grid Lines */}
+                      {gridSteps.map((step, idx) => {
+                        const y = padTop + plotH - step * plotH;
+                        const labelVal = Math.round(step * maxDaily);
+                        return (
+                          <g key={idx}>
+                            <line
+                              x1={padLeft}
+                              y1={y}
+                              x2={padLeft + plotW}
+                              y2={y}
+                              stroke="#334155"
+                              strokeWidth="1"
+                              strokeDasharray="4 4"
+                              strokeOpacity="0.35"
+                            />
+                            <text
+                              x={padLeft - 8}
+                              y={y + 3.5}
+                              textAnchor="end"
+                              className="text-[10px] font-mono fill-slate-500"
+                            >
+                              {labelVal}
+                            </text>
+                          </g>
+                        );
+                      })}
+
+                      {/* Area Fills Under Lines */}
+                      <path d={areaPrev} fill="url(#ecGradPrev)" />
+                      <path d={areaCurr} fill="url(#ecGradCurr)" />
+
+                      {/* Smooth Lines */}
+                      {/* Bulan Lalu Line */}
+                      <path
+                        d={pathPrev}
+                        fill="none"
+                        stroke="#6366f1"
+                        strokeWidth="2.5"
+                        strokeDasharray="5 3"
+                        strokeOpacity="0.85"
+                      />
+
+                      {/* Bulan Ini Line */}
+                      <path
+                        d={pathCurr}
+                        fill="none"
+                        stroke="url(#strokeCurr)"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+
+                      {/* X Axis Baseline */}
+                      <line
+                        x1={padLeft}
+                        y1={padTop + plotH}
+                        x2={padLeft + plotW}
+                        y2={padTop + plotH}
+                        stroke="#475569"
+                        strokeWidth="1.5"
+                        strokeOpacity="0.7"
+                      />
+
+                      {/* Active Day Vertical Guideline & Indicator */}
+                      {activeCurrPoint && (
+                        <g>
+                          <line
+                            x1={activeCurrPoint.x}
+                            y1={padTop}
+                            x2={activeCurrPoint.x}
+                            y2={padTop + plotH}
+                            stroke="#06b6d4"
+                            strokeWidth="1.5"
+                            strokeDasharray="4 4"
+                          />
+                        </g>
+                      )}
+
+                      {/* Circles for Points */}
+                      {pointsPrev.map((p, idx) => {
+                        const isDaySelected = selectedDay === String(p.d.day);
+                        const isDayHovered = hoveredDay === p.d.day;
+                        return (
+                          <circle
+                            key={`prev_dot_${idx}`}
+                            cx={p.x}
+                            cy={p.y}
+                            r={isDayHovered || isDaySelected ? 5.5 : 2.5}
+                            fill="#6366f1"
+                            stroke={isDayHovered || isDaySelected ? '#ffffff' : '#0f172a'}
+                            strokeWidth={isDayHovered || isDaySelected ? 2 : 1}
+                            className="transition-all"
+                          />
+                        );
+                      })}
+
+                      {pointsCurr.map((p, idx) => {
+                        const isDaySelected = selectedDay === String(p.d.day);
+                        const isDayHovered = hoveredDay === p.d.day;
+                        return (
+                          <g key={`curr_dot_${idx}`}>
+                            <circle
+                              cx={p.x}
+                              cy={p.y}
+                              r={isDayHovered || isDaySelected ? 6.5 : 3.5}
+                              fill="#fbbf24"
+                              stroke={isDayHovered || isDaySelected ? '#ffffff' : '#0f172a'}
+                              strokeWidth={isDayHovered || isDaySelected ? 2.5 : 1.5}
+                              className="transition-all"
+                            />
+                            {isDaySelected && (
+                              <circle
+                                cx={p.x}
+                                cy={p.y}
+                                r="11"
+                                fill="none"
+                                stroke="#fbbf24"
+                                strokeWidth="2"
+                                strokeDasharray="3 3"
+                                className="animate-spin"
+                              />
+                            )}
+                          </g>
+                        );
+                      })}
+
+                      {/* X Axis Labels */}
+                      {dailyTrendData.map((d, idx) => {
+                        const x = padLeft + (idx / 30) * plotW;
+                        const isSelected = selectedDay === String(d.day);
+                        const isHovered = hoveredDay === d.day;
+                        const shouldShowLabel = 
+                          d.day === 1 || 
+                          d.day % 3 === 0 || 
+                          d.day === 31 || 
+                          isSelected || 
+                          isHovered;
+
+                        return (
+                          <g key={`x_tick_${d.day}`}>
+                            <line
+                              x1={x}
+                              y1={padTop + plotH}
+                              x2={x}
+                              y2={padTop + plotH + 4}
+                              stroke={isSelected || isHovered ? '#fbbf24' : '#475569'}
+                              strokeWidth={isSelected || isHovered ? '2' : '1'}
+                            />
+                            {shouldShowLabel && (
+                              <text
+                                x={x}
+                                y={padTop + plotH + 18}
+                                textAnchor="middle"
+                                className={`text-[10px] font-mono transition-colors ${
+                                  isSelected
+                                    ? 'fill-cyan-300 font-bold'
+                                    : isHovered
+                                    ? 'fill-amber-300 font-bold'
+                                    : 'fill-slate-400'
+                                }`}
+                              >
+                                {d.day}
+                              </text>
+                            )}
+
+                            {/* Transparent Hit Area for Touch & Mouse Events */}
+                            <rect
+                              x={x - (plotW / 30) / 2}
+                              y={padTop}
+                              width={plotW / 30}
+                              height={plotH + padBottom}
+                              fill="transparent"
+                              className="cursor-pointer"
+                              onMouseEnter={() => setHoveredDay(d.day)}
+                              onMouseLeave={() => setHoveredDay(null)}
+                              onClick={() => setSelectedDay(selectedDay === String(d.day) ? 'ALL' : String(d.day))}
+                            >
+                              <title>{`Tgl ${d.day}: Lalu=${d.ecPrev} EC, Ini=${d.ecCurr} EC (Selisih: ${d.diff >= 0 ? '+' : ''}${d.diff})`}</title>
+                            </rect>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
                 </div>
-              </div>
-            );
-          })()}
-        </div>
+              );
+            })()}
+          </div>
+        ) : (
+          /* Alternate Bar Chart View */
+          <div className="pt-2">
+            {(() => {
+              const maxDaily = Math.max(...dailyTrendData.map(d => Math.max(d.ecPrev, d.ecCurr)), 1);
+
+              return (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-7 sm:grid-cols-10 md:grid-cols-16 lg:grid-cols-31 gap-1">
+                    {dailyTrendData.map(item => {
+                      const prevH = (item.ecPrev / maxDaily) * 100;
+                      const currH = (item.ecCurr / maxDaily) * 100;
+                      const isSelected = selectedDay === String(item.day);
+
+                      return (
+                        <div
+                          key={item.day}
+                          onClick={() => setSelectedDay(selectedDay === String(item.day) ? 'ALL' : String(item.day))}
+                          className={`flex flex-col items-center p-1 rounded-lg cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-cyan-950/60 border border-cyan-500/60 ring-1 ring-cyan-500/40'
+                              : 'hover:bg-slate-800/60 border border-transparent'
+                          }`}
+                          title={`Tgl ${item.day}: Lalu=${item.ecPrev} EC, Ini=${item.ecCurr} EC (Selisih: ${item.diff >= 0 ? '+' : ''}${item.diff})`}
+                        >
+                          <div className="h-20 w-full flex items-end justify-center gap-0.5 bg-slate-950/40 rounded p-0.5">
+                            <div
+                              className="w-1.5 bg-indigo-500/80 rounded-t transition-all"
+                              style={{ height: `${Math.max(4, prevH)}%` }}
+                            />
+                            <div
+                              className="w-1.5 bg-amber-400 rounded-t transition-all"
+                              style={{ height: `${Math.max(4, currH)}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-mono mt-1 ${
+                            isSelected ? 'font-bold text-cyan-300' : 'text-slate-500'
+                          }`}>
+                            {item.day}
+                          </span>
+                          <span className="text-[9px] font-mono font-bold text-amber-300">
+                            {item.ecCurr > 0 ? item.ecCurr : '-'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* 4. Automated Insights Section (🔎 INSIGHT MONITORING EC) */}

@@ -11,7 +11,7 @@ const INITIAL_SEED_PROFILES: (UserProfile & { password?: string })[] = [
     id: 'usr_dias_00',
     username: 'dias',
     name: 'Dias',
-    role: 'ADMIN',
+    role: 'SALESMAN',
     status: 'ACTIVE',
     cabang: 'BONE',
     password: 'password123',
@@ -204,6 +204,14 @@ function getLocalUsers(): (UserProfile & { password?: string })[] {
         // Auto-merge any missing seed profiles into local storage (ensures dias & salesmen are present)
         const existingMap = new Map(parsed.map(p => [p.username.toLowerCase().replace(/^@+/, ''), p]));
         let hasNew = false;
+
+        // Ensure dias has role SALESMAN
+        const diasUser = existingMap.get('dias');
+        if (diasUser && diasUser.role !== 'SALESMAN') {
+          diasUser.role = 'SALESMAN';
+          hasNew = true;
+        }
+
         for (const seed of INITIAL_SEED_PROFILES) {
           const cleanSeedUser = seed.username.toLowerCase().replace(/^@+/, '');
           if (!existingMap.has(cleanSeedUser)) {
@@ -300,7 +308,7 @@ function authenticateLocally(
         id: `usr_${cleanUsername}_${Date.now()}`,
         username: cleanUsername,
         name: cleanUsername === 'dias' ? 'Dias' : cleanUsername.charAt(0).toUpperCase() + cleanUsername.slice(1),
-        role: cleanUsername === 'dias' || cleanUsername.includes('admin') ? 'ADMIN' : 'SALESMAN',
+        role: cleanUsername === 'dias' ? 'SALESMAN' : (cleanUsername.includes('admin') ? 'ADMIN' : 'SALESMAN'),
         status: 'ACTIVE',
         cabang: 'BONE',
         password: cleanPass || 'password123',
