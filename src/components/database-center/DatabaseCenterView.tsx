@@ -188,6 +188,17 @@ export function DatabaseCenterView({
             <Sparkles className="w-4 h-4" />
             <span>Muat Data Contoh Kantor</span>
           </button>
+
+          {readyCategoryCount > 0 && (
+            <button
+              onClick={onClearAllData}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 text-xs font-semibold border border-rose-500/30 transition-colors shadow-sm"
+              title="Kosongkan semua file yang ada di 4 stasiun database"
+            >
+              <Trash2 className="w-4 h-4 text-rose-400" />
+              <span>Kosongkan Semua File</span>
+            </button>
+          )}
         </div>
       </div>
 

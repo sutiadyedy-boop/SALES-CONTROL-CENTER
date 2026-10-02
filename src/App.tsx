@@ -324,10 +324,10 @@ export default function App() {
     });
   }, []);
 
-  // Initial load
+  // Initial load: database starts empty as requested (clean state for real office uploads)
   useEffect(() => {
-    populateSampleFiles();
-  }, [populateSampleFiles]);
+    // Files start empty. User can upload their own real files or click "Muat Data Contoh Kantor"
+  }, []);
 
   // User-triggered load demo data with success sound
   const handleUserLoadSampleData = useCallback(() => {
@@ -563,7 +563,6 @@ export default function App() {
 
   // Reset all session data
   const handleClearSession = useCallback(() => {
-    if (userProfile.role !== 'ADMIN') return;
     setPrevTransactions([]);
     setCurrTransactions([]);
     setTargets([]);
@@ -574,7 +573,11 @@ export default function App() {
       target_salesman: [],
       master_cb: [],
     });
-  }, [userProfile.role]);
+    setDupPrev(0);
+    setDupCurr(0);
+    rawFileObjectsRef.current.clear();
+    soundManager.playClick();
+  }, []);
 
   // Start new session
   const handleNewSession = useCallback(() => {
