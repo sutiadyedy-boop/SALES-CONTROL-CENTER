@@ -26,10 +26,13 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   UserCheck,
-  Lock
+  Lock,
+  Image as ImageIcon,
+  LogOut
 } from 'lucide-react';
 import { ControlTowerKPIs } from '../types/analytics';
 import { UserProfile } from '../types/database';
+import { LogoDashboard } from './common/LogoDashboard';
 
 interface SidebarProps {
   currentTab: string;
@@ -43,6 +46,7 @@ interface SidebarProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
   userProfile?: UserProfile;
+  onLogout?: () => void;
 }
 
 export function Sidebar({
@@ -57,6 +61,7 @@ export function Sidebar({
   collapsed,
   onToggleCollapse,
   userProfile,
+  onLogout,
 }: SidebarProps) {
   // Support both controlled & uncontrolled collapsed state
   const [internalCollapsed, setInternalCollapsed] = useState(() => {
@@ -258,20 +263,29 @@ export function Sidebar({
       badge: isNonAdmin ? 'Lihat Saja' : null,
       badgeColor: 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
     },
-    { 
-      id: 'settings', 
-      label: 'Settings & Rules', 
-      icon: Settings, 
-      badge: isNonAdmin ? 'Lihat Saja' : null,
-      badgeColor: 'bg-amber-500/10 text-amber-300/80 border border-amber-500/20 font-mono'
-    },
-    ...(userProfile?.role === 'ADMIN' ? [{
-      id: 'users',
-      label: 'Admin User Management',
-      icon: UserCheck,
-      badge: 'Admin',
-      badgeColor: 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono',
-    }] : []),
+    ...(userProfile?.role === 'ADMIN' ? [
+      { 
+        id: 'settings', 
+        label: 'Settings & Rules', 
+        icon: Settings, 
+        badge: 'Admin',
+        badgeColor: 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-mono'
+      },
+      {
+        id: 'logo_management',
+        label: 'Logo Management',
+        icon: ImageIcon,
+        badge: 'Admin',
+        badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono',
+      },
+      {
+        id: 'users',
+        label: 'User Management',
+        icon: UserCheck,
+        badge: 'Admin',
+        badgeColor: 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono',
+      }
+    ] : []),
   ];
 
   return (
@@ -280,7 +294,7 @@ export function Sidebar({
         isCollapsed ? 'w-[72px]' : 'w-64'
       }`}
     >
-      {/* Brand Header */}
+      {/* Brand Header with Official Dashboard Logo */}
       <div className={`border-b border-slate-800/80 flex items-center transition-all ${
         isCollapsed ? 'p-3 flex-col gap-2 justify-center' : 'p-4 justify-between gap-2'
       }`}>
@@ -288,10 +302,10 @@ export function Sidebar({
           <>
             <button
               onClick={toggleCollapse}
-              className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 hover:bg-cyan-500/20 transition-all group"
+              className="group cursor-pointer hover:opacity-90 transition-opacity"
               title="Klik untuk Expand Sidebar (Ctrl+B)"
             >
-              <FileSpreadsheet className="w-5 h-5 group-hover:scale-110 transition-transform" />
+              <LogoDashboard size="sm" collapsed />
             </button>
             <button
               onClick={toggleCollapse}
@@ -303,18 +317,13 @@ export function Sidebar({
           </>
         ) : (
           <>
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 shrink-0">
-                <FileSpreadsheet className="w-5 h-5" />
-              </div>
-              <div className="truncate">
-                <h1 className="text-xs font-extrabold tracking-wider uppercase text-slate-100 font-mono truncate">
-                  CONTROL TOWER
-                </h1>
-                <span className="text-[10px] text-cyan-400 font-bold block -mt-0.5 truncate">
-                  PHASE 3 · CALCULATION & BI
-                </span>
-              </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <LogoDashboard
+                size="md"
+                showText
+                title="CONTROL TOWER"
+                subtitle="PT PINUS MERAH ABADI"
+              />
             </div>
 
             <button
@@ -487,6 +496,27 @@ export function Sidebar({
             );
           })}
         </div>
+
+        {/* Section 3: Logout Action (Section 11) */}
+        {onLogout && (
+          <div className="pt-2 border-t border-slate-800/80">
+            <button
+              onClick={onLogout}
+              className={`w-full flex items-center rounded-xl text-xs font-medium text-rose-400/90 hover:text-rose-300 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-colors ${
+                isCollapsed ? 'justify-center p-2.5' : 'justify-between px-3 py-2'
+              }`}
+              title={isCollapsed ? 'Keluar / Logout' : undefined}
+            >
+              <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                <LogOut className="w-4 h-4 shrink-0 text-rose-400" />
+                {!isCollapsed && <span className="font-semibold">Logout</span>}
+              </div>
+              {!isCollapsed && (
+                <span className="text-[10px] text-slate-500 font-mono">Keluar</span>
+              )}
+            </button>
+          </div>
+        )}
       </nav>
 
       {/* Footer System Info */}

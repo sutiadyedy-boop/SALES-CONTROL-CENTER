@@ -18,6 +18,7 @@ import { ReportsView } from './components/analytics/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { LoginPage } from './components/auth/LoginPage';
 import { UserManagementView } from './components/users/UserManagementView';
+import { LogoManagementView } from './components/settings/LogoManagementView';
 import { fetchCurrentSession, logoutUser } from './services/authService';
 import { Shield, ShieldAlert, Loader2 } from 'lucide-react';
 
@@ -463,7 +464,6 @@ export default function App() {
       } catch (err: any) {
         console.error('Error processing file:', err);
         soundManager.playError();
-        alert(`Gagal membaca file Excel ${file.name}: ${err.message}`);
       }
     }
 
@@ -573,6 +573,18 @@ export default function App() {
       target_salesman: [],
       master_cb: [],
     });
+    setSession(prev => ({
+      ...prev,
+      previousFiles: [],
+      currentFiles: [],
+      targetFiles: [],
+      masterFiles: [],
+      totalPreviousRows: 0,
+      totalCurrentRows: 0,
+      totalTargetRows: 0,
+      totalMasterRows: 0,
+      status: 'ready',
+    }));
     setDupPrev(0);
     setDupCurr(0);
     rawFileObjectsRef.current.clear();
@@ -846,6 +858,7 @@ export default function App() {
         collapsed={sidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
         userProfile={userProfile}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
@@ -865,6 +878,7 @@ export default function App() {
           onClearAllData={handleClearSession}
           onNavigateToSettings={() => handleSelectTab('settings')}
           onNavigateToUsers={() => handleSelectTab('users')}
+          onNavigateToLogo={() => handleSelectTab('logo_management')}
           onLogout={handleLogout}
         />
 
@@ -1025,14 +1039,34 @@ export default function App() {
             )}
 
             {currentTab === 'settings' && (
-              <SettingsView
-                settings={settings}
-                userProfile={userProfile}
-                availableSalesmen={filterOptions.salesmen}
-                onSaveSettings={handleUpdateSettings}
-                onUpdateUser={handleUpdateUser}
-                onResetToDefaults={handleResetSettings}
-              />
+              userProfile.role === 'ADMIN' ? (
+                <SettingsView
+                  settings={settings}
+                  userProfile={userProfile}
+                  availableSalesmen={filterOptions.salesmen}
+                  onSaveSettings={handleUpdateSettings}
+                  onUpdateUser={handleUpdateUser}
+                  onResetToDefaults={handleResetSettings}
+                />
+              ) : (
+                <div className="min-h-[50vh] flex flex-col items-center justify-center text-center p-8 bg-slate-900/60 border border-rose-500/30 rounded-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mb-4 shadow-xl">
+                    <ShieldAlert className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-xl font-extrabold text-slate-100 font-mono tracking-wider">
+                    403 ACCESS DENIED
+                  </h2>
+                  <p className="text-xs text-rose-300 font-medium max-w-md mt-2">
+                    Akses ditolak: Pengaturan dashboard hanya dapat diakses oleh pengguna dengan peran ADMIN.
+                  </p>
+                  <button
+                    onClick={() => setCurrentTab('dashboard')}
+                    className="mt-6 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
+                  >
+                    Kembali ke Dashboard
+                  </button>
+                </div>
+              )
             )}
 
             {/* ADMIN USER MANAGEMENT VIEW (Requirement #8, #14) */}
@@ -1052,6 +1086,34 @@ export default function App() {
                   </h2>
                   <p className="text-xs text-rose-300 font-medium max-w-md mt-2">
                     Hanya pengguna dengan peran ADMIN yang memiliki otoritas untuk mengakses menu Admin User Management.
+                  </p>
+                  <button
+                    onClick={() => setCurrentTab('dashboard')}
+                    className="mt-6 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors"
+                  >
+                    Kembali ke Dashboard
+                  </button>
+                </div>
+              )
+            )}
+
+            {/* ADMIN LOGO MANAGEMENT VIEW */}
+            {currentTab === 'logo_management' && (
+              userProfile.role === 'ADMIN' ? (
+                <LogoManagementView
+                  currentUser={userProfile}
+                  onNavigateToDashboard={() => setCurrentTab('dashboard')}
+                />
+              ) : (
+                <div className="min-h-[50vh] flex flex-col items-center justify-center text-center p-8 bg-slate-900/60 border border-rose-500/30 rounded-2xl">
+                  <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center text-rose-400 mb-4 shadow-xl">
+                    <ShieldAlert className="w-8 h-8" />
+                  </div>
+                  <h2 className="text-xl font-extrabold text-slate-100 font-mono tracking-wider">
+                    403 ACCESS DENIED
+                  </h2>
+                  <p className="text-xs text-rose-300 font-medium max-w-md mt-2">
+                    Hanya pengguna dengan peran ADMIN yang memiliki otoritas untuk mengakses menu Logo Management.
                   </p>
                   <button
                     onClick={() => setCurrentTab('dashboard')}

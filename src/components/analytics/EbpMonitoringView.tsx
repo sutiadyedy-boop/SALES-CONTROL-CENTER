@@ -51,6 +51,8 @@ export interface EbpOutletItem {
   area: string;
   channel: string;
   rayon: string;
+  fc?: string;
+  pma?: string;
   epbPrev: number;
   epbCurr: number;
   diff: number;
@@ -355,6 +357,8 @@ export function EbpMonitoringView({
         area: m.area || '-',
         channel: m.channel || '-',
         rayon: m.rayon || '-',
+        fc: m.fc || '-',
+        pma: m.pma || '-',
         epbPrev,
         epbCurr,
         diff,
@@ -385,31 +389,57 @@ export function EbpMonitoringView({
     return Array.from(set).sort();
   }, [allEbpItems]);
 
-  // 5. Apply filters
+  // 5. Apply filters synchronized with Dashboard Global Filters
   const filteredItems = useMemo(() => {
+    const cleanStr = (s?: string) => (s || '').trim().toLowerCase().replace(/^pma\s+/i, '');
+
+    const matchesMulti = (filterVal: string | string[] | undefined, actualVal: string | undefined, secondaryVal?: string | undefined): boolean => {
+      if (!filterVal) return true;
+      const vals = Array.isArray(filterVal) ? filterVal : [filterVal];
+      if (vals.length === 0 || vals.includes('ALL')) return true;
+
+      const checkMatch = (target?: string) => {
+        if (!target || target === '-') return false;
+        const ct = cleanStr(target);
+        return vals.some(v => {
+          const cv = cleanStr(v);
+          return cv === ct || ct.includes(cv) || cv.includes(ct);
+        });
+      };
+
+      return checkMatch(actualVal) || (secondaryVal ? checkMatch(secondaryVal) : false);
+    };
+
     return allEbpItems.filter(item => {
-      // Real-time Search
+      // Local Search Query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchesSearch = 
           item.outletName.toLowerCase().includes(q) ||
           item.outletId.toLowerCase().includes(q) ||
           item.salesmanName.toLowerCase().includes(q) ||
-          item.depo.toLowerCase().includes(q);
+          item.salesmanId.toLowerCase().includes(q) ||
+          item.depo.toLowerCase().includes(q) ||
+          item.cabang.toLowerCase().includes(q) ||
+          item.area.toLowerCase().includes(q) ||
+          item.rayon.toLowerCase().includes(q) ||
+          item.channel.toLowerCase().includes(q) ||
+          (item.fc ? item.fc.toLowerCase().includes(q) : false) ||
+          (item.pma ? item.pma.toLowerCase().includes(q) : false);
         if (!matchesSearch) return false;
       }
 
-      // Status Filter
+      // Local Status Filter
       if (selectedStatus !== 'ALL' && item.status !== selectedStatus) {
         return false;
       }
 
-      // Salesman Filter
+      // Local Salesman Filter
       if (selectedSalesman !== 'ALL' && item.salesmanName !== selectedSalesman) {
         return false;
       }
 
-      // Depo Filter
+      // Local Depo Filter
       if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) {
         return false;
       }
@@ -422,23 +452,49 @@ export function EbpMonitoringView({
       if (selectedEpbPrevFilter === 'HAS_EPB' && item.epbPrev === 0) return false;
       if (selectedEpbPrevFilter === 'ZERO_EPB' && item.epbPrev > 0) return false;
 
-      // Global filters if any
-      if (filters?.salesmanId) {
-        const val = Array.isArray(filters.salesmanId) ? filters.salesmanId : [filters.salesmanId];
-        if (val.length > 0 && !val.includes('ALL') && !val.includes(item.salesmanId) && !val.includes(item.salesmanName)) {
-          return false;
+      // =========================================================================
+      // Synchronization with Global Dashboard Filters
+      // =========================================================================
+      if (filters) {
+        if (!matchesMulti(filters.cabang, item.cabang)) return false;
+        if (!matchesMulti(filters.depo, item.depo)) return false;
+        if (!matchesMulti(filters.area, item.area, item.pma)) return false;
+        if (!matchesMulti(filters.rayon, item.rayon)) return false;
+        if (!matchesMulti(filters.channel, item.channel)) return false;
+        if (!matchesMulti(filters.fc, item.fc)) return false;
+        if (!matchesMulti(filters.pma, item.pma, item.area)) return false;
+
+        if (filters.salesmanId) {
+          const vals = Array.isArray(filters.salesmanId) ? filters.salesmanId : [filters.salesmanId];
+          if (vals.length > 0 && !vals.includes('ALL')) {
+            const match = vals.some(v => {
+              const cleanV = v.trim().toLowerCase();
+              return (
+                item.salesmanId.toLowerCase() === cleanV ||
+                item.salesmanName.toLowerCase() === cleanV ||
+                item.salesmanName.toLowerCase().includes(cleanV) ||
+                cleanV.includes(item.salesmanName.toLowerCase())
+              );
+            });
+            if (!match) return false;
+          }
         }
-      }
-      if (filters?.depo) {
-        const val = Array.isArray(filters.depo) ? filters.depo : [filters.depo];
-        if (val.length > 0 && !val.includes('ALL') && !val.includes(item.depo)) {
-          return false;
-        }
-      }
-      if (filters?.area) {
-        const val = Array.isArray(filters.area) ? filters.area : [filters.area];
-        if (val.length > 0 && !val.includes('ALL') && !val.includes(item.area)) {
-          return false;
+
+        if (filters.searchQuery && filters.searchQuery.trim()) {
+          const q = filters.searchQuery.trim().toLowerCase();
+          const match =
+            item.outletName.toLowerCase().includes(q) ||
+            item.outletId.toLowerCase().includes(q) ||
+            item.salesmanName.toLowerCase().includes(q) ||
+            item.salesmanId.toLowerCase().includes(q) ||
+            item.area.toLowerCase().includes(q) ||
+            item.depo.toLowerCase().includes(q) ||
+            item.cabang.toLowerCase().includes(q) ||
+            item.rayon.toLowerCase().includes(q) ||
+            item.channel.toLowerCase().includes(q) ||
+            (item.fc ? item.fc.toLowerCase().includes(q) : false) ||
+            (item.pma ? item.pma.toLowerCase().includes(q) : false);
+          if (!match) return false;
         }
       }
 
@@ -555,13 +611,26 @@ export function EbpMonitoringView({
     if (onFilterChange) onFilterChange({});
   };
 
+  const hasActiveDashboardFilters = Boolean(
+    (filters?.cabang && (Array.isArray(filters.cabang) ? filters.cabang.length > 0 : filters.cabang !== 'ALL')) ||
+    (filters?.depo && (Array.isArray(filters.depo) ? filters.depo.length > 0 : filters.depo !== 'ALL')) ||
+    (filters?.area && (Array.isArray(filters.area) ? filters.area.length > 0 : filters.area !== 'ALL')) ||
+    (filters?.rayon && (Array.isArray(filters.rayon) ? filters.rayon.length > 0 : filters.rayon !== 'ALL')) ||
+    (filters?.salesmanId && (Array.isArray(filters.salesmanId) ? filters.salesmanId.length > 0 : filters.salesmanId !== 'ALL')) ||
+    (filters?.channel && (Array.isArray(filters.channel) ? filters.channel.length > 0 : filters.channel !== 'ALL')) ||
+    (filters?.fc && (Array.isArray(filters.fc) ? filters.fc.length > 0 : filters.fc !== 'ALL')) ||
+    (filters?.pma && (Array.isArray(filters.pma) ? filters.pma.length > 0 : filters.pma !== 'ALL')) ||
+    filters?.searchQuery
+  );
+
   const hasActiveFilters = 
     searchQuery.trim() !== '' ||
     selectedStatus !== 'ALL' ||
     selectedSalesman !== 'ALL' ||
     selectedDepo !== 'ALL' ||
     selectedEpbCurrFilter !== 'ALL' ||
-    selectedEpbPrevFilter !== 'ALL';
+    selectedEpbPrevFilter !== 'ALL' ||
+    hasActiveDashboardFilters;
 
   // 10. Table Columns for DataTable
   const columns: ColumnDef<EbpOutletItem>[] = [
@@ -767,6 +836,69 @@ export function EbpMonitoringView({
           )}
         </div>
       </div>
+
+      {/* Synchronized Dashboard Filters Banner */}
+      {hasActiveDashboardFilters && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-cyan-300 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Tersinkronisasi dengan Filter Dashboard:</span>
+            </span>
+            {filters?.cabang && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Cabang: {Array.isArray(filters.cabang) ? filters.cabang.join(', ') : filters.cabang}
+              </span>
+            )}
+            {filters?.depo && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Depo: {Array.isArray(filters.depo) ? filters.depo.join(', ') : filters.depo}
+              </span>
+            )}
+            {filters?.area && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Area: {Array.isArray(filters.area) ? filters.area.join(', ') : filters.area}
+              </span>
+            )}
+            {filters?.rayon && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Rayon: {Array.isArray(filters.rayon) ? filters.rayon.join(', ') : filters.rayon}
+              </span>
+            )}
+            {filters?.salesmanId && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Salesman: {Array.isArray(filters.salesmanId) ? filters.salesmanId.join(', ') : filters.salesmanId}
+              </span>
+            )}
+            {filters?.pma && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                PMA: {Array.isArray(filters.pma) ? filters.pma.join(', ') : filters.pma}
+              </span>
+            )}
+            {filters?.channel && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Channel: {Array.isArray(filters.channel) ? filters.channel.join(', ') : filters.channel}
+              </span>
+            )}
+            {filters?.fc && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                FC: {Array.isArray(filters.fc) ? filters.fc.join(', ') : filters.fc}
+              </span>
+            )}
+            {filters?.searchQuery && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Cari: "{filters.searchQuery}"
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => onFilterChange && onFilterChange({})}
+            className="text-cyan-400 hover:text-cyan-200 text-xs font-semibold underline shrink-0 ml-2"
+          >
+            Reset Filter Dashboard
+          </button>
+        </div>
+      )}
 
       {/* 2. KPI Cards Section (9 KPI Cards as requested) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">

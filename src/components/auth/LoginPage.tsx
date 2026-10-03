@@ -13,6 +13,7 @@ import {
 import { loginWithCredentials, requestPasswordRecovery } from '../../services/authService';
 import { UserProfile } from '../../types/database';
 import { ThemeToggle } from '../common/ThemeToggle';
+import { LogoDashboard } from '../common/LogoDashboard';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -117,8 +118,8 @@ export function LoginPage({ onLoginSuccess }: LoginPageProps) {
           
           {/* Header Title & Branding */}
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-tr from-cyan-950 via-slate-900 to-cyan-900/40 border border-cyan-500/30 text-cyan-400 mb-4 shadow-lg shadow-cyan-950/50">
-              <Shield className="w-7 h-7" />
+            <div className="flex justify-center mb-4">
+              <LogoDashboard size="xl" className="shadow-lg shadow-cyan-950/40" />
             </div>
 
             <h1 className="text-xl sm:text-2xl font-extrabold tracking-wider font-mono text-slate-100 uppercase">

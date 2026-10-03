@@ -14,13 +14,15 @@ import {
   ChevronDown,
   Building2,
   Sun,
-  Moon
+  Moon,
+  Image as ImageIcon
 } from 'lucide-react';
 import { UserProfile } from '../types/database';
 import { CaptureJpgButton } from './common/CaptureJpgButton';
 import { ThemeToggle } from './common/ThemeToggle';
 import { SoundToggle } from './common/SoundToggle';
 import { useTheme } from '../context/ThemeContext';
+import { LogoDashboard } from './common/LogoDashboard';
 
 interface HeaderProps {
   sessionId: string;
@@ -36,6 +38,7 @@ interface HeaderProps {
   onClearAllData: () => void;
   onNavigateToSettings: () => void;
   onNavigateToUsers?: () => void;
+  onNavigateToLogo?: () => void;
   onLogout?: () => void;
 }
 
@@ -62,6 +65,7 @@ const tabLabels: Record<string, string> = {
   session: 'Upload_Session_Logs',
   settings: 'Pengaturan_Aturan',
   users: 'Admin_User_Management',
+  logo_management: 'Logo_Dashboard',
 };
 
 export function Header({
@@ -78,6 +82,7 @@ export function Header({
   onClearAllData,
   onNavigateToSettings,
   onNavigateToUsers,
+  onNavigateToLogo,
   onLogout,
 }: HeaderProps) {
   const activeMenuLabel = tabLabels[currentTab] || currentTab;
@@ -101,6 +106,7 @@ export function Header({
     MANAGER: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
     SUPERVISOR: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
     SALESMAN: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    USER: 'bg-slate-800 text-slate-300 border-slate-700',
   }[userProfile.role] || 'bg-slate-800 text-slate-300 border-slate-700';
 
   return (
@@ -119,6 +125,13 @@ export function Header({
               <PanelLeftClose className="w-5 h-5" />
             )}
           </button>
+        )}
+
+        {/* Header Logo - Visible when sidebar is collapsed or on compact screens */}
+        {sidebarCollapsed && (
+          <div className="hidden sm:flex items-center shrink-0">
+            <LogoDashboard size="sm" />
+          </div>
         )}
 
         <div>
@@ -261,17 +274,33 @@ export function Header({
                   </button>
                 )}
 
-                {/* Settings & Rules */}
-                <button
-                  onClick={() => {
-                    setDropdownOpen(false);
-                    onNavigateToSettings();
-                  }}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-slate-800/80 transition-colors text-left"
-                >
-                  <Settings className="w-4 h-4 text-slate-400" />
-                  <span>Pengaturan & Profil</span>
-                </button>
+                {/* Logo Management (ADMIN only) */}
+                {userProfile.role === 'ADMIN' && onNavigateToLogo && (
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onNavigateToLogo();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-cyan-300 hover:text-cyan-200 hover:bg-cyan-500/10 transition-colors font-medium text-left"
+                  >
+                    <ImageIcon className="w-4 h-4 text-cyan-400" />
+                    <span>Logo Dashboard (Admin)</span>
+                  </button>
+                )}
+
+                {/* Settings & Rules (ADMIN only) */}
+                {userProfile.role === 'ADMIN' && onNavigateToSettings && (
+                  <button
+                    onClick={() => {
+                      setDropdownOpen(false);
+                      onNavigateToSettings();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2 text-xs text-slate-300 hover:text-slate-100 hover:bg-slate-800/80 transition-colors text-left"
+                  >
+                    <Settings className="w-4 h-4 text-slate-400" />
+                    <span>Pengaturan Admin & Aturan</span>
+                  </button>
+                )}
 
                 {/* Theme Toggle in Dropdown */}
                 <button

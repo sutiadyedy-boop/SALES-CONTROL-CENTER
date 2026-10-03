@@ -21,7 +21,8 @@ import {
   BarChart3,
   CheckCircle2,
   AlertTriangle,
-  LineChart
+  LineChart,
+  Filter
 } from 'lucide-react';
 import { MasterOutletRecord, TransactionRecord, AppSettings } from '../../types/database';
 import { GlobalFilterState } from '../../types/analytics';
@@ -187,13 +188,32 @@ export function MonitoringEcView({
   const [chartType, setChartType] = useState<'line' | 'bar'>('line');
   const [hoveredDay, setHoveredDay] = useState<number | null>(null);
 
-  // Master outlet map for enrichment
+  // Master outlet map for enrichment (supports both outletId and outletName lookup)
   const masterMap = useMemo(() => {
-    const map = new Map<string, MasterOutletRecord>();
+    const byId = new Map<string, MasterOutletRecord>();
+    const byName = new Map<string, MasterOutletRecord>();
     masterOutlets.forEach(m => {
-      if (m.outletId) map.set(m.outletId, m);
+      if (m.outletId) {
+        byId.set(m.outletId.trim(), m);
+        byId.set(m.outletId.trim().toLowerCase(), m);
+      }
+      if (m.outletName) {
+        byName.set(m.outletName.trim().toLowerCase(), m);
+      }
     });
-    return map;
+    return {
+      get: (id?: string, name?: string) => {
+        if (id) {
+          const direct = byId.get(id.trim()) || byId.get(id.trim().toLowerCase());
+          if (direct) return direct;
+        }
+        if (name) {
+          const direct = byName.get(name.trim().toLowerCase());
+          if (direct) return direct;
+        }
+        return undefined;
+      }
+    };
   }, [masterOutlets]);
 
   // Working days auto-detection & persistence (synced with target_work_days if exists)
@@ -238,54 +258,155 @@ export function MonitoringEcView({
     }
   };
 
+  // Helper for multi-value filtering synchronized with Global Dashboard Filters
+  const matchesFilter = (item: {
+    cabang?: string;
+    depo?: string;
+    area?: string;
+    rayon?: string;
+    salesmanId?: string;
+    salesmanName?: string;
+    channel?: string;
+    fc?: string;
+    pma?: string;
+    outletId?: string;
+    outletName?: string;
+  }) => {
+    if (!filters) return true;
+
+    const cleanStr = (s?: string) => (s || '').trim().toLowerCase().replace(/^pma\s+/i, '');
+
+    const matchesMulti = (filterVal: string | string[] | undefined, actualVal: string | undefined, secondaryVal?: string | undefined): boolean => {
+      if (!filterVal) return true;
+      const vals = Array.isArray(filterVal) ? filterVal : [filterVal];
+      if (vals.length === 0 || vals.includes('ALL')) return true;
+
+      const checkMatch = (target?: string) => {
+        if (!target || target === '-') return false;
+        const ct = cleanStr(target);
+        return vals.some(v => {
+          const cv = cleanStr(v);
+          return cv === ct || ct.includes(cv) || cv.includes(ct);
+        });
+      };
+
+      return checkMatch(actualVal) || (secondaryVal ? checkMatch(secondaryVal) : false);
+    };
+
+    if (!matchesMulti(filters.cabang, item.cabang)) return false;
+    if (!matchesMulti(filters.depo, item.depo)) return false;
+    if (!matchesMulti(filters.area, item.area, item.pma)) return false;
+    if (!matchesMulti(filters.rayon, item.rayon)) return false;
+    if (!matchesMulti(filters.channel, item.channel)) return false;
+    if (!matchesMulti(filters.fc, item.fc)) return false;
+    if (!matchesMulti(filters.pma, item.pma, item.area)) return false;
+
+    if (filters.salesmanId) {
+      const vals = Array.isArray(filters.salesmanId) ? filters.salesmanId : [filters.salesmanId];
+      if (vals.length > 0 && !vals.includes('ALL')) {
+        const match = vals.some(v => {
+          const cleanV = v.trim().toLowerCase();
+          return (
+            (item.salesmanId && item.salesmanId.trim().toLowerCase() === cleanV) ||
+            (item.salesmanName && item.salesmanName.trim().toLowerCase() === cleanV) ||
+            (item.salesmanName && item.salesmanName.toLowerCase().includes(cleanV)) ||
+            (cleanV.includes(item.salesmanName?.toLowerCase() || ''))
+          );
+        });
+        if (!match) return false;
+      }
+    }
+
+    if (filters.searchQuery && filters.searchQuery.trim()) {
+      const q = filters.searchQuery.trim().toLowerCase();
+      const match =
+        (item.outletId && item.outletId.toLowerCase().includes(q)) ||
+        (item.outletName && item.outletName.toLowerCase().includes(q)) ||
+        (item.salesmanId && item.salesmanId.toLowerCase().includes(q)) ||
+        (item.salesmanName && item.salesmanName.toLowerCase().includes(q)) ||
+        (item.area && item.area.toLowerCase().includes(q)) ||
+        (item.depo && item.depo.toLowerCase().includes(q)) ||
+        (item.cabang && item.cabang.toLowerCase().includes(q)) ||
+        (item.rayon && item.rayon.toLowerCase().includes(q)) ||
+        (item.channel && item.channel.toLowerCase().includes(q)) ||
+        (item.fc && item.fc.toLowerCase().includes(q)) ||
+        (item.pma && item.pma.toLowerCase().includes(q));
+      if (!match) return false;
+    }
+
+    return true;
+  };
+
   // Enriched Transactions with PMA & Master Metadata
   const enrichedPrevTxs = useMemo(() => {
-    return prevTransactions.map(t => {
-      const m = masterMap.get(t.outletId);
-      const pma = (t.pma || m?.pma || 'PMA REGULER').trim().toUpperCase();
-      const slsName = t.salesmanName || m?.salesmanName || t.salesmanId || 'Salesman Unassigned';
-      const day = getTxDay(t.transactionDate);
-      const outletKey = t.outletId || t.outletName;
-      return {
-        ...t,
-        pma,
-        salesmanName: slsName,
-        day,
-        outletKey,
-      };
-    });
-  }, [prevTransactions, masterMap]);
+    return prevTransactions
+      .map(t => {
+        const m = masterMap.get(t.outletId, t.outletName);
+        const pma = (t.pma || m?.pma || m?.area || 'PMA REGULER').trim().toUpperCase();
+        const slsName = t.salesmanName || m?.salesmanName || t.salesmanId || 'Salesman Unassigned';
+        const slsId = t.salesmanId || m?.salesmanId || '';
+        const day = getTxDay(t.transactionDate);
+        const outletKey = t.outletId || t.outletName;
+        return {
+          ...t,
+          pma,
+          salesmanId: slsId,
+          salesmanName: slsName,
+          cabang: t.cabang || m?.cabang,
+          depo: t.depo || m?.depo,
+          area: t.area || m?.area,
+          rayon: t.rayon || m?.rayon,
+          channel: t.channel || m?.channel,
+          fc: t.fc || m?.fc,
+          day,
+          outletKey,
+        };
+      })
+      .filter(t => matchesFilter(t));
+  }, [prevTransactions, masterMap, filters]);
 
   const enrichedCurrTxs = useMemo(() => {
-    return currTransactions.map(t => {
-      const m = masterMap.get(t.outletId);
-      const pma = (t.pma || m?.pma || 'PMA REGULER').trim().toUpperCase();
-      const slsName = t.salesmanName || m?.salesmanName || t.salesmanId || 'Salesman Unassigned';
-      const day = getTxDay(t.transactionDate);
-      const outletKey = t.outletId || t.outletName;
-      return {
-        ...t,
-        pma,
-        salesmanName: slsName,
-        day,
-        outletKey,
-      };
-    });
-  }, [currTransactions, masterMap]);
+    return currTransactions
+      .map(t => {
+        const m = masterMap.get(t.outletId, t.outletName);
+        const pma = (t.pma || m?.pma || m?.area || 'PMA REGULER').trim().toUpperCase();
+        const slsName = t.salesmanName || m?.salesmanName || t.salesmanId || 'Salesman Unassigned';
+        const slsId = t.salesmanId || m?.salesmanId || '';
+        const day = getTxDay(t.transactionDate);
+        const outletKey = t.outletId || t.outletName;
+        return {
+          ...t,
+          pma,
+          salesmanId: slsId,
+          salesmanName: slsName,
+          cabang: t.cabang || m?.cabang,
+          depo: t.depo || m?.depo,
+          area: t.area || m?.area,
+          rayon: t.rayon || m?.rayon,
+          channel: t.channel || m?.channel,
+          fc: t.fc || m?.fc,
+          day,
+          outletKey,
+        };
+      })
+      .filter(t => matchesFilter(t));
+  }, [currTransactions, masterMap, filters]);
 
   // List of all unique PMAs and Salesmen for dropdowns
   const allPmas = useMemo(() => {
     const set = new Set<string>();
-    masterOutlets.forEach(m => { if (m.pma) set.add(m.pma.trim().toUpperCase()); });
+    masterOutlets.forEach(m => { 
+      if (matchesFilter(m) && m.pma) set.add(m.pma.trim().toUpperCase()); 
+    });
     enrichedPrevTxs.forEach(t => { if (t.pma) set.add(t.pma); });
     enrichedCurrTxs.forEach(t => { if (t.pma) set.add(t.pma); });
     return Array.from(set).sort();
-  }, [masterOutlets, enrichedPrevTxs, enrichedCurrTxs]);
+  }, [masterOutlets, enrichedPrevTxs, enrichedCurrTxs, filters]);
 
   const allSalesmen = useMemo(() => {
     const map = new Map<string, string>();
     masterOutlets.forEach(m => {
-      if (m.salesmanId) map.set(m.salesmanId, m.salesmanName || m.salesmanId);
+      if (matchesFilter(m) && m.salesmanId) map.set(m.salesmanId, m.salesmanName || m.salesmanId);
     });
     enrichedPrevTxs.forEach(t => {
       if (t.salesmanId) map.set(t.salesmanId, t.salesmanName);
@@ -294,7 +415,7 @@ export function MonitoringEcView({
       if (t.salesmanId) map.set(t.salesmanId, t.salesmanName);
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [masterOutlets, enrichedPrevTxs, enrichedCurrTxs]);
+  }, [masterOutlets, enrichedPrevTxs, enrichedCurrTxs, filters]);
 
   // If no transactions available
   if (prevTransactions.length === 0 && currTransactions.length === 0) {
@@ -767,6 +888,18 @@ export function MonitoringEcView({
     });
   }, [dailySalesList, searchQuery, selectedPma, selectedSalesman, selectedDay, selectedStatus]);
 
+  const hasActiveDashboardFilters = Boolean(
+    (filters?.cabang && (Array.isArray(filters.cabang) ? filters.cabang.length > 0 : filters.cabang !== 'ALL')) ||
+    (filters?.depo && (Array.isArray(filters.depo) ? filters.depo.length > 0 : filters.depo !== 'ALL')) ||
+    (filters?.area && (Array.isArray(filters.area) ? filters.area.length > 0 : filters.area !== 'ALL')) ||
+    (filters?.rayon && (Array.isArray(filters.rayon) ? filters.rayon.length > 0 : filters.rayon !== 'ALL')) ||
+    (filters?.salesmanId && (Array.isArray(filters.salesmanId) ? filters.salesmanId.length > 0 : filters.salesmanId !== 'ALL')) ||
+    (filters?.channel && (Array.isArray(filters.channel) ? filters.channel.length > 0 : filters.channel !== 'ALL')) ||
+    (filters?.fc && (Array.isArray(filters.fc) ? filters.fc.length > 0 : filters.fc !== 'ALL')) ||
+    (filters?.pma && (Array.isArray(filters.pma) ? filters.pma.length > 0 : filters.pma !== 'ALL')) ||
+    filters?.searchQuery
+  );
+
   // Reset Filters
   const handleResetFilters = () => {
     setSearchQuery('');
@@ -774,6 +907,7 @@ export function MonitoringEcView({
     setSelectedSalesman('ALL');
     setSelectedDay('ALL');
     setSelectedStatus('ALL');
+    if (onFilterChange) onFilterChange({});
   };
 
   const hasActiveFilters = 
@@ -781,7 +915,8 @@ export function MonitoringEcView({
     selectedPma !== 'ALL' ||
     selectedSalesman !== 'ALL' ||
     selectedDay !== 'ALL' ||
-    selectedStatus !== 'ALL';
+    selectedStatus !== 'ALL' ||
+    hasActiveDashboardFilters;
 
   // =========================================================================
   // 8. TABLE COLUMN DEFINITIONS
@@ -1332,6 +1467,69 @@ export function MonitoringEcView({
           )}
         </div>
       </div>
+
+      {/* Synchronized Dashboard Filters Banner */}
+      {hasActiveDashboardFilters && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-cyan-950/40 border border-cyan-500/30 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-cyan-300 flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Tersinkronisasi dengan Filter Dashboard:</span>
+            </span>
+            {filters?.cabang && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Cabang: {Array.isArray(filters.cabang) ? filters.cabang.join(', ') : filters.cabang}
+              </span>
+            )}
+            {filters?.depo && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Depo: {Array.isArray(filters.depo) ? filters.depo.join(', ') : filters.depo}
+              </span>
+            )}
+            {filters?.area && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Area: {Array.isArray(filters.area) ? filters.area.join(', ') : filters.area}
+              </span>
+            )}
+            {filters?.rayon && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Rayon: {Array.isArray(filters.rayon) ? filters.rayon.join(', ') : filters.rayon}
+              </span>
+            )}
+            {filters?.salesmanId && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Salesman: {Array.isArray(filters.salesmanId) ? filters.salesmanId.join(', ') : filters.salesmanId}
+              </span>
+            )}
+            {filters?.pma && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                PMA: {Array.isArray(filters.pma) ? filters.pma.join(', ') : filters.pma}
+              </span>
+            )}
+            {filters?.channel && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Channel: {Array.isArray(filters.channel) ? filters.channel.join(', ') : filters.channel}
+              </span>
+            )}
+            {filters?.fc && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                FC: {Array.isArray(filters.fc) ? filters.fc.join(', ') : filters.fc}
+              </span>
+            )}
+            {filters?.searchQuery && (
+              <span className="px-2 py-0.5 rounded bg-slate-900 text-slate-300 border border-slate-700 font-mono text-[11px]">
+                Cari: "{filters.searchQuery}"
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => onFilterChange && onFilterChange({})}
+            className="text-cyan-400 hover:text-cyan-200 text-xs font-semibold underline shrink-0 ml-2"
+          >
+            Reset Filter Dashboard
+          </button>
+        </div>
+      )}
 
       {/* 2. KPI Cards Utama (7 Key Metrics) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">

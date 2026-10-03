@@ -6,7 +6,7 @@ import fs from 'fs';
 // Stable Secret for session signing
 const SESSION_SECRET = process.env.SESSION_SECRET || 'scc_secret_key_2026_enterprise_elite_auth';
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'SUPERVISOR' | 'SALESMAN';
+export type UserRole = 'ADMIN' | 'USER' | 'MANAGER' | 'SUPERVISOR' | 'SALESMAN';
 export type UserStatus = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'DISABLED';
 
 export interface StoredUser {
@@ -178,20 +178,109 @@ const INITIAL_SEED_USERS: StoredUser[] = [
     created_at: '2026-09-30T07:24:24.913Z',
     updated_at: '2026-09-30T07:24:24.913Z',
   },
+  {
+    id: 'usr_regular_user',
+    username: 'user',
+    full_name: 'Staff User',
+    role: 'USER',
+    status: 'ACTIVE',
+    password_hash: 'f643b10e72a97ddce9e4afb2b57613c07ed7c69d5b2b53bb9dd4cb95225a5f9c8883319bcde3e7660e75f984211aa6e42cfba4396e83d69224aca6daf076facd',
+    password_salt: '8547e111d0a4140f623803cd5a01b805',
+    cabang: 'BONE',
+    created_at: '2026-09-30T07:24:24.913Z',
+    updated_at: '2026-09-30T07:24:24.913Z',
+  },
+  {
+    id: 'usr_sales01',
+    username: 'sales01',
+    full_name: 'Sales 01',
+    role: 'USER',
+    status: 'ACTIVE',
+    password_hash: 'f643b10e72a97ddce9e4afb2b57613c07ed7c69d5b2b53bb9dd4cb95225a5f9c8883319bcde3e7660e75f984211aa6e42cfba4396e83d69224aca6daf076facd',
+    password_salt: '8547e111d0a4140f623803cd5a01b805',
+    cabang: 'BONE',
+    created_at: '2026-09-30T07:24:24.913Z',
+    updated_at: '2026-09-30T07:24:24.913Z',
+  },
 ];
 
 // Persistent storage path helper with fallback
+function getDataDir(): string {
+  const isVercel = !!process.env.VERCEL;
+  const baseDir = isVercel ? '/tmp/scc_data' : path.resolve(process.cwd(), 'data');
+  if (!fs.existsSync(baseDir)) {
+    try {
+      fs.mkdirSync(baseDir, { recursive: true });
+    } catch {}
+  }
+  return baseDir;
+}
+
 function getDataFilePath(): string | null {
   try {
-    const isVercel = !!process.env.VERCEL;
-    const baseDir = isVercel ? '/tmp/scc_data' : path.resolve(process.cwd(), 'data');
-    if (!fs.existsSync(baseDir)) {
-      fs.mkdirSync(baseDir, { recursive: true });
-    }
-    return path.resolve(baseDir, 'users.json');
+    return path.resolve(getDataDir(), 'users.json');
   } catch {
     return null;
   }
+}
+
+function getLogoConfigPath(): string {
+  return path.resolve(getDataDir(), 'logo-config.json');
+}
+
+function getCustomLogoFilePath(ext = 'png'): string {
+  return path.resolve(getDataDir(), `custom-logo.${ext}`);
+}
+
+// In-memory Logo Configuration Cache
+export interface StoredLogoConfig {
+  hasCustomLogo: boolean;
+  mimeType: string;
+  extension: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  version: number;
+}
+
+let logoConfigCache: StoredLogoConfig = {
+  hasCustomLogo: false,
+  mimeType: 'image/png',
+  extension: 'png',
+  updatedAt: null,
+  updatedBy: null,
+  version: 1,
+};
+
+function loadLogoConfig() {
+  try {
+    const configPath = getLogoConfigPath();
+    if (fs.existsSync(configPath)) {
+      const data = fs.readFileSync(configPath, 'utf-8');
+      const loaded = JSON.parse(data);
+      if (loaded && typeof loaded === 'object') {
+        const logoFile = getCustomLogoFilePath(loaded.extension || 'png');
+        if (loaded.hasCustomLogo && fs.existsSync(logoFile)) {
+          logoConfigCache = { ...logoConfigCache, ...loaded };
+          return;
+        }
+      }
+    }
+  } catch {}
+  logoConfigCache = {
+    hasCustomLogo: false,
+    mimeType: 'image/png',
+    extension: 'png',
+    updatedAt: null,
+    updatedBy: null,
+    version: 1,
+  };
+}
+
+function saveLogoConfig() {
+  try {
+    const configPath = getLogoConfigPath();
+    fs.writeFileSync(configPath, JSON.stringify(logoConfigCache, null, 2), 'utf-8');
+  } catch {}
 }
 
 let usersCache: StoredUser[] = [...INITIAL_SEED_USERS];
@@ -208,6 +297,14 @@ function loadData() {
         const diasInFile = loadedMap.get('dias');
         if (diasInFile && diasInFile.role !== 'SALESMAN') {
           diasInFile.role = 'SALESMAN';
+        }
+        const sales01InFile = loadedMap.get('sales01');
+        if (sales01InFile && sales01InFile.role !== 'USER') {
+          sales01InFile.role = 'USER';
+        }
+        const userInFile = loadedMap.get('user');
+        if (userInFile && userInFile.role !== 'USER') {
+          userInFile.role = 'USER';
         }
         for (const seed of INITIAL_SEED_USERS) {
           const cleanSeed = seed.username.toLowerCase().replace(/^@+/, '');
@@ -239,6 +336,7 @@ function saveUsers() {
 
 // Initial load
 loadData();
+loadLogoConfig();
 
 // Sanitize user (strip password hash and salt)
 export function sanitizeUser(user: StoredUser) {
@@ -335,7 +433,11 @@ export function createApiRouter(): express.Router {
             id: `usr_${cleanUsername}_${Date.now()}`,
             username: cleanUsername,
             full_name: cleanUsername === 'dias' ? 'Dias' : cleanUsername.charAt(0).toUpperCase() + cleanUsername.slice(1),
-            role: cleanUsername === 'dias' ? 'SALESMAN' : (cleanUsername.includes('admin') ? 'ADMIN' : 'SALESMAN'),
+            role: cleanUsername === 'dias'
+              ? 'SALESMAN'
+              : (cleanUsername.includes('admin')
+                  ? 'ADMIN'
+                  : (cleanUsername.startsWith('user') || cleanUsername.startsWith('sales') ? 'USER' : 'USER')),
             status: 'ACTIVE',
             password_hash: '',
             password_salt: '',
@@ -455,8 +557,8 @@ export function createApiRouter(): express.Router {
       return res.status(400).json({ error: 'Nama Lengkap wajib diisi.' });
     }
 
-    const validRoles: UserRole[] = ['ADMIN', 'MANAGER', 'SUPERVISOR', 'SALESMAN'];
-    const assignedRole: UserRole = validRoles.includes(role) ? role : 'SALESMAN';
+    const validRoles: UserRole[] = ['ADMIN', 'USER', 'MANAGER', 'SUPERVISOR', 'SALESMAN'];
+    const assignedRole: UserRole = validRoles.includes(role) ? role : 'USER';
 
     const validStatuses: UserStatus[] = ['ACTIVE', 'PENDING', 'SUSPENDED', 'DISABLED'];
     const assignedStatus: UserStatus = validStatuses.includes(status) ? status : 'ACTIVE';
@@ -522,7 +624,7 @@ export function createApiRouter(): express.Router {
       user.full_name = name.trim();
     }
 
-    if (role && ['ADMIN', 'MANAGER', 'SUPERVISOR', 'SALESMAN'].includes(role)) {
+    if (role && ['ADMIN', 'USER', 'MANAGER', 'SUPERVISOR', 'SALESMAN'].includes(role)) {
       user.role = role as UserRole;
     }
 
@@ -573,6 +675,175 @@ export function createApiRouter(): express.Router {
     });
   });
 
+  // ==========================================
+  // LOGO MANAGEMENT ENDPOINTS
+  // ==========================================
+
+  // 9. GET /logo - Public: Retrieve active logo configuration
+  router.get('/logo', (_req, res) => {
+    const hasCustom = logoConfigCache.hasCustomLogo;
+    return res.json({
+      success: true,
+      hasCustomLogo: hasCustom,
+      logoUrl: hasCustom ? `/api/logo/image?v=${logoConfigCache.version}` : '/assets/logo-dashboard.png',
+      defaultLogoUrl: '/assets/logo-dashboard.png',
+      updatedAt: logoConfigCache.updatedAt,
+      updatedBy: logoConfigCache.updatedBy,
+      version: logoConfigCache.version,
+    });
+  });
+
+  // 10. GET /logo/image - Public: Stream active logo image
+  router.get('/logo/image', (_req, res) => {
+    try {
+      if (logoConfigCache.hasCustomLogo) {
+        const filePath = getCustomLogoFilePath(logoConfigCache.extension);
+        if (fs.existsSync(filePath)) {
+          res.setHeader('Content-Type', logoConfigCache.mimeType || 'image/png');
+          res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=3600');
+          return res.sendFile(filePath);
+        }
+      }
+    } catch {
+      // Fallback
+    }
+
+    // Default logo fallback
+    const defaultLogoPath = path.resolve(process.cwd(), 'public/assets/logo-dashboard.png');
+    if (fs.existsSync(defaultLogoPath)) {
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.sendFile(defaultLogoPath);
+    }
+    return res.redirect('/assets/logo-dashboard.png');
+  });
+
+  // 11. POST /logo - ADMIN ONLY: Upload and update dashboard logo
+  router.post('/logo', authMiddleware, requireAdmin, (req, res) => {
+    try {
+      const currentUser = (req as any).user as StoredUser;
+      if (!currentUser || currentUser.role !== 'ADMIN') {
+        return res.status(403).json({
+          error: 'Akses ditolak: Hanya pengguna dengan peran ADMIN yang memiliki otoritas untuk mengelola logo dashboard.',
+        });
+      }
+
+      const { imageBase64, mimeType } = req.body;
+
+      if (!imageBase64 || typeof imageBase64 !== 'string') {
+        return res.status(400).json({ error: 'Data gambar logo wajib disertakan.' });
+      }
+
+      // Strip data URL scheme prefix if present
+      const cleanBase64 = imageBase64.replace(/^data:image\/[a-zA-Z0-9+.-]+;base64,/, '').trim();
+      const buffer = Buffer.from(cleanBase64, 'base64');
+
+      // Size validation: max 2 MB
+      const maxBytes = 2 * 1024 * 1024;
+      if (buffer.length > maxBytes) {
+        return res.status(400).json({
+          error: `Ukuran file (${(buffer.length / (1024 * 1024)).toFixed(2)} MB) melebihi batas maksimal 2 MB.`,
+        });
+      }
+
+      // Format validation: PNG, JPG, JPEG, WEBP
+      const validMimes: Record<string, string> = {
+        'image/png': 'png',
+        'image/jpeg': 'jpg',
+        'image/jpg': 'jpg',
+        'image/webp': 'webp',
+      };
+
+      const detectedMime = (mimeType || 'image/png').toLowerCase().trim();
+      const ext = validMimes[detectedMime];
+
+      if (!ext) {
+        return res.status(400).json({
+          error: 'Format file tidak didukung. Format yang diperbolehkan: PNG, JPG, JPEG, WEBP.',
+        });
+      }
+
+      // Save custom logo file to disk
+      const targetPath = getCustomLogoFilePath(ext);
+      fs.writeFileSync(targetPath, buffer);
+
+      // Clean up previous extensions if different
+      if (logoConfigCache.extension && logoConfigCache.extension !== ext) {
+        try {
+          const oldPath = getCustomLogoFilePath(logoConfigCache.extension);
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        } catch {}
+      }
+
+      const now = new Date().toISOString();
+      const version = Date.now();
+
+      logoConfigCache = {
+        hasCustomLogo: true,
+        mimeType: detectedMime,
+        extension: ext,
+        updatedAt: now,
+        updatedBy: currentUser.full_name || currentUser.username,
+        version,
+      };
+
+      saveLogoConfig();
+
+      return res.json({
+        success: true,
+        message: 'Logo berhasil diperbarui.',
+        logoUrl: `/api/logo/image?v=${version}`,
+        version,
+        updatedAt: now,
+        updatedBy: logoConfigCache.updatedBy,
+      });
+    } catch (err: any) {
+      console.error('Error saving logo:', err);
+      return res.status(500).json({ error: 'Terjadi kesalahan sistem saat menyimpan logo baru.' });
+    }
+  });
+
+  // 12. DELETE /logo - ADMIN ONLY: Reset custom logo and revert to default
+  router.delete('/logo', authMiddleware, requireAdmin, (req, res) => {
+    try {
+      const currentUser = (req as any).user as StoredUser;
+      if (!currentUser || currentUser.role !== 'ADMIN') {
+        return res.status(403).json({
+          error: 'Akses ditolak: Hanya pengguna dengan peran ADMIN yang memiliki otoritas untuk menghapus logo.',
+        });
+      }
+
+      try {
+        const filePath = getCustomLogoFilePath(logoConfigCache.extension);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {}
+
+      const version = Date.now();
+      logoConfigCache = {
+        hasCustomLogo: false,
+        mimeType: 'image/png',
+        extension: 'png',
+        updatedAt: new Date().toISOString(),
+        updatedBy: currentUser.full_name || currentUser.username,
+        version,
+      };
+
+      saveLogoConfig();
+
+      return res.json({
+        success: true,
+        message: 'Logo custom berhasil dihapus, kembali menggunakan logo default.',
+        logoUrl: '/assets/logo-dashboard.png',
+        version,
+      });
+    } catch (err: any) {
+      console.error('Error deleting logo:', err);
+      return res.status(500).json({ error: 'Terjadi kesalahan sistem saat menghapus logo.' });
+    }
+  });
+
   return router;
 }
 
@@ -590,7 +861,13 @@ export function createApp(): express.Express {
     next();
   });
 
-  app.use(express.json());
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+  const publicDir = path.resolve(process.cwd(), 'public');
+  if (fs.existsSync(publicDir)) {
+    app.use(express.static(publicDir));
+  }
 
   const apiRouter = createApiRouter();
   // Mount on both /api and root

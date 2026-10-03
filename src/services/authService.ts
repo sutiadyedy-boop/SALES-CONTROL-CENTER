@@ -193,6 +193,28 @@ const INITIAL_SEED_PROFILES: (UserProfile & { password?: string })[] = [
     createdAt: '2026-09-30T07:24:24.913Z',
     updatedAt: '2026-09-30T07:24:24.913Z',
   },
+  {
+    id: 'usr_regular_user',
+    username: 'user',
+    name: 'Staff User',
+    role: 'USER',
+    status: 'ACTIVE',
+    cabang: 'BONE',
+    password: 'password123',
+    createdAt: '2026-09-30T07:24:24.913Z',
+    updatedAt: '2026-09-30T07:24:24.913Z',
+  },
+  {
+    id: 'usr_sales01',
+    username: 'sales01',
+    name: 'Sales 01',
+    role: 'USER',
+    status: 'ACTIVE',
+    cabang: 'BONE',
+    password: 'password123',
+    createdAt: '2026-09-30T07:24:24.913Z',
+    updatedAt: '2026-09-30T07:24:24.913Z',
+  },
 ];
 
 function getLocalUsers(): (UserProfile & { password?: string })[] {

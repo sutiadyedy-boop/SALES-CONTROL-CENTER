@@ -148,8 +148,17 @@ export interface AppSettings {
   thresholds?: InsightThresholds;
 }
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'SUPERVISOR' | 'SALESMAN';
+export type UserRole = 'ADMIN' | 'USER' | 'MANAGER' | 'SUPERVISOR' | 'SALESMAN';
 export type UserStatus = 'ACTIVE' | 'PENDING' | 'SUSPENDED' | 'DISABLED';
+
+export interface LogoConfig {
+  hasCustomLogo: boolean;
+  logoUrl: string;
+  defaultLogoUrl: string;
+  updatedAt: string | null;
+  updatedBy: string | null;
+  version: number;
+}
 
 export interface UserProfile {
   id: string;

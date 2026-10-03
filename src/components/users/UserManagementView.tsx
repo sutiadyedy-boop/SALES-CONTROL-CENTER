@@ -371,6 +371,7 @@ export function UserManagementView({ currentUser, onNavigateToDashboard }: UserM
                     MANAGER: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
                     SUPERVISOR: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
                     SALESMAN: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+                    USER: 'bg-slate-700/40 text-slate-300 border-slate-600/40',
                   }[u.role] || 'bg-slate-800 text-slate-300';
 
                   const statusBadgeColor = {
