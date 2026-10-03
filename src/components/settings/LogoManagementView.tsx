@@ -150,7 +150,17 @@ export function LogoManagementView({
       await refreshLogo();
     } catch (err: any) {
       soundManager.playError();
-      setErrorMessage(err.message || 'Gagal memperbarui logo dashboard.');
+      let errorText = 'Gagal memperbarui logo dashboard.';
+      if (typeof err === 'string') {
+        errorText = err;
+      } else if (err?.message && typeof err.message === 'string') {
+        errorText = err.message;
+      } else if (err?.error && typeof err.error === 'string') {
+        errorText = err.error;
+      } else if (err?.error?.message && typeof err.error.message === 'string') {
+        errorText = err.error.message;
+      }
+      setErrorMessage(errorText);
     } finally {
       setIsSubmitting(false);
     }
@@ -181,7 +191,17 @@ export function LogoManagementView({
       await refreshLogo();
     } catch (err: any) {
       soundManager.playError();
-      setErrorMessage(err.message || 'Gagal mereset logo dashboard.');
+      let errorText = 'Gagal mereset logo dashboard.';
+      if (typeof err === 'string') {
+        errorText = err;
+      } else if (err?.message && typeof err.message === 'string') {
+        errorText = err.message;
+      } else if (err?.error && typeof err.error === 'string') {
+        errorText = err.error;
+      } else if (err?.error?.message && typeof err.error.message === 'string') {
+        errorText = err.error.message;
+      }
+      setErrorMessage(errorText);
     } finally {
       setIsDeleting(false);
     }

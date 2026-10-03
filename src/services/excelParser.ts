@@ -62,11 +62,25 @@ export async function parseExcelFile(
   file: File,
   category: DatabaseCategory
 ): Promise<RawUploadedFile> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+  // Security Guard: File size limit protection against excessive memory exhaustion (max 50 MB)
+  const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error(`Ukuran file (${(file.size / (1024 * 1024)).toFixed(1)} MB) melebihi batas maksimal keamanan 50 MB.`);
+  }
+
+  // Security Guard: Filename sanitization against path traversal / dangerous symbols
+  const safeFileName = file.name.replace(/[/\\?%*:|"<>]/g, '_').trim();
+
+  let workbook: XLSX.WorkBook;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+  } catch {
+    throw new Error(`File "${safeFileName}" rusak, korup, atau bukan format spreadsheet Excel yang valid.`);
+  }
 
   const sheetNames = workbook.SheetNames;
-  if (sheetNames.length === 0) {
+  if (!sheetNames || sheetNames.length === 0) {
     throw new Error('File Excel tidak memiliki sheet yang valid.');
   }
 
@@ -84,10 +98,13 @@ export async function parseExcelFile(
   }
 
   const worksheet = workbook.Sheets[selectedSheet];
+  if (!worksheet) {
+    throw new Error(`Sheet "${selectedSheet}" tidak ditemukan dalam file.`);
+  }
   const matrix: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
 
   if (matrix.length === 0) {
-    throw new Error(`Sheet "${selectedSheet}" dalam file ${file.name} kosong.`);
+    throw new Error(`Sheet "${selectedSheet}" dalam file ${safeFileName} kosong.`);
   }
 
   const headerRowIdx = findHeaderRowIndex(matrix);
@@ -162,11 +179,23 @@ export async function parseSpecificSheet(
   file: File,
   sheetName: string
 ): Promise<ParsedSheetData> {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+  const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    throw new Error(`Ukuran file melebihi batas maksimal keamanan (50 MB).`);
+  }
+
+  const safeFileName = file.name.replace(/[/\\?%*:|"<>]/g, '_').trim();
+  let workbook: XLSX.WorkBook;
+  try {
+    const arrayBuffer = await file.arrayBuffer();
+    workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+  } catch {
+    throw new Error(`Gagal membaca lembar kerja Excel pada file "${safeFileName}".`);
+  }
+
   const worksheet = workbook.Sheets[sheetName];
   if (!worksheet) {
-    throw new Error(`Sheet ${sheetName} tidak ditemukan`);
+    throw new Error(`Sheet "${sheetName}" tidak ditemukan`);
   }
 
   const matrix: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });

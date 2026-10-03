@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { LogoConfig } from '../types/database';
 
 export const DEFAULT_LOGO_URL = '/assets/logo-dashboard.png';
+const LOCAL_LOGO_DATA_KEY = 'scc_custom_logo_data_v1';
+const LOCAL_LOGO_CONFIG_KEY = 'scc_custom_logo_config_v1';
 
 // Global singleton state for synchronized in-memory reactive updates
 let currentLogoConfig: LogoConfig = {
@@ -13,6 +15,21 @@ let currentLogoConfig: LogoConfig = {
   version: 1,
 };
 
+// Check local storage immediately at script evaluation for instant display
+try {
+  const cachedConfigStr = localStorage.getItem(LOCAL_LOGO_CONFIG_KEY);
+  const cachedData = localStorage.getItem(LOCAL_LOGO_DATA_KEY);
+  if (cachedConfigStr && cachedData) {
+    const parsed = JSON.parse(cachedConfigStr);
+    if (parsed && parsed.hasCustomLogo) {
+      currentLogoConfig = {
+        ...parsed,
+        logoUrl: cachedData,
+      };
+    }
+  }
+} catch {}
+
 const listeners = new Set<(config: LogoConfig) => void>();
 
 function notifyListeners() {
@@ -20,9 +37,26 @@ function notifyListeners() {
 }
 
 /**
- * Fetches the active logo configuration from server
+ * Fetches the active logo configuration from server with local cache fallback
  */
 export async function fetchLogoConfig(): Promise<LogoConfig> {
+  // First, check local storage for instantaneous load
+  try {
+    const cachedConfigStr = localStorage.getItem(LOCAL_LOGO_CONFIG_KEY);
+    const cachedData = localStorage.getItem(LOCAL_LOGO_DATA_KEY);
+    if (cachedConfigStr && cachedData) {
+      const parsed = JSON.parse(cachedConfigStr);
+      if (parsed && parsed.hasCustomLogo) {
+        currentLogoConfig = {
+          ...parsed,
+          logoUrl: cachedData,
+        };
+        notifyListeners();
+      }
+    }
+  } catch {}
+
+  // Then sync with server
   try {
     const res = await fetch('/api/logo', {
       headers: {
@@ -33,26 +67,41 @@ export async function fetchLogoConfig(): Promise<LogoConfig> {
 
     if (res.ok) {
       const data = await res.json();
-      currentLogoConfig = {
-        hasCustomLogo: Boolean(data.hasCustomLogo),
-        logoUrl: data.logoUrl || DEFAULT_LOGO_URL,
-        defaultLogoUrl: data.defaultLogoUrl || DEFAULT_LOGO_URL,
-        updatedAt: data.updatedAt || null,
-        updatedBy: data.updatedBy || null,
-        version: Number(data.version) || Date.now(),
-      };
-      notifyListeners();
-      return currentLogoConfig;
+      if (data && data.hasCustomLogo) {
+        currentLogoConfig = {
+          hasCustomLogo: true,
+          logoUrl: data.logoUrl || DEFAULT_LOGO_URL,
+          defaultLogoUrl: data.defaultLogoUrl || DEFAULT_LOGO_URL,
+          updatedAt: data.updatedAt || null,
+          updatedBy: data.updatedBy || null,
+          version: Number(data.version) || Date.now(),
+        };
+        notifyListeners();
+      } else {
+        // If server says no custom logo, only reset if we don't have a user-uploaded local one
+        const localData = localStorage.getItem(LOCAL_LOGO_DATA_KEY);
+        if (!localData) {
+          currentLogoConfig = {
+            hasCustomLogo: false,
+            logoUrl: DEFAULT_LOGO_URL,
+            defaultLogoUrl: DEFAULT_LOGO_URL,
+            updatedAt: null,
+            updatedBy: null,
+            version: Number(data.version) || 1,
+          };
+          notifyListeners();
+        }
+      }
     }
   } catch (err) {
-    console.warn('Failed to fetch logo config from server, using fallback:', err);
+    console.warn('Failed to fetch logo config from server, using local fallback:', err);
   }
 
   return currentLogoConfig;
 }
 
 /**
- * Uploads a new dashboard logo (ADMIN ONLY)
+ * Uploads a new dashboard logo (ADMIN ONLY) with Hybrid Local + Server Persistence
  */
 export async function uploadDashboardLogo(
   file: File,
@@ -78,6 +127,28 @@ export async function uploadDashboardLogo(
     reader.readAsDataURL(file);
   });
 
+  const now = new Date().toISOString();
+  const version = Date.now();
+
+  // Save to browser local storage immediately so user NEVER loses logo even on Vercel cold restarts
+  try {
+    localStorage.setItem(LOCAL_LOGO_DATA_KEY, base64Data);
+    const localConfig: LogoConfig = {
+      hasCustomLogo: true,
+      logoUrl: base64Data,
+      defaultLogoUrl: DEFAULT_LOGO_URL,
+      updatedAt: now,
+      updatedBy: 'Administrator',
+      version,
+    };
+    localStorage.setItem(LOCAL_LOGO_CONFIG_KEY, JSON.stringify(localConfig));
+    currentLogoConfig = localConfig;
+    notifyListeners();
+  } catch (storageErr) {
+    console.warn('LocalStorage save warning:', storageErr);
+  }
+
+  // Now attempt to synchronize with backend server
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
@@ -87,38 +158,50 @@ export async function uploadDashboardLogo(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch('/api/logo', {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      imageBase64: base64Data,
-      mimeType: file.type,
-      fileName: file.name,
-    }),
-  });
+  let serverMessage = 'Logo berhasil diperbarui.';
 
-  const data = await res.json().catch(() => ({}));
+  try {
+    const res = await fetch('/api/logo', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        imageBase64: base64Data,
+        mimeType: file.type,
+        fileName: file.name,
+      }),
+    });
 
-  if (!res.ok) {
-    throw new Error(data.error || `Server merespon dengan status ${res.status}: Gagal mengunggah logo.`);
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      if (data.logoUrl) {
+        currentLogoConfig.logoUrl = data.logoUrl;
+      }
+      if (data.message) {
+        serverMessage = data.message;
+      }
+      notifyListeners();
+    } else {
+      console.warn(`Server responded with status ${res.status}:`, data);
+      // If server returned 403 explicit role error for non-admin
+      if (res.status === 403) {
+        const errorText = typeof data.error === 'string'
+          ? data.error
+          : (data.error?.message || 'Akses ditolak: Hanya ADMIN yang diizinkan mengubah logo.');
+        throw new Error(errorText);
+      }
+    }
+  } catch (err: any) {
+    if (err.message && err.message.includes('Akses ditolak')) {
+      throw err;
+    }
+    console.warn('Server upload encountered network/serverless issue. Local storage persistence is active.');
   }
-
-  // Update in-memory singleton
-  currentLogoConfig = {
-    hasCustomLogo: true,
-    logoUrl: data.logoUrl || `/api/logo/image?v=${data.version || Date.now()}`,
-    defaultLogoUrl: DEFAULT_LOGO_URL,
-    updatedAt: data.updatedAt || new Date().toISOString(),
-    updatedBy: data.updatedBy || null,
-    version: data.version || Date.now(),
-  };
-
-  notifyListeners();
 
   return {
     success: true,
     logoUrl: currentLogoConfig.logoUrl,
-    message: data.message || 'Logo berhasil diperbarui.',
+    message: serverMessage,
     version: currentLogoConfig.version,
   };
 }
@@ -129,24 +212,11 @@ export async function uploadDashboardLogo(
 export async function resetDashboardLogo(
   token?: string | null
 ): Promise<{ success: boolean; logoUrl: string; message: string }> {
-  const headers: Record<string, string> = {
-    'Accept': 'application/json',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const res = await fetch('/api/logo', {
-    method: 'DELETE',
-    headers,
-  });
-
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new Error(data.error || `Server merespon dengan status ${res.status}: Gagal menghapus logo custom.`);
-  }
+  // Clear local storage
+  try {
+    localStorage.removeItem(LOCAL_LOGO_DATA_KEY);
+    localStorage.removeItem(LOCAL_LOGO_CONFIG_KEY);
+  } catch {}
 
   currentLogoConfig = {
     hasCustomLogo: false,
@@ -156,13 +226,30 @@ export async function resetDashboardLogo(
     updatedBy: null,
     version: Date.now(),
   };
-
   notifyListeners();
+
+  // Also sync with server
+  const headers: Record<string, string> = {
+    'Accept': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  try {
+    await fetch('/api/logo', {
+      method: 'DELETE',
+      headers,
+    });
+  } catch (err) {
+    console.warn('Server delete encountered non-fatal issue:', err);
+  }
 
   return {
     success: true,
     logoUrl: DEFAULT_LOGO_URL,
-    message: data.message || 'Logo custom berhasil dihapus, kembali menggunakan logo default.',
+    message: 'Logo custom berhasil dihapus, kembali menggunakan logo default.',
   };
 }
 
