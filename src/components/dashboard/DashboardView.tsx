@@ -20,6 +20,8 @@ import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
 import { ControlTowerCharts } from './ControlTowerCharts';
 import { ControlTowerTables } from './ControlTowerTables';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { ExecutiveBriefingBar } from './ExecutiveBriefingBar';
+import { TopLeakageOutletsCard } from './TopLeakageOutletsCard';
 
 interface DashboardViewProps {
   calculation: CalculationResult | null;
@@ -112,6 +114,12 @@ export function DashboardView({
           </div>
         </div>
       </div>
+
+      {/* EXECUTIVE 60-SECOND BRIEFING & RUN-RATE CLOSING ESTIMATION */}
+      <ExecutiveBriefingBar
+        calculation={calculation}
+        settings={settings}
+      />
 
       {/* TOP 9 PRIMARY KPI CARDS */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5">
@@ -285,6 +293,13 @@ export function DashboardView({
         calculation={calculation}
         currentPeriodLabel={currLabel}
         previousPeriodLabel={prevLabel}
+      />
+
+      {/* TOP 10 LEAKAGE OUTLETS (PARETO 80/20 HIGH-VALUE DROP RECOVERY) */}
+      <TopLeakageOutletsCard
+        dropOutlets={calculation.dropOutlets}
+        totalLostRevenue={kpis.dropOutletLostRevenue}
+        onNavigate={onNavigate}
       />
 
       {/* TOP OPPORTUNITY ALERT PREVIEW (OPTIONAL COMPONENT) */}
