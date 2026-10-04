@@ -2,6 +2,13 @@ import express from 'express';
 import path from 'path';
 import crypto from 'crypto';
 import fs from 'fs';
+import { 
+  explainDecisionWithGemini, 
+  generateExecutiveInsightWithGemini, 
+  chatAboutDecisionWithGemini,
+  generateDeterministicFallbackExplanation
+} from './geminiDecisionService';
+import { EvidencePackage } from '../types/decisionEngine';
 
 // Secure Secret for session signing: read from server environment or use stable cryptographic fallback
 function resolveSessionSecret(): string {
@@ -879,6 +886,52 @@ export function createApiRouter(): express.Router {
     } catch (err: any) {
       console.error('Error deleting logo:', err);
       return res.status(500).json({ error: 'Terjadi kesalahan sistem saat menghapus logo.' });
+    }
+  });
+
+  // ==========================================
+  // PHASE 2: AI DECISION INTELLIGENCE ENDPOINTS
+  // ==========================================
+  router.post('/ai/explain-decision', async (req, res) => {
+    try {
+      const { evidencePackage } = req.body;
+      if (!evidencePackage || !evidencePackage.decisionId) {
+        return res.status(400).json({ error: 'EvidencePackage is required' });
+      }
+      const explanation = await explainDecisionWithGemini(evidencePackage);
+      return res.json({ success: true, explanation });
+    } catch (err: any) {
+      console.error('[API /ai/explain-decision error]:', err?.message || err);
+      const fallback = generateDeterministicFallbackExplanation(req.body?.evidencePackage || {});
+      return res.json({ success: true, explanation: fallback, fallbackUsed: true });
+    }
+  });
+
+  router.post('/ai/executive-insight', async (req, res) => {
+    try {
+      const { summaryData } = req.body;
+      if (!summaryData) {
+        return res.status(400).json({ error: 'SummaryData is required' });
+      }
+      const insight = await generateExecutiveInsightWithGemini(summaryData);
+      return res.json({ success: true, insight });
+    } catch (err: any) {
+      console.error('[API /ai/executive-insight error]:', err?.message || err);
+      return res.status(500).json({ error: 'Failed to generate executive insight' });
+    }
+  });
+
+  router.post('/ai/chat-decision', async (req, res) => {
+    try {
+      const { evidencePackage, question, history } = req.body;
+      if (!evidencePackage || !question) {
+        return res.status(400).json({ error: 'evidencePackage and question are required' });
+      }
+      const chatResponse = await chatAboutDecisionWithGemini(evidencePackage, question, history || []);
+      return res.json({ success: true, ...chatResponse });
+    } catch (err: any) {
+      console.error('[API /ai/chat-decision error]:', err?.message || err);
+      return res.status(500).json({ error: 'Failed to answer question' });
     }
   });
 

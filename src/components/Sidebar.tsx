@@ -28,7 +28,9 @@ import {
   UserCheck,
   Lock,
   Image as ImageIcon,
-  LogOut
+  LogOut,
+  Cpu,
+  Award
 } from 'lucide-react';
 import { ControlTowerKPIs } from '../types/analytics';
 import { UserProfile } from '../types/database';
@@ -175,9 +177,9 @@ export function Sidebar({
     },
     { 
       id: 'opportunity', 
-      label: 'Opportunity Radar', 
+      label: 'Opportunity Intelligence', 
       icon: Lightbulb, 
-      badge: 'Radar',
+      badge: 'Phase 4',
       badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
     },
     { 
@@ -188,6 +190,27 @@ export function Sidebar({
       badgeColor: pendingActionCount !== undefined && pendingActionCount > 0
         ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30 font-mono'
         : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
+    },
+    {
+      id: 'decision_center',
+      label: 'AI Decision Center',
+      icon: Cpu,
+      badge: 'Core V1',
+      badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono'
+    },
+    {
+      id: 'next_best_action',
+      label: 'Next Best Action',
+      icon: Zap,
+      badge: 'Phase 3',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono'
+    },
+    { 
+      id: 'performance_learning', 
+      label: 'Performance & Learning', 
+      icon: Award, 
+      badge: 'Phase 5',
+      badgeColor: 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono'
     },
     { 
       id: 'reports', 

@@ -104,16 +104,42 @@ export function TargetRealisasiView({
     return autoDetectDefaults.elapsed;
   });
 
-  // Save to localStorage whenever working days change
+  // Save to localStorage whenever working days change and broadcast to other views
   useEffect(() => {
     try {
       localStorage.setItem(storageKey, JSON.stringify({
         blnIni: hariKerjaBlnIni,
         berjalan: hariKerjaBerjalan,
       }));
+      window.dispatchEvent(new Event('target_work_days_updated'));
     } catch {
       // ignore
     }
+  }, [storageKey, hariKerjaBlnIni, hariKerjaBerjalan]);
+
+  // Synchronize when working days change from other components (e.g. Dashboard Navigasi Run-Rate)
+  useEffect(() => {
+    const handleSync = () => {
+      try {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (typeof parsed.blnIni === 'number' && parsed.blnIni > 0 && parsed.blnIni !== hariKerjaBlnIni) {
+            setHariKerjaBlnIni(parsed.blnIni);
+          }
+          if (typeof parsed.berjalan === 'number' && parsed.berjalan >= 0 && parsed.berjalan !== hariKerjaBerjalan) {
+            setHariKerjaBerjalan(parsed.berjalan);
+          }
+        }
+      } catch {}
+    };
+
+    window.addEventListener('storage', handleSync);
+    window.addEventListener('target_work_days_updated', handleSync);
+    return () => {
+      window.removeEventListener('storage', handleSync);
+      window.removeEventListener('target_work_days_updated', handleSync);
+    };
   }, [storageKey, hariKerjaBlnIni, hariKerjaBerjalan]);
 
   // Derived: Sisa Hari Kerja = Hari Kerja Bln ini - Hari Kerja Berjalan

@@ -76,11 +76,10 @@ export function WhatsAppBriefingModal({
 • Realisasi s/d Hari Ini: ${formatRupiah(kpis.totalActualCurrent)} (${kpis.achievementRate !== null ? kpis.achievementRate.toFixed(1) : 0}%)
 • Sisa Kekurangan Gap: ${formatRupiah(kekuranganTarget)}
 
-⏱️ *NAVIGASI WAKTU & RUN-RATE*
+⏱️ *NAVIGASI HARI KERJA & PENJUALAN AKTUAL*
 • Hari Kerja: Hari ke-${hariKerjaBerjalan} dari ${totalHariKerja} hari (Sisa ${sisaHariKerja} hari)
-• Rata-rata Harian Aktual (ADS): ${formatRupiah(ads)}/hari
-• 🔥 *SETORAN WAJIB HARIAN: ${formatRupiah(targetHarianWajib)} / HARI*
-• 📈 Proyeksi Tutup Bulan: ${formatRupiah(closingEstimation)} (${projectedAch.toFixed(1)}%)
+• Rata-rata Penjualan Harian (ADS): ${formatRupiah(ads)}/hari
+• GAP Defisit Saat Ini: ${formatRupiah(kekuranganTarget)}
 
 🚨 *3 TITIK FOKUS UTAMA HARI INI:*
 1️⃣ *Outlet Belum Order:* Ada *${kpis.outletsNotTransactedCurrent} Outlet Aktif* belum order di bulan ini. Segera visit & terbitkan faktur!

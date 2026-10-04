@@ -14,6 +14,8 @@ import { SalesmanPerformanceView } from './components/analytics/SalesmanPerforma
 import { OpportunityView } from './components/analytics/OpportunityView';
 import { SmartInsightView } from './components/analytics/SmartInsightView';
 import { ActionMonitoringView } from './components/analytics/ActionMonitoringView';
+import { DecisionCenterView } from './components/analytics/DecisionCenterView';
+import { NextBestActionView } from './components/analytics/NextBestActionView';
 import { ReportsView } from './components/analytics/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { LoginPage } from './components/auth/LoginPage';
@@ -45,11 +47,39 @@ import { computeAnalytics } from './services/calculationEngine';
 import { generateOpportunities } from './services/opportunityEngine';
 import { generateSmartInsights } from './services/smartInsightEngine';
 import { 
+  buildDecisionContext, 
+  synthesizeDeterministicDecisions,
+  generateDecisionAuditReport
+} from './services/decisionEngineCore';
+import { DecisionResult } from './types/decisionEngine';
+import { 
   generateActionItems, 
   computeActionMonitoringSummary, 
   loadPersistedActionState, 
-  savePersistedActionState 
+  savePersistedActionState,
+  synthesizeNextBestActions,
+  loadPersistedNbaStates,
+  savePersistedNbaStates
 } from './services/actionMonitoringService';
+import { PersistedNbaState } from './services/nextBestActionEngine';
+import { 
+  synthesizeOpportunities, 
+  loadPersistedOpportunityStates, 
+  savePersistedOpportunityStates,
+  PersistedOpportunityState 
+} from './services/opportunityIntelligenceEngine';
+import { PerformanceLearningView } from './components/analytics/PerformanceLearningView';
+import { 
+  synthesizePerformanceResults,
+  computePerformanceExecutiveSummary,
+  computeActionTypePerformance,
+  computeOpportunityTypePerformance,
+  computeSalesmanExecutionPerformance,
+  synthesizeLearningSignals,
+  filterPerformanceResultsByRole,
+  loadConfirmedOutcomes,
+} from './services/performanceLearningEngine';
+import { ConfirmedOutcomeRecord } from './types/performanceEngine';
 import { parseExcelFile, parseSpecificSheet } from './services/excelParser';
 import { autoDetectMappings } from './services/columnMapper';
 import { 
@@ -711,6 +741,121 @@ export default function App() {
     return computeActionMonitoringSummary(actions);
   }, [actions]);
 
+  // AI Decision Engine Core (Deterministic Phase 1 Synthesis)
+  const decisionContext = useMemo(() => {
+    return buildDecisionContext(
+      analytics,
+      prevTransactions,
+      currTransactions,
+      targets,
+      masterOutlets,
+      settings
+    );
+  }, [analytics, prevTransactions, currTransactions, targets, masterOutlets, settings]);
+
+  const decisions = useMemo(() => {
+    return synthesizeDeterministicDecisions(decisionContext);
+  }, [decisionContext]);
+
+  const decisionAuditReport = useMemo(() => {
+    return generateDecisionAuditReport(decisionContext, decisions, {
+      previousRows: prevTransactions.length,
+      currentRows: currTransactions.length,
+      targetRows: targets.length,
+      masterRows: masterOutlets.length,
+    });
+  }, [decisionContext, decisions, prevTransactions.length, currTransactions.length, targets.length, masterOutlets.length]);
+
+  // Phase 3: Next Best Action (NBA) Engine Integration
+  const [nbaStates, setNbaStates] = useState<Record<string, PersistedNbaState>>(() => loadPersistedNbaStates());
+
+  const nextBestActions = useMemo(() => {
+    return synthesizeNextBestActions(decisions, decisionContext, nbaStates);
+  }, [decisions, decisionContext, nbaStates]);
+
+  const handleUpdateNbaState = useCallback((actionId: string, newState: PersistedNbaState) => {
+    setNbaStates(prev => {
+      const updated = {
+        ...prev,
+        [actionId]: newState,
+      };
+      savePersistedNbaStates(updated);
+      return updated;
+    });
+  }, []);
+
+  // Phase 4: Opportunity Intelligence Engine Integration
+  const [opportunityStates, setOpportunityStates] = useState<Record<string, PersistedOpportunityState>>(() => loadPersistedOpportunityStates());
+
+  const opportunityResults = useMemo(() => {
+    return synthesizeOpportunities(
+      analytics,
+      decisionContext,
+      decisions,
+      nextBestActions,
+      opportunityStates,
+      { previous: prevTransactions, current: currTransactions }
+    );
+  }, [analytics, decisionContext, decisions, nextBestActions, opportunityStates, prevTransactions, currTransactions]);
+
+  const handleUpdateOpportunityState = useCallback((oppId: string, newState: PersistedOpportunityState) => {
+    setOpportunityStates(prev => {
+      const updated = {
+        ...prev,
+        [oppId]: newState,
+      };
+      savePersistedOpportunityStates(updated);
+      return updated;
+    });
+  }, []);
+
+  // Phase 5: Performance & Learning Engine Integration
+  const [confirmedOutcomes, setConfirmedOutcomes] = useState<Record<string, ConfirmedOutcomeRecord>>(() => loadConfirmedOutcomes());
+
+  const handleRefreshOutcomes = useCallback(() => {
+    setConfirmedOutcomes(loadConfirmedOutcomes());
+  }, []);
+
+  const performanceResults = useMemo(() => {
+    return synthesizePerformanceResults(
+      nextBestActions,
+      opportunityResults,
+      decisions,
+      currTransactions,
+      confirmedOutcomes,
+      settings.currentMonthLabel
+    );
+  }, [nextBestActions, opportunityResults, decisions, currTransactions, confirmedOutcomes, settings.currentMonthLabel]);
+
+  const roleFilteredPerformanceResults = useMemo(() => {
+    return filterPerformanceResultsByRole(performanceResults, userProfile);
+  }, [performanceResults, userProfile]);
+
+  const performanceSummary = useMemo(() => {
+    return computePerformanceExecutiveSummary(roleFilteredPerformanceResults, decisions, opportunityResults);
+  }, [roleFilteredPerformanceResults, decisions, opportunityResults]);
+
+  const actionTypePerformances = useMemo(() => {
+    return computeActionTypePerformance(roleFilteredPerformanceResults);
+  }, [roleFilteredPerformanceResults]);
+
+  const opportunityTypePerformances = useMemo(() => {
+    return computeOpportunityTypePerformance(roleFilteredPerformanceResults, opportunityResults);
+  }, [roleFilteredPerformanceResults, opportunityResults]);
+
+  const salesmanPerformances = useMemo(() => {
+    return computeSalesmanExecutionPerformance(performanceResults);
+  }, [performanceResults]);
+
+  const learningSignals = useMemo(() => {
+    return synthesizeLearningSignals(
+      actionTypePerformances,
+      opportunityTypePerformances,
+      salesmanPerformances,
+      settings.currentMonthLabel
+    );
+  }, [actionTypePerformances, opportunityTypePerformances, salesmanPerformances, settings.currentMonthLabel]);
+
   const handleUpdateActionStatus = useCallback((actionId: string, status: ActionStatus, note?: string) => {
     setActionStates(prev => {
       const existing = prev[actionId] || { status: 'OPEN', notes: [] };
@@ -727,6 +872,12 @@ export default function App() {
       return updated;
     });
   }, []);
+
+  const handleSendDecisionToAction = useCallback((decision: DecisionResult) => {
+    const actionId = `act-${decision.category.toLowerCase().replace(/_/g, '-')}-${decision.entityId}`;
+    handleUpdateActionStatus(actionId, 'IN_PROGRESS', `[AI DECISION CENTER] ${decision.recommendedAction}`);
+    soundManager.playSuccess();
+  }, [handleUpdateActionStatus]);
 
   const handleAddActionNote = useCallback((actionId: string, note: string) => {
     setActionStates(prev => {
@@ -808,6 +959,7 @@ export default function App() {
     'new_outlets',
     'salesman_performance',
     'opportunity',
+    'performance_learning',
     'smart_insight',
     'action_monitoring',
     'reports'
@@ -1002,6 +1154,13 @@ export default function App() {
             {currentTab === 'opportunity' && (
               <OpportunityView
                 opportunities={opportunities}
+                opportunityResults={opportunityResults}
+                context={decisionContext}
+                decisions={decisions}
+                nbaActions={nextBestActions}
+                userProfile={userProfile}
+                onUpdateOpportunityState={handleUpdateOpportunityState}
+                onNavigateToTab={(tab) => handleSelectTab(tab)}
                 onNavigateToUpload={() => setCurrentTab('database')}
                 onLoadSampleData={populateSampleFiles}
                 onNavigateToActionMonitoring={() => setCurrentTab('action_monitoring')}
@@ -1023,6 +1182,45 @@ export default function App() {
                 summary={actionSummary}
                 onUpdateStatus={handleUpdateActionStatus}
                 onAddNote={handleAddActionNote}
+                onNavigateToUpload={() => setCurrentTab('database')}
+                onLoadSampleData={populateSampleFiles}
+              />
+            )}
+
+            {currentTab === 'decision_center' && (
+              <DecisionCenterView
+                context={decisionContext}
+                decisions={decisions}
+                auditReport={decisionAuditReport}
+                onNavigateToTab={(tab) => handleSelectTab(tab)}
+                onSendToActionMonitoring={handleSendDecisionToAction}
+              />
+            )}
+
+            {currentTab === 'next_best_action' && (
+              <NextBestActionView
+                actions={nextBestActions}
+                context={decisionContext}
+                decisions={decisions}
+                userProfile={userProfile}
+                onUpdateActionState={handleUpdateNbaState}
+                onNavigateToTab={(tab) => handleSelectTab(tab)}
+                onNavigateToUpload={() => setCurrentTab('database')}
+                onLoadSampleData={populateSampleFiles}
+              />
+            )}
+
+            {currentTab === 'performance_learning' && (
+              <PerformanceLearningView
+                performanceResults={roleFilteredPerformanceResults}
+                summary={performanceSummary}
+                actionTypePerformances={actionTypePerformances}
+                opportunityTypePerformances={opportunityTypePerformances}
+                salesmanPerformances={salesmanPerformances}
+                learningSignals={learningSignals}
+                userProfile={userProfile}
+                onRefreshOutcomes={handleRefreshOutcomes}
+                onNavigateToTab={(tab) => handleSelectTab(tab)}
                 onNavigateToUpload={() => setCurrentTab('database')}
                 onLoadSampleData={populateSampleFiles}
               />

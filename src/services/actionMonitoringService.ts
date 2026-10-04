@@ -7,6 +7,22 @@ import {
   SmartInsightItem,
   InsightClassification
 } from '../types/analytics';
+import { 
+  NextBestAction, 
+  NextBestActionStatus, 
+  NextBestActionOutcome,
+  DecisionPriority
+} from '../types/decisionEngine';
+export {
+  synthesizeNextBestActions,
+  filterActionsByUserRole,
+  getTopActionsPerSalesman,
+  computeNextBestActionSummary,
+  computeNextBestActionFunnel,
+  loadPersistedNbaStates,
+  savePersistedNbaStates,
+  NBA_STORAGE_KEY
+} from './nextBestActionEngine';
 
 const ACTION_STORAGE_KEY = 'spm_action_monitoring_v1';
 
@@ -236,5 +252,41 @@ export function computeActionMonitoringSummary(actions: ActionItem[]): ActionMon
     completedCount,
     totalImpactValue,
     resolvedImpactValue,
+  };
+}
+
+/**
+ * Bridges Phase 3 NextBestAction with Phase 1 ActionItem for unified monitoring
+ */
+export function convertNbaToActionItem(nba: NextBestAction): ActionItem {
+  const mapClassification = (priority: DecisionPriority): InsightClassification => {
+    if (priority === 'CRITICAL' || priority === 'HIGH') return 'PRIORITY';
+    if (priority === 'MEDIUM') return 'ATTENTION';
+    return 'OPPORTUNITY';
+  };
+
+  const mapStatus = (status: NextBestActionStatus): ActionStatus => {
+    if (status === 'IN_PROGRESS') return 'IN_PROGRESS';
+    if (status === 'COMPLETED') return 'COMPLETED';
+    return 'OPEN';
+  };
+
+  return {
+    id: nba.id,
+    title: nba.actionTitle,
+    category: nba.actionType.includes('OUTLET') ? 'DROP_OUTLET' : nba.actionType.includes('SKU') ? 'SALESMAN' : 'RO',
+    classification: mapClassification(nba.priority),
+    urgency: nba.priority === 'CRITICAL' || nba.priority === 'HIGH' ? 'HIGH' : 'MEDIUM',
+    targetEntity: nba.entityName,
+    identifier: nba.entityId,
+    assignedPic: nba.salesmanName || 'Supervisor Area',
+    area: nba.area,
+    impactValue: nba.expectedRevenueReference || 0,
+    status: mapStatus(nba.status),
+    recommendedAction: nba.actionDescription,
+    notes: nba.outcome?.notes ? [nba.outcome.notes] : [],
+    dueDate: nba.when,
+    createdAt: nba.createdAt,
+    completedAt: nba.outcome?.completedAt,
   };
 }
