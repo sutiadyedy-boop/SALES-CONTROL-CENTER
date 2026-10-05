@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { DatabaseCategory, RawUploadedFile } from '../types/database';
+import { detectPeriod } from './periodDetectionService';
 
 export interface ParsedSheetData {
   sheetName: string;
@@ -127,20 +128,9 @@ export async function parseExcelFile(
     dataRows.push(record);
   }
 
-  // Guess period from filename or sheet name if possible
-  let periodGuess = '';
-  const nameUpper = file.name.toUpperCase();
-  if (nameUpper.includes('AGUSTUS') || nameUpper.includes('AUG') || nameUpper.includes('2026-08')) {
-    periodGuess = 'AGUSTUS 2026';
-  } else if (nameUpper.includes('SEPTEMBER') || nameUpper.includes('SEP') || nameUpper.includes('2026-09')) {
-    periodGuess = 'SEPTEMBER 2026';
-  } else if (category === 'previous_month') {
-    periodGuess = 'AGUSTUS 2026';
-  } else if (category === 'current_month') {
-    periodGuess = 'SEPTEMBER 2026';
-  } else {
-    periodGuess = 'SEPTEMBER 2026';
-  }
+  // Detect period from row dates, filename, or sheet name accurately
+  const detected = detectPeriod(file.name, sheetNames, dataRows, category);
+  const periodGuess = detected.label;
 
   return {
     id: `${file.name}-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,

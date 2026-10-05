@@ -54,13 +54,13 @@ export function createAuthenticOfficeData() {
     });
   }
 
-  // August Transactions (Previous Month)
-  // ~80 outlets transacted in August
+  // September Transactions (Previous Month)
+  // ~80 outlets transacted in September
   const prevTransactions: TransactionRecord[] = [];
   let invoicePrevCounter = 1001;
 
   for (let i = 1; i <= totalOutlets; i++) {
-    // 70% of outlets ordered in August
+    // 70% of outlets ordered in September
     if (i % 10 <= 6) {
       const m = masterOutlets[i - 1];
       const orderCount = (i % 3) + 1;
@@ -79,26 +79,26 @@ export function createAuthenticOfficeData() {
           salesmanId: m.salesmanId,
           salesmanName: m.salesmanName || '',
           salesmanNik: m.salesmanNik,
-          transactionDate: `2026-08-${String(day).padStart(2, '0')}`,
+          transactionDate: `2026-09-${String(day).padStart(2, '0')}`,
           qty,
           salesValue: netValue,
           grossValue,
-          invoiceId: `FAK-AUG-${invoicePrevCounter++}`,
+          invoiceId: `FAK-SEP-${invoicePrevCounter++}`,
           productCode: `BRG-00${(o % 4) + 1}`,
           productName: `PRODUK REGULER ${(o % 4) + 1}`,
           channel: m.channel,
           markNew,
-          sourceFile: 'Dbase BONE - AGUSTUS.xlsx',
-          period: '2026-08',
-          periodLabel: 'AGUSTUS 2026',
+          sourceFile: 'Dbase BONE - SEPTEMBER.xlsx',
+          period: '2026-09',
+          periodLabel: 'SEPTEMBER 2026',
         });
       }
     }
   }
 
-  // September Transactions (Current Month)
-  // Includes drop outlets (ordered in August, not in September)
-  // and new active outlets (not ordered in August, ordered in September)
+  // October Transactions (Current Month)
+  // Includes drop outlets (ordered in September, not in October)
+  // and new active outlets (not ordered in September, ordered in October)
   const currTransactions: TransactionRecord[] = [];
   let invoiceCurrCounter = 5001;
 
@@ -107,10 +107,10 @@ export function createAuthenticOfficeData() {
     let shouldTransactCurr = false;
 
     if (isPrevTransacted) {
-      // 20% of previous transacting outlets DROP in September (DROP OUTLET!)
+      // 20% of previous transacting outlets DROP in October (DROP OUTLET!)
       shouldTransactCurr = (i % 5 !== 0);
     } else {
-      // 30% of previous non-transacting outlets START in September (NEW ACTIVE!)
+      // 30% of previous non-transacting outlets START in October (NEW ACTIVE!)
       shouldTransactCurr = (i % 3 === 0);
     }
 
@@ -132,18 +132,18 @@ export function createAuthenticOfficeData() {
           salesmanId: m.salesmanId,
           salesmanName: m.salesmanName || '',
           salesmanNik: m.salesmanNik,
-          transactionDate: `2026-09-${String(day).padStart(2, '0')}`,
+          transactionDate: `2026-10-${String(day).padStart(2, '0')}`,
           qty,
           salesValue: netValue,
           grossValue,
-          invoiceId: `FAK-SEP-${invoiceCurrCounter++}`,
+          invoiceId: `FAK-OKT-${invoiceCurrCounter++}`,
           productCode: `BRG-00${(o % 4) + 1}`,
           productName: `PRODUK REGULER ${(o % 4) + 1}`,
           channel: m.channel,
           markNew,
           sourceFile: '_dBase KSNI BNE.xlsx',
-          period: '2026-09',
-          periodLabel: 'SEPTEMBER 2026',
+          period: '2026-10',
+          periodLabel: 'OKTOBER 2026',
         });
       }
     }
@@ -151,7 +151,7 @@ export function createAuthenticOfficeData() {
 
   // Targets
   const targets: TargetRecord[] = salesmen.map(s => ({
-    id: `TRG-2026-09-${s.id}`,
+    id: `TRG-2026-10-${s.id}`,
     salesmanId: s.id,
     salesmanName: s.name,
     area: s.area,
@@ -163,9 +163,9 @@ export function createAuthenticOfficeData() {
       'NXC-E02K TARGET': 35000000,
       'PST-E500 TARGET': 25000000,
     },
-    period: '2026-09',
-    periodLabel: 'SEPTEMBER 2026',
-    sourceFile: 'Target SC September 2026.xlsx',
+    period: '2026-10',
+    periodLabel: 'OKTOBER 2026',
+    sourceFile: 'Target SC Oktober 2026.xlsx',
   }));
 
   return {
@@ -182,7 +182,7 @@ export function createAuthenticOfficeData() {
 export function generateOfficeExcelFiles() {
   const data = createAuthenticOfficeData();
 
-  // 1. Previous Month: Dbase BONE - AGUSTUS.xlsx
+  // 1. Previous Month: Dbase BONE - SEPTEMBER.xlsx
   const prevRows = data.prevTransactions.map(t => ({
     'KODE OUTLET': t.outletId,
     'NAMA OUTLET': t.outletName,
@@ -202,7 +202,7 @@ export function generateOfficeExcelFiles() {
   }));
   const wsPrev = XLSX.utils.json_to_sheet(prevRows);
   const wbPrev = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wbPrev, wsPrev, 'DBASE_AGUSTUS');
+  XLSX.utils.book_append_sheet(wbPrev, wsPrev, 'DBASE_SEPTEMBER');
 
   // 2. Current Month: _dBase KSNI BNE.xlsx
   const currRows = data.currTransactions.map(t => ({
@@ -226,7 +226,7 @@ export function generateOfficeExcelFiles() {
   const wbCurr = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbCurr, wsCurr, 'DATA_KSNI');
 
-  // 3. Target: Target SC September 2026.xlsx
+  // 3. Target: Target SC Oktober 2026.xlsx
   const targetRows = data.targets.map(t => ({
     'KD_SLS': t.salesmanId,
     'NM_SLS': t.salesmanName,

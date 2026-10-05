@@ -20,8 +20,8 @@ interface ControlTowerChartsProps {
 
 export function ControlTowerCharts({
   calculation,
-  currentPeriodLabel = 'September 2026',
-  previousPeriodLabel = 'Agustus 2026',
+  currentPeriodLabel = 'Oktober 2026',
+  previousPeriodLabel = 'September 2026',
 }: ControlTowerChartsProps) {
   const { salesmanPerformances, channelBreakdown, rayonBreakdown, kpis } = calculation;
   const [activeTab, setActiveTab] = useState<'all' | 'target_actual' | 'aug_sept' | 'ach_salesman' | 'growth_salesman' | 'ro_dist'>('all');
@@ -80,7 +80,7 @@ export function ControlTowerCharts({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Agustus vs September
+            {previousPeriodLabel} vs {currentPeriodLabel}
           </button>
           <button
             onClick={() => setActiveTab('ach_salesman')}
@@ -244,7 +244,7 @@ export function ControlTowerCharts({
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-indigo-400" />
-                  <h3 className="text-sm font-bold text-slate-100">2. Agustus vs September (MoM)</h3>
+                  <h3 className="text-sm font-bold text-slate-100">2. {previousPeriodLabel} vs {currentPeriodLabel} (MoM)</h3>
                 </div>
                 <div className="flex items-center gap-3 text-[11px] font-mono text-slate-400">
                   <span className="flex items-center gap-1.5">
@@ -328,8 +328,8 @@ export function ControlTowerCharts({
             </div>
 
             <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-mono">
-              <span>Agustus: {formatRupiah(kpis.totalActualPrevious)}</span>
-              <span className="text-emerald-400 font-semibold">September: {formatRupiah(kpis.totalActualCurrent)}</span>
+              <span>{previousPeriodLabel}: {formatRupiah(kpis.totalActualPrevious)}</span>
+              <span className="text-emerald-400 font-semibold">{currentPeriodLabel}: {formatRupiah(kpis.totalActualCurrent)}</span>
             </div>
           </div>
         )}
@@ -446,9 +446,8 @@ export function ControlTowerCharts({
                 </div>
               </div>
               <p className="text-xs text-slate-400 mb-4">
-                Divergensi pertumbuhan persentase MoM dari baseline 0% (Agustus vs September).
+                Divergensi pertumbuhan persentase MoM dari baseline 0% ({previousPeriodLabel} vs {currentPeriodLabel}).
               </p>
-
               {!hasSalesmen ? (
                 <div className="h-60 flex items-center justify-center text-slate-500 text-xs">
                   DATA BELUM TERSEDIA
@@ -463,15 +462,15 @@ export function ControlTowerCharts({
                     const barScale = isNull ? 0 : Math.min(100, Math.abs(g));
 
                     return (
-                      <div
+                       <div
                         key={s.salesmanId}
                         onMouseEnter={() =>
                           setHoveredItem({
                             title: `${s.salesmanName} MoM Growth`,
                             lines: [
                               `Growth %: ${formatPercent(s.growthRate)}`,
-                              `Agustus: ${formatRupiah(s.actualPrevious)}`,
-                              `September: ${formatRupiah(s.actualCurrent)}`,
+                              `${previousPeriodLabel}: ${formatRupiah(s.actualPrevious)}`,
+                              `${currentPeriodLabel}: ${formatRupiah(s.actualCurrent)}`,
                               `Status: ${s.growthStatus}`,
                             ],
                           })

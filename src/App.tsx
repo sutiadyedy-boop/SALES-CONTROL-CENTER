@@ -82,6 +82,7 @@ import {
 import { ConfirmedOutcomeRecord } from './types/performanceEngine';
 import { parseExcelFile, parseSpecificSheet } from './services/excelParser';
 import { autoDetectMappings } from './services/columnMapper';
+import { detectPeriod } from './services/periodDetectionService';
 import { 
   normalizeMasterOutletRecords, 
   normalizeTargetRecords, 
@@ -162,11 +163,11 @@ export default function App() {
 
   // Upload Session
   const [session, setSession] = useState<UploadSession>({
-    sessionId: `SES-202609-001`,
+    sessionId: `SES-202610-001`,
     createdAt: new Date().toISOString(),
     createdBy: userProfile.name,
-    previousMonthPeriod: 'AGUSTUS 2026',
-    currentMonthPeriod: 'SEPTEMBER 2026',
+    previousMonthPeriod: 'SEPTEMBER 2026',
+    currentMonthPeriod: 'OKTOBER 2026',
     previousFiles: [],
     currentFiles: [],
     targetFiles: [],
@@ -263,18 +264,18 @@ export default function App() {
       previous_month: [
         {
           id: 'prev-file-bone',
-          name: 'Dbase BONE - AGUSTUS.xlsx',
-          fileName: 'Dbase BONE - AGUSTUS.xlsx',
-          sheet: 'DBASE_AGUSTUS',
+          name: 'Dbase BONE - SEPTEMBER.xlsx',
+          fileName: 'Dbase BONE - SEPTEMBER.xlsx',
+          sheet: 'DBASE_SEPTEMBER',
           rows: prevRows.length,
           columns: prevHeaders.length,
-          period: 'AGUSTUS 2026',
+          period: 'SEPTEMBER 2026',
           status: 'ready',
           size: 145280,
           uploadTime: '10:00:00',
           category: 'previous_month',
-          sheetNames: ['DBASE_AGUSTUS'],
-          selectedSheet: 'DBASE_AGUSTUS',
+          sheetNames: ['DBASE_SEPTEMBER'],
+          selectedSheet: 'DBASE_SEPTEMBER',
           rowCount: prevRows.length,
           headers: prevHeaders,
           sampleRows: prevRows,
@@ -291,7 +292,7 @@ export default function App() {
           sheet: 'DATA_KSNI',
           rows: currRows.length,
           columns: currHeaders.length,
-          period: 'SEPTEMBER 2026',
+          period: 'OKTOBER 2026',
           status: 'ready',
           size: 161800,
           uploadTime: '10:05:00',
@@ -309,12 +310,12 @@ export default function App() {
       target_salesman: [
         {
           id: 'target-file-sc',
-          name: 'Target SC September 2026.xlsx',
-          fileName: 'Target SC September 2026.xlsx',
+          name: 'Target SC Oktober 2026.xlsx',
+          fileName: 'Target SC Oktober 2026.xlsx',
           sheet: 'TARGET_SC',
           rows: targetRows.length,
           columns: trgHeaders.length,
-          period: 'SEPTEMBER 2026',
+          period: 'OKTOBER 2026',
           status: 'ready',
           size: 42100,
           uploadTime: '10:10:00',
@@ -337,7 +338,7 @@ export default function App() {
           sheet: 'MASTER_CB',
           rows: masterRows.length,
           columns: mstHeaders.length,
-          period: 'SEPTEMBER 2026',
+          period: 'OKTOBER 2026',
           status: 'ready',
           size: 128400,
           uploadTime: '10:15:00',
@@ -352,6 +353,22 @@ export default function App() {
           validation: validateUploadedFile('master_cb', mstHeaders, mstMap, masterRows),
         },
       ],
+    });
+
+    setSession(prev => ({
+      ...prev,
+      previousMonthPeriod: 'SEPTEMBER 2026',
+      currentMonthPeriod: 'OKTOBER 2026',
+    }));
+
+    setSettings(prev => {
+      const updated = {
+        ...prev,
+        previousMonthLabel: 'SEPTEMBER 2026',
+        currentMonthLabel: 'OKTOBER 2026',
+      };
+      saveSettings(updated);
+      return updated;
     });
   }, []);
 
@@ -378,12 +395,15 @@ export default function App() {
       let totalDups = 0;
       filesList.forEach(file => {
         const rowsToProcess = file.allRows && file.allRows.length > 0 ? file.allRows : file.sampleRows;
+        const detected = detectPeriod(file.fileName || file.name, file.sheetNames || [], rowsToProcess, 'previous_month', mapping['transaction_date']);
+        const periodCode = detected.periodCode;
+        const periodLabel = detected.label || (currentSettings.previousMonthLabel && !currentSettings.previousMonthLabel.toUpperCase().includes('AGUSTUS') ? currentSettings.previousMonthLabel : 'SEPTEMBER 2026');
         const { records, duplicateCount } = normalizeTransactionRecords(
           rowsToProcess,
           mapping,
           file.fileName || file.name,
-          '2026-08',
-          currentSettings.previousMonthLabel,
+          periodCode,
+          periodLabel,
           currentSettings
         );
         allRecords = allRecords.concat(records);
@@ -396,12 +416,15 @@ export default function App() {
       let totalDups = 0;
       filesList.forEach(file => {
         const rowsToProcess = file.allRows && file.allRows.length > 0 ? file.allRows : file.sampleRows;
+        const detected = detectPeriod(file.fileName || file.name, file.sheetNames || [], rowsToProcess, 'current_month', mapping['transaction_date']);
+        const periodCode = detected.periodCode;
+        const periodLabel = detected.label || (currentSettings.currentMonthLabel && !currentSettings.currentMonthLabel.toUpperCase().includes('AGUSTUS') ? currentSettings.currentMonthLabel : 'OKTOBER 2026');
         const { records, duplicateCount } = normalizeTransactionRecords(
           rowsToProcess,
           mapping,
           file.fileName || file.name,
-          '2026-09',
-          currentSettings.currentMonthLabel,
+          periodCode,
+          periodLabel,
           currentSettings
         );
         allRecords = allRecords.concat(records);
@@ -413,12 +436,15 @@ export default function App() {
       let allRecords: TargetRecord[] = [];
       filesList.forEach(file => {
         const rowsToProcess = file.allRows && file.allRows.length > 0 ? file.allRows : file.sampleRows;
+        const detected = detectPeriod(file.fileName || file.name, file.sheetNames || [], rowsToProcess, 'target_salesman');
+        const periodCode = detected.periodCode;
+        const periodLabel = detected.label || (currentSettings.currentMonthLabel && !currentSettings.currentMonthLabel.toUpperCase().includes('AGUSTUS') ? currentSettings.currentMonthLabel : 'OKTOBER 2026');
         const records = normalizeTargetRecords(
           rowsToProcess,
           mapping,
           file.fileName || file.name,
-          '2026-09',
-          currentSettings.currentMonthLabel
+          periodCode,
+          periodLabel
         );
         allRecords = allRecords.concat(records);
       });
@@ -456,6 +482,7 @@ export default function App() {
     }
 
     let resolvedMap = { ...(categoryMappings[category] || {}) };
+    let currentActiveSettings = settings;
 
     for (const file of filesArray) {
       try {
@@ -469,6 +496,18 @@ export default function App() {
         }
 
         const allRows = parsed.allRows || parsed.sampleRows;
+        const detected = detectPeriod(file.name, parsed.sheetNames, allRows, category, resolvedMap['transaction_date']);
+
+        // Update settings dynamically if period detected
+        if (category === 'previous_month' && detected.label) {
+          currentActiveSettings = { ...currentActiveSettings, previousMonthLabel: detected.label };
+          setSettings(currentActiveSettings);
+          saveSettings(currentActiveSettings);
+        } else if ((category === 'current_month' || category === 'target_salesman') && detected.label) {
+          currentActiveSettings = { ...currentActiveSettings, currentMonthLabel: detected.label };
+          setSettings(currentActiveSettings);
+          saveSettings(currentActiveSettings);
+        }
 
         // Validate file
         const validation = validateUploadedFile(category, parsed.headers, resolvedMap, parsed.sampleRows);
@@ -479,7 +518,7 @@ export default function App() {
           sheet: parsed.selectedSheet,
           rows: allRows.length,
           columns: parsed.headers.length,
-          period: parsed.period || (category === 'previous_month' ? 'AGUSTUS 2026' : 'SEPTEMBER 2026'),
+          period: detected.label || parsed.period || (category === 'previous_month' ? 'SEPTEMBER 2026' : 'OKTOBER 2026'),
           status: validation.isValid ? 'ready' : 'needs_mapping',
           validation,
           mappingConfirmed: false,
@@ -515,7 +554,7 @@ export default function App() {
     });
 
     // Re-normalize all records for this category with all rows
-    renormalizeCategory(category, updatedFilesForCat, resolvedMap, settings);
+    renormalizeCategory(category, updatedFilesForCat, resolvedMap, currentActiveSettings);
   }, [uploadedFiles, categoryMappings, settings, renormalizeCategory]);
 
   // Remove file
@@ -591,6 +630,99 @@ export default function App() {
     renormalizeCategory(category, currentFiles, newMappings, settings);
   }, [userProfile.role, uploadedFiles, settings, renormalizeCategory]);
 
+  // Update period label manually or automatically
+  const handleUpdatePeriodLabel = useCallback((category: DatabaseCategory, newPeriodLabel: string) => {
+    if (!newPeriodLabel || !newPeriodLabel.trim()) return;
+    const formatted = newPeriodLabel.trim().toUpperCase();
+    setSettings(prev => {
+      const updated = {
+        ...prev,
+        previousMonthLabel: category === 'previous_month' ? formatted : prev.previousMonthLabel,
+        currentMonthLabel: (category === 'current_month' || category === 'target_salesman') ? formatted : prev.currentMonthLabel,
+      };
+      saveSettings(updated);
+
+      renormalizeCategory('previous_month', uploadedFiles.previous_month || [], categoryMappings.previous_month || {}, updated);
+      renormalizeCategory('current_month', uploadedFiles.current_month || [], categoryMappings.current_month || {}, updated);
+      renormalizeCategory('target_salesman', uploadedFiles.target_salesman || [], categoryMappings.target_salesman || {}, updated);
+
+      return updated;
+    });
+    soundManager.playSuccess();
+  }, [uploadedFiles, categoryMappings, renormalizeCategory]);
+
+  // Synchronize month labels with uploaded files or transactions
+  useEffect(() => {
+    let newPrev = settings.previousMonthLabel;
+    let newCurr = settings.currentMonthLabel;
+    let changed = false;
+
+    if (uploadedFiles.previous_month && uploadedFiles.previous_month.length > 0) {
+      const pFile = uploadedFiles.previous_month[0];
+      const detected = detectPeriod(
+        pFile.fileName || pFile.name, 
+        pFile.sheetNames || [], 
+        pFile.allRows || pFile.sampleRows || [], 
+        'previous_month',
+        categoryMappings.previous_month?.['transaction_date']
+      );
+      if (detected.label && detected.label !== newPrev) {
+        newPrev = detected.label;
+        changed = true;
+      }
+    } else if (prevTransactions.length > 0) {
+      const sample = prevTransactions[0];
+      if (sample?.periodLabel && !sample.periodLabel.toUpperCase().includes('AGUSTUS') && sample.periodLabel !== newPrev) {
+        newPrev = sample.periodLabel;
+        changed = true;
+      }
+    }
+
+    if (uploadedFiles.current_month && uploadedFiles.current_month.length > 0) {
+      const cFile = uploadedFiles.current_month[0];
+      const detected = detectPeriod(
+        cFile.fileName || cFile.name, 
+        cFile.sheetNames || [], 
+        cFile.allRows || cFile.sampleRows || [], 
+        'current_month',
+        categoryMappings.current_month?.['transaction_date']
+      );
+      if (detected.label && detected.label !== newCurr) {
+        newCurr = detected.label;
+        changed = true;
+      }
+    } else if (currTransactions.length > 0) {
+      const sample = currTransactions[0];
+      if (sample?.periodLabel && !sample.periodLabel.toUpperCase().includes('AGUSTUS') && sample.periodLabel !== newCurr) {
+        newCurr = sample.periodLabel;
+        changed = true;
+      }
+    }
+
+    // Cleanse any remaining legacy 'AGUSTUS'
+    if (newPrev && newPrev.toUpperCase().includes('AGUSTUS')) {
+      newPrev = 'SEPTEMBER 2026';
+      changed = true;
+    }
+    if (newCurr && (newCurr.toUpperCase().includes('AGUSTUS') || (newCurr.toUpperCase().includes('SEPTEMBER') && newPrev === 'SEPTEMBER 2026'))) {
+      newCurr = 'OKTOBER 2026';
+      changed = true;
+    }
+
+    if (changed) {
+      setSettings(prev => {
+        const updated = { ...prev, previousMonthLabel: newPrev, currentMonthLabel: newCurr };
+        saveSettings(updated);
+        return updated;
+      });
+      setSession(prev => ({
+        ...prev,
+        previousMonthPeriod: newPrev,
+        currentMonthPeriod: newCurr,
+      }));
+    }
+  }, [uploadedFiles.previous_month, uploadedFiles.current_month, prevTransactions, currTransactions, categoryMappings]);
+
   // Reset all session data
   const handleClearSession = useCallback(() => {
     setPrevTransactions([]);
@@ -626,11 +758,11 @@ export default function App() {
     if (userProfile.role !== 'ADMIN') return;
     const rand = Math.floor(100 + Math.random() * 900);
     setSession({
-      sessionId: `SES-202609-${rand}`,
+      sessionId: `SES-202610-${rand}`,
       createdAt: new Date().toISOString(),
       createdBy: userProfile.name,
-      previousMonthPeriod: 'AGUSTUS 2026',
-      currentMonthPeriod: 'SEPTEMBER 2026',
+      previousMonthPeriod: 'SEPTEMBER 2026',
+      currentMonthPeriod: 'OKTOBER 2026',
       previousFiles: [],
       currentFiles: [],
       targetFiles: [],
@@ -1011,6 +1143,8 @@ export default function App() {
         onToggleCollapse={handleToggleSidebar}
         userProfile={userProfile}
         onLogout={handleLogout}
+        previousMonthLabel={settings.previousMonthLabel}
+        currentMonthLabel={settings.currentMonthLabel}
       />
 
       {/* Main Content Area */}
@@ -1080,6 +1214,7 @@ export default function App() {
                 onFilterChange={setFilters}
                 onNavigateToUpload={() => setCurrentTab('database')}
                 onLoadSampleData={populateSampleFiles}
+                onUpdatePeriodLabel={handleUpdatePeriodLabel}
               />
             )}
 
@@ -1337,6 +1472,8 @@ export default function App() {
                 onConfirmMapping={handleConfirmMapping}
                 onLoadSampleData={populateSampleFiles}
                 onClearAllData={handleClearSession}
+                settings={settings}
+                onUpdatePeriodLabel={handleUpdatePeriodLabel}
               />
             )}
 
@@ -1364,6 +1501,7 @@ export default function App() {
               <ReconciliationReportView
                 reconciliation={reconciliation}
                 userProfile={userProfile}
+                settings={settings}
                 onNavigateToUpload={() => setCurrentTab('database')}
               />
             )}

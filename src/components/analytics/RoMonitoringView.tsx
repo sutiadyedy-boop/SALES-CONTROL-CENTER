@@ -83,8 +83,12 @@ export function RoMonitoringView({
     outletsNotTransacted = [] 
   } = calculation;
 
-  const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
-  const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
+  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
+    ? settings.previousMonthLabel 
+    : 'SEPTEMBER 2026';
+  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
+    ? settings.currentMonthLabel 
+    : 'OKTOBER 2026';
 
   // 1. Identify active global filters
   const activeFiltersSummary: { label: string; value: string }[] = [];

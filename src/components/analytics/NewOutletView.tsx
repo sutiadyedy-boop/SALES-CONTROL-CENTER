@@ -32,8 +32,12 @@ export function NewOutletView({
   }
 
   const { newOutlets, kpis } = calculation;
-  const currLabel = settings.currentMonthLabel || 'September 2026';
-  const prevLabel = settings.previousMonthLabel || 'Agustus 2026';
+  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
+    ? settings.previousMonthLabel 
+    : 'September 2026';
+  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
+    ? settings.currentMonthLabel 
+    : 'Oktober 2026';
 
   const columns: ColumnDef<NewOutletItem>[] = [
     {

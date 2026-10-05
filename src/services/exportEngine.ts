@@ -14,8 +14,8 @@ export function exportToExcel(
   // 1. Sheet: Ringkasan Eksekutif
   const summaryData = [
     ['SALES PERFORMANCE MONITORING - EXECUTIVE SUMMARY'],
-    ['Periode Berjalan', settings.currentMonthLabel || 'September 2026'],
-    ['Periode Pembanding', settings.previousMonthLabel || 'Agustus 2026'],
+    ['Periode Berjalan', settings.currentMonthLabel || 'Oktober 2026'],
+    ['Periode Pembanding', settings.previousMonthLabel || 'September 2026'],
     ['Tanggal Generate', new Date().toLocaleString('id-ID')],
     [],
     ['METRIK UTAMA', 'NILAI', 'STATUS / CATATAN'],

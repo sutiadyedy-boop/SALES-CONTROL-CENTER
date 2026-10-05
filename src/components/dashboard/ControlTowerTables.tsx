@@ -26,8 +26,8 @@ type TableTabKey = 'salesman_ranking' | 'drop_outlets' | 'new_active' | 'belum_t
 
 export function ControlTowerTables({
   calculation,
-  currentPeriodLabel = 'September 2026',
-  previousPeriodLabel = 'Agustus 2026',
+  currentPeriodLabel = 'Oktober 2026',
+  previousPeriodLabel = 'September 2026',
 }: ControlTowerTablesProps) {
   const [activeTab, setActiveTab] = useState<TableTabKey>('salesman_ranking');
   const { salesmanPerformances, dropOutlets, newOutlets, outletsNotTransacted } = calculation;

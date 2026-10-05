@@ -39,8 +39,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     outletKey: 'KODE_OUTLET',
     transactionKey: 'INVOICE_ONLY',
   },
-  previousMonthLabel: 'AGUSTUS 2026',
-  currentMonthLabel: 'SEPTEMBER 2026',
+  previousMonthLabel: 'SEPTEMBER 2026',
+  currentMonthLabel: 'OKTOBER 2026',
   thresholds: DEFAULT_THRESHOLDS,
 };
 
@@ -64,7 +64,30 @@ const STORAGE_KEYS = {
 export function loadSavedSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-    if (raw) return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      let needsSave = false;
+      const prevUpper = String(parsed.previousMonthLabel || '').toUpperCase();
+      const currUpper = String(parsed.currentMonthLabel || '').toUpperCase();
+
+      // Auto-migrate legacy hardcoded August vs September setting to current September vs October
+      if (prevUpper.includes('AGUSTUS') || prevUpper.includes('AUGUST') || !parsed.previousMonthLabel) {
+        parsed.previousMonthLabel = 'SEPTEMBER 2026';
+        needsSave = true;
+      }
+      if (currUpper.includes('SEPTEMBER') && parsed.previousMonthLabel === 'SEPTEMBER 2026') {
+        parsed.currentMonthLabel = 'OKTOBER 2026';
+        needsSave = true;
+      }
+      if (!parsed.currentMonthLabel || currUpper.includes('AGUSTUS')) {
+        parsed.currentMonthLabel = 'OKTOBER 2026';
+        needsSave = true;
+      }
+      if (needsSave) {
+        saveSettings({ ...DEFAULT_SETTINGS, ...parsed });
+      }
+      return { ...DEFAULT_SETTINGS, ...parsed };
+    }
   } catch (e) {
     console.error('Failed to load settings', e);
   }

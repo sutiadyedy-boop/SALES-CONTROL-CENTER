@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   TrendingUp, 
   TrendingDown,
@@ -31,6 +31,7 @@ import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { parseYearMonthFromDate, INDONESIAN_MONTHS } from '../../services/periodDetectionService';
 
 interface MonthComparisonViewProps {
   calculation: CalculationResult | null;
@@ -42,6 +43,7 @@ interface MonthComparisonViewProps {
   onFilterChange?: (filters: GlobalFilterState) => void;
   onNavigateToUpload: () => void;
   onLoadSampleData: () => void;
+  onUpdatePeriodLabel?: (category: 'previous_month' | 'current_month', label: string) => void;
 }
 
 // Helpers
@@ -49,26 +51,58 @@ function formatNumber(num: number): string {
   return new Intl.NumberFormat('id-ID').format(Math.round(num));
 }
 
-function getTxDay(dateStr?: string): number | null {
-  if (!dateStr) return null;
-  const str = String(dateStr).trim();
-  // YYYY-MM-DD or YYYY/MM/DD
+function getTxDay(dateVal?: any): number | null {
+  if (dateVal === null || dateVal === undefined || dateVal === '') return null;
+
+  // 1. If it's a JavaScript Date object (e.g. from SheetJS cellDates: true)
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return null;
+    // Add 12 hours (midday) to prevent UTC-offset corruption in positive timezones (WIB/WITA)
+    const midday = new Date(dateVal.getTime() + 12 * 3600 * 1000);
+    const d = midday.getUTCDate();
+    return d >= 1 && d <= 31 ? d : null;
+  }
+
+  // 2. Direct day number or Excel serial number
+  const num = typeof dateVal === 'number' ? dateVal : parseFloat(String(dateVal).trim());
+  if (!isNaN(num)) {
+    const strVal = String(dateVal).trim();
+    // Direct day of month e.g. 1..31 or "1".."31"
+    if (num >= 1 && num <= 31 && strVal.length <= 2) {
+      return Math.round(num);
+    }
+    // Excel serial number e.g. 46299
+    if (num > 30000 && num < 60000) {
+      const utcMs = Math.round((num - 25569) * 86400 * 1000);
+      const d = new Date(utcMs).getUTCDate();
+      return d >= 1 && d <= 31 ? d : null;
+    }
+  }
+
+  const str = String(dateVal).trim();
+  if (!str) return null;
+
+  // 3. YYYY-MM-DD or YYYY/MM/DD (with optional timestamp)
   const isoMatch = str.match(/^\d{4}[-\/](\d{1,2})[-\/](\d{1,2})/);
   if (isoMatch) {
     const d = parseInt(isoMatch[2], 10);
     return d >= 1 && d <= 31 ? d : null;
   }
-  // DD/MM/YYYY or DD-MM-YYYY
-  const ddmmyyyy = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/]\d{4}/);
+
+  // 4. DD/MM/YYYY or DD-MM-YYYY or DD/MM/YY or DD-MM-YY
+  const ddmmyyyy = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
   if (ddmmyyyy) {
     const d = parseInt(ddmmyyyy[1], 10);
     return d >= 1 && d <= 31 ? d : null;
   }
-  // Direct day number e.g. "12"
-  const directNum = parseInt(str, 10);
-  if (!isNaN(directNum) && directNum >= 1 && directNum <= 31 && str.length <= 2) {
-    return directNum;
+
+  // 5. Text date e.g. "04-OKT-2026", "4 Oktober 2026", "04 OKT 26"
+  const textDayMatch = str.match(/^(\d{1,2})[\s\-_]/);
+  if (textDayMatch) {
+    const d = parseInt(textDayMatch[1], 10);
+    return d >= 1 && d <= 31 ? d : null;
   }
+
   return null;
 }
 
@@ -106,6 +140,7 @@ export function MonthComparisonView({
   onFilterChange,
   onNavigateToUpload,
   onLoadSampleData,
+  onUpdatePeriodLabel,
 }: MonthComparisonViewProps) {
   // If no data
   const hasData = calculation && (
@@ -114,6 +149,11 @@ export function MonthComparisonView({
     prevTransactions.length > 0 || 
     currTransactions.length > 0
   );
+
+  // Period adjustment modal
+  const [showPeriodModal, setShowPeriodModal] = useState(false);
+  const [modalPrevText, setModalPrevText] = useState('');
+  const [modalCurrText, setModalCurrText] = useState('');
 
   if (!hasData) {
     return (
@@ -126,8 +166,47 @@ export function MonthComparisonView({
     );
   }
 
-  const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
-  const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
+  // Dynamically resolve comparison month labels from:
+  // 1. Transaction records in prevTransactions / currTransactions (ground truth)
+  // 2. Settings (sanitized from legacy 'AGUSTUS')
+  // 3. Fallback defaults: SEPTEMBER 2026 vs OKTOBER 2026
+  const prevLabel = useMemo(() => {
+    if (prevTransactions && prevTransactions.length > 0) {
+      const pLabel = prevTransactions[0]?.periodLabel;
+      if (pLabel && !pLabel.toUpperCase().includes('AGUSTUS')) {
+        return pLabel;
+      }
+      for (let i = 0; i < Math.min(prevTransactions.length, 50); i++) {
+        const ym = parseYearMonthFromDate(prevTransactions[i]?.transactionDate);
+        if (ym) {
+          return `${INDONESIAN_MONTHS[ym.month - 1]} ${ym.year}`;
+        }
+      }
+    }
+    if (settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS')) {
+      return settings.previousMonthLabel;
+    }
+    return 'SEPTEMBER 2026';
+  }, [prevTransactions, settings.previousMonthLabel]);
+
+  const currLabel = useMemo(() => {
+    if (currTransactions && currTransactions.length > 0) {
+      const cLabel = currTransactions[0]?.periodLabel;
+      if (cLabel && !cLabel.toUpperCase().includes('AGUSTUS')) {
+        return cLabel;
+      }
+      for (let i = 0; i < Math.min(currTransactions.length, 50); i++) {
+        const ym = parseYearMonthFromDate(currTransactions[i]?.transactionDate);
+        if (ym) {
+          return `${INDONESIAN_MONTHS[ym.month - 1]} ${ym.year}`;
+        }
+      }
+    }
+    if (settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel) {
+      return settings.currentMonthLabel;
+    }
+    return 'OKTOBER 2026';
+  }, [currTransactions, settings.currentMonthLabel, prevLabel]);
 
   // Master outlet map for enrichment (channel, rayon, area, etc.)
   const masterMap = useMemo(() => {
@@ -148,20 +227,40 @@ export function MonthComparisonView({
     return max > 1 ? max : 24;
   }, [currTransactions]);
 
+  // Detected max day of previous month transactions
+  const maxPrevDay = useMemo(() => {
+    let max = 1;
+    prevTransactions.forEach(t => {
+      const d = getTxDay(t.transactionDate);
+      if (d && d > max) max = d;
+    });
+    return max > 1 ? max : 31;
+  }, [prevTransactions]);
+
   // 1. STATE: Pilihan Tanggal Perbandingan Harian Terpisah per Bulan (Bisa Pilih Lebih dari 1 Tanggal)
   const [prevSelectedDays, setPrevSelectedDays] = useState<number[]>(() => {
-    // Default: semua 31 hari terpilih untuk Bulan Lalu
+    const set = new Set<number>();
+    prevTransactions.forEach(t => {
+      const d = getTxDay(t.transactionDate);
+      if (d) set.add(d);
+    });
+    if (set.size > 0) return Array.from(set).sort((a, b) => a - b);
     return Array.from({ length: 31 }, (_, i) => i + 1);
   });
 
   const [currSelectedDays, setCurrSelectedDays] = useState<number[]>(() => {
-    // Default: hari 1 s/d maxCurrDay terpilih untuk Bulan Ini
+    const set = new Set<number>();
+    currTransactions.forEach(t => {
+      const d = getTxDay(t.transactionDate);
+      if (d) set.add(d);
+    });
+    if (set.size > 0) return Array.from(set).sort((a, b) => a - b);
     return Array.from({ length: maxCurrDay }, (_, i) => i + 1);
   });
 
   // Range inputs for Bulan Lalu
   const [prevRangeStart, setPrevRangeStart] = useState<number>(1);
-  const [prevRangeEnd, setPrevRangeEnd] = useState<number>(31);
+  const [prevRangeEnd, setPrevRangeEnd] = useState<number>(() => maxPrevDay);
 
   // Range inputs for Bulan Ini
   const [currRangeStart, setCurrRangeStart] = useState<number>(1);
@@ -522,6 +621,35 @@ export function MonthComparisonView({
     });
     return map;
   }, [enrichedCurrTxs]);
+
+  // Auto-synchronize selected days when new transactions are loaded or uploaded to the database
+  const prevTransCount = enrichedPrevTxs.length;
+  const currTransCount = enrichedCurrTxs.length;
+  const lastCountsRef = useRef<{ prev: number; curr: number }>({ prev: 0, curr: 0 });
+
+  useEffect(() => {
+    if (prevTransCount > 0 && prevTransCount !== lastCountsRef.current.prev) {
+      lastCountsRef.current.prev = prevTransCount;
+      if (prevTransactedDays.size > 0) {
+        const sortedDays = Array.from(prevTransactedDays).sort((a, b) => a - b);
+        setPrevSelectedDays(sortedDays);
+        setPrevRangeStart(sortedDays[0]);
+        setPrevRangeEnd(sortedDays[sortedDays.length - 1]);
+      }
+    }
+  }, [prevTransCount, prevTransactedDays]);
+
+  useEffect(() => {
+    if (currTransCount > 0 && currTransCount !== lastCountsRef.current.curr) {
+      lastCountsRef.current.curr = currTransCount;
+      if (currTransactedDays.size > 0) {
+        const sortedDays = Array.from(currTransactedDays).sort((a, b) => a - b);
+        setCurrSelectedDays(sortedDays);
+        setCurrRangeStart(sortedDays[0]);
+        setCurrRangeEnd(sortedDays[sortedDays.length - 1]);
+      }
+    }
+  }, [currTransCount, currTransactedDays]);
 
   // Date-Filtered & Dimension-Filtered Transactions - Terpisah Independen untuk Masing-Masing Bulan
   const activePrevTxs = useMemo(() => {
@@ -1539,11 +1667,14 @@ export function MonthComparisonView({
               <TrendingUp className="w-5 h-5" />
             </span>
             <div>
-              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                <span>Komparasi Bulan: {prevLabel} vs {currLabel}</span>
+              <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2 flex-wrap">
+                <span>Komparasi Bulan: <span className="text-indigo-300 font-mono">{prevLabel}</span> vs <span className="text-cyan-300 font-mono">{currLabel}</span></span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-medium">
+                  Sesuai Data Database Terupload
+                </span>
               </h2>
               <p className="text-xs text-slate-400 mt-0.5">
-                Monitoring komparasi multi-dimensi: Salesman, Eceran (Omset, Qty, EC), Outlet, dan Analisa Harian secara non-destruktif.
+                Monitoring komparasi multi-dimensi: Salesman, Eceran (Omset, Qty, EC), Outlet, dan Analisa Harian ({prevLabel} vs {currLabel}).
               </p>
             </div>
           </div>
@@ -1551,6 +1682,22 @@ export function MonthComparisonView({
 
         {/* Global Date Filter Badge & Capture Button */}
         <div className="flex flex-wrap items-center gap-3">
+          {onUpdatePeriodLabel && (
+            <button
+              type="button"
+              onClick={() => {
+                setModalPrevText(prevLabel);
+                setModalCurrText(currLabel);
+                setShowPeriodModal(true);
+              }}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-cyan-300 border border-slate-700 hover:border-cyan-500/50 text-xs font-mono flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              title="Sesuaikan atau ganti label periode komparasi bulan"
+            >
+              <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Ubah Periode</span>
+            </button>
+          )}
+
           <CaptureJpgButton
             targetId="main-capture-area"
             fileName={`Komparasi_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}.jpg`}
@@ -1573,6 +1720,115 @@ export function MonthComparisonView({
           </div>
         </div>
       </div>
+
+      {/* Period Adjustment Modal */}
+      {showPeriodModal && onUpdatePeriodLabel && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-cyan-400">
+                <Calendar className="w-5 h-5" />
+                <h3 className="font-bold text-slate-100 text-sm">Sesuaikan Periode Komparasi</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPeriodModal(false)}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-300">
+              Pilih preset periode sesuai data yang diupload ke database, atau ketik label periode manual:
+            </p>
+
+            <div className="space-y-2">
+              <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider block">
+                Preset Cepat:
+              </label>
+              <div className="grid grid-cols-1 gap-2">
+                {[
+                  { prev: 'SEPTEMBER 2026', curr: 'OKTOBER 2026', desc: 'Bulan Lalu: September 2026 vs Bulan Ini: Oktober 2026 (Aktif)' },
+                  { prev: 'OKTOBER 2026', curr: 'NOVEMBER 2026', desc: 'Bulan Lalu: Oktober 2026 vs Bulan Ini: November 2026' },
+                  { prev: 'AGUSTUS 2026', curr: 'SEPTEMBER 2026', desc: 'Bulan Lalu: Agustus 2026 vs Bulan Ini: September 2026' },
+                ].map(item => (
+                  <button
+                    key={`${item.prev}-${item.curr}`}
+                    type="button"
+                    onClick={() => {
+                      onUpdatePeriodLabel('previous_month', item.prev);
+                      onUpdatePeriodLabel('current_month', item.curr);
+                      setShowPeriodModal(false);
+                    }}
+                    className={`p-3 text-left rounded-xl border transition-all ${
+                      prevLabel === item.prev && currLabel === item.curr
+                        ? 'bg-cyan-950/50 border-cyan-500/80 text-cyan-200 ring-1 ring-cyan-500/50'
+                        : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/40'
+                    }`}
+                  >
+                    <div className="font-bold font-mono text-xs flex items-center justify-between">
+                      <span>{item.prev} vs {item.curr}</span>
+                      {prevLabel === item.prev && currLabel === item.curr && (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                      )}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{item.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2 border-t border-slate-800">
+              <div>
+                <label className="text-[11px] font-mono text-indigo-300 block mb-1">
+                  Label Bulan Lalu (Database 1):
+                </label>
+                <input
+                  type="text"
+                  value={modalPrevText}
+                  onChange={(e) => setModalPrevText(e.target.value.toUpperCase())}
+                  placeholder="SEPTEMBER 2026"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-mono text-cyan-300 block mb-1">
+                  Label Bulan Ini (Database 2):
+                </label>
+                <input
+                  type="text"
+                  value={modalCurrText}
+                  onChange={(e) => setModalCurrText(e.target.value.toUpperCase())}
+                  placeholder="OKTOBER 2026"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-cyan-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPeriodModal(false)}
+                className="px-3 py-1.5 text-xs text-slate-400 hover:text-white"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (modalPrevText.trim()) onUpdatePeriodLabel('previous_month', modalPrevText.trim());
+                  if (modalCurrText.trim()) onUpdatePeriodLabel('current_month', modalCurrText.trim());
+                  setShowPeriodModal(false);
+                }}
+                className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl text-xs font-bold transition-colors"
+              >
+                Terapkan Perubahan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. Pilihan Tanggal Perbandingan Harian Terpisah untuk Masing-Masing Bulan */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-5">
@@ -1634,6 +1890,23 @@ export function MonthComparisonView({
                 {prevSelectedDays.length === 31 ? 'Semua (31 Hari)' : `${prevSelectedDays.length} Hari Aktif`}
               </span>
             </div>
+
+            {/* Database Detection Summary */}
+            {prevTransactedDays.size > 0 && (
+              <div className="text-[11px] text-indigo-200/90 bg-indigo-950/70 border border-indigo-800/60 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_#818cf8]" />
+                  <span>Database {prevLabel}: <strong className="text-white">{prevTransactedDays.size} tanggal</strong> ada transaksi (Tgl {Array.from(prevTransactedDays).sort((a, b) => a - b).join(', ')})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPrevSelectedDays(Array.from(prevTransactedDays).sort((a, b) => a - b))}
+                  className="text-[10px] text-indigo-300 hover:text-white underline font-semibold ml-2 cursor-pointer"
+                >
+                  Pilih Tgl Transaksi
+                </button>
+              </div>
+            )}
 
             {/* Presets Bulan Lalu */}
             <div className="flex flex-wrap items-center gap-1 text-[11px]">
@@ -1750,15 +2023,15 @@ export function MonthComparisonView({
                   let btnClass = '';
                   if (hasTx) {
                     if (isSelected) {
-                      btnClass = 'bg-indigo-600 text-white font-black shadow-[0_0_12px_rgba(99,102,241,0.65)] border-2 border-indigo-300 ring-1 ring-indigo-400 scale-[1.04] z-10';
+                      btnClass = 'bg-indigo-600 text-white font-black shadow-[0_0_14px_rgba(99,102,241,0.75)] border-2 border-indigo-200 ring-2 ring-indigo-400/80 scale-[1.05] z-10 cursor-pointer';
                     } else {
-                      btnClass = 'bg-slate-800/90 text-indigo-200 font-bold border border-indigo-500/60 hover:border-indigo-400 hover:bg-slate-750 shadow-sm';
+                      btnClass = 'bg-indigo-950/80 text-indigo-200 font-bold border-2 border-indigo-500/80 hover:border-indigo-400 hover:bg-indigo-900/60 shadow-[0_0_8px_rgba(99,102,241,0.3)] cursor-pointer';
                     }
                   } else {
                     if (isSelected) {
-                      btnClass = 'bg-slate-900 text-slate-500 border border-dashed border-slate-700 opacity-45 hover:opacity-75';
+                      btnClass = 'bg-slate-900 text-slate-500 border border-dashed border-slate-700 opacity-50 hover:opacity-80 cursor-pointer';
                     } else {
-                      btnClass = 'bg-slate-950/40 text-slate-700 border border-slate-900/60 opacity-30 hover:opacity-60 cursor-default';
+                      btnClass = 'bg-slate-950/40 text-slate-700 border border-slate-900/70 opacity-30 hover:opacity-60 cursor-pointer';
                     }
                   }
 
@@ -1799,6 +2072,23 @@ export function MonthComparisonView({
                 {currSelectedDays.length === 31 ? 'Semua (31 Hari)' : `${currSelectedDays.length} Hari Aktif`}
               </span>
             </div>
+
+            {/* Database Detection Summary */}
+            {currTransactedDays.size > 0 && (
+              <div className="text-[11px] text-cyan-200/90 bg-cyan-950/70 border border-cyan-800/60 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+                  <span>Database {currLabel}: <strong className="text-white">{currTransactedDays.size} tanggal</strong> ada transaksi (Tgl {Array.from(currTransactedDays).sort((a, b) => a - b).join(', ')})</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrSelectedDays(Array.from(currTransactedDays).sort((a, b) => a - b))}
+                  className="text-[10px] text-cyan-300 hover:text-white underline font-semibold ml-2 cursor-pointer"
+                >
+                  Pilih Tgl Transaksi
+                </button>
+              </div>
+            )}
 
             {/* Presets Bulan Ini */}
             <div className="flex flex-wrap items-center gap-1 text-[11px]">
@@ -1920,15 +2210,15 @@ export function MonthComparisonView({
                   let btnClass = '';
                   if (hasTx) {
                     if (isSelected) {
-                      btnClass = 'bg-cyan-400 text-slate-950 font-black shadow-[0_0_14px_rgba(34,211,238,0.7)] border-2 border-cyan-100 ring-1 ring-cyan-300 scale-[1.04] z-10';
+                      btnClass = 'bg-cyan-400 text-slate-950 font-black shadow-[0_0_16px_rgba(34,211,238,0.85)] border-2 border-cyan-100 ring-2 ring-cyan-300/80 scale-[1.05] z-10 cursor-pointer';
                     } else {
-                      btnClass = 'bg-slate-800/90 text-cyan-200 font-bold border border-cyan-500/60 hover:border-cyan-400 hover:bg-slate-750 shadow-sm';
+                      btnClass = 'bg-cyan-950/80 text-cyan-200 font-bold border-2 border-cyan-500/80 hover:border-cyan-400 hover:bg-cyan-900/60 shadow-[0_0_8px_rgba(34,211,238,0.3)] cursor-pointer';
                     }
                   } else {
                     if (isSelected) {
-                      btnClass = 'bg-slate-900 text-slate-500 border border-dashed border-slate-700 opacity-45 hover:opacity-75';
+                      btnClass = 'bg-slate-900 text-slate-500 border border-dashed border-slate-700 opacity-50 hover:opacity-80 cursor-pointer';
                     } else {
-                      btnClass = 'bg-slate-950/40 text-slate-700 border border-slate-900/60 opacity-30 hover:opacity-60 cursor-default';
+                      btnClass = 'bg-slate-950/40 text-slate-700 border border-slate-900/70 opacity-30 hover:opacity-60 cursor-pointer';
                     }
                   }
 

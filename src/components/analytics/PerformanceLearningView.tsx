@@ -39,9 +39,9 @@ import {
 import { 
   DecisionResult, 
   NextBestAction, 
-  OpportunityResult, 
-  UserProfile 
+  OpportunityResult 
 } from '../../types/decisionEngine';
+import { UserProfile } from '../../types/database';
 import { 
   formatRupiah, 
   MIN_SAMPLE_SIZE,
@@ -229,7 +229,7 @@ export function PerformanceLearningView({
           </div>
 
           <div className="flex items-center gap-3">
-            <CaptureJpgButton elementId="performance-learning-view" fileName="Performance-Learning-Control-Tower.jpg" />
+            <CaptureJpgButton targetId="performance-learning-view" fileName="Performance-Learning-Control-Tower.jpg" />
             {onNavigateToTab && (
               <button
                 onClick={() => onNavigateToTab('opportunity')}

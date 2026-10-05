@@ -191,8 +191,12 @@ export function EbpMonitoringView({
   const [selectedEpbCurrFilter, setSelectedEpbCurrFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
   const [selectedEpbPrevFilter, setSelectedEpbPrevFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
 
-  const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
-  const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
+  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
+    ? settings.previousMonthLabel 
+    : 'SEPTEMBER 2026';
+  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
+    ? settings.currentMonthLabel 
+    : 'OKTOBER 2026';
 
   // 1. Check if Master CB is available
   if (!masterOutlets || masterOutlets.length === 0) {
@@ -672,7 +676,7 @@ export function EbpMonitoringView({
     },
     {
       key: 'epbPrev',
-      header: `EPB Bulan Agustus (${prevLabel})`,
+      header: `EPB Bulan Lalu (${prevLabel})`,
       align: 'right',
       accessor: (row) => row.epbPrev,
       render: (row) => (
@@ -686,7 +690,7 @@ export function EbpMonitoringView({
     },
     {
       key: 'epbCurr',
-      header: `EPB Bulan September (${currLabel})`,
+      header: `EPB Bulan Ini (${currLabel})`,
       align: 'right',
       accessor: (row) => row.epbCurr,
       render: (row) => (
@@ -812,7 +816,7 @@ export function EbpMonitoringView({
                 </span>
               </h1>
               <p className="text-xs text-slate-400 font-medium mt-0.5">
-                Monitoring Eceran Per Bulan &bull; Sumber Data Real 100% dari Database Bulan Lalu (Agustus) &amp; Bulan Ini (September) pada kolom <strong className="text-amber-300 font-mono">MARK NEW</strong> &bull; Master Toko: <strong className="text-slate-200">Master CB</strong>
+                Monitoring Eceran Per Bulan &bull; Sumber Data Real 100% dari Database Bulan Lalu ({prevLabel}) &amp; Bulan Ini ({currLabel}) pada kolom <strong className="text-amber-300 font-mono">MARK NEW</strong> &bull; Master Toko: <strong className="text-slate-200">Master CB</strong>
               </p>
             </div>
           </div>
@@ -914,10 +918,10 @@ export function EbpMonitoringView({
           <div className="text-[10px] text-slate-500 mt-0.5 truncate">Daftar Master CB</div>
         </div>
 
-        {/* KPI 2: EPB BULAN AGUSTUS */}
+        {/* KPI 2: EPB BULAN LALU */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>EPB AGUSTUS</span>
+            <span>EPB {prevLabel}</span>
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
           </div>
           <div className="text-lg font-bold font-mono text-slate-200 mt-1.5">
@@ -926,10 +930,10 @@ export function EbpMonitoringView({
           <div className="text-[10px] text-cyan-400 font-mono mt-0.5 truncate">Real Kolom MARK NEW</div>
         </div>
 
-        {/* KPI 3: EPB BULAN SEPTEMBER */}
+        {/* KPI 3: EPB BULAN INI */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-amber-500/30 transition-all border-l-2 border-l-amber-500">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span className="text-amber-300 font-semibold">EPB SEPTEMBER</span>
+            <span className="text-amber-300 font-semibold">EPB {currLabel}</span>
             <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-lg font-bold font-mono text-amber-300 mt-1.5">
@@ -1650,7 +1654,7 @@ export function EbpMonitoringView({
             Validasi Data &amp; Integritas Real 100% Kolom MARK NEW:
           </div>
           <div>
-            Data EPB Bulan Agustus dan Bulan September diambil <strong>Real 100% dari kolom MARK NEW</strong> file Database bulan lalu dan bulan berjalan.
+            Data EPB {prevLabel} dan {currLabel} diambil <strong>Real 100% dari kolom MARK NEW</strong> file Database bulan lalu dan bulan berjalan.
             Daftar toko berpegang pada <strong>Master CB</strong> dengan pencocokan <strong>Kode Toko</strong> sebagai primary key. Jika suatu toko tidak memiliki catatan pada kolom <code className="text-amber-300">MARK NEW</code> pada bulan tersebut, sistem menetapkan nilai aktual <code className="text-slate-300">EPB = 0</code> tanpa rekayasa data.
           </div>
         </div>

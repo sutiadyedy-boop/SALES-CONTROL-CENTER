@@ -141,23 +141,55 @@ export interface DailyTrendItem {
 /**
  * Extracts day of month (1..31) from various date formats
  */
-function getTxDay(dateStr?: string): number | null {
-  if (!dateStr) return null;
-  const clean = String(dateStr).trim();
-  if (clean.includes('-')) {
-    const parts = clean.split('-');
-    if (parts.length >= 3) {
-      const d = parseInt(parts[2].slice(0, 2), 10);
-      return !isNaN(d) && d >= 1 && d <= 31 ? d : null;
+function getTxDay(dateVal?: any): number | null {
+  if (dateVal === null || dateVal === undefined || dateVal === '') return null;
+
+  // 1. If it's a JavaScript Date object (e.g. from SheetJS cellDates: true)
+  if (dateVal instanceof Date) {
+    if (isNaN(dateVal.getTime())) return null;
+    const midday = new Date(dateVal.getTime() + 12 * 3600 * 1000);
+    const d = midday.getUTCDate();
+    return d >= 1 && d <= 31 ? d : null;
+  }
+
+  // 2. Direct day number or Excel serial number
+  const num = typeof dateVal === 'number' ? dateVal : parseFloat(String(dateVal).trim());
+  if (!isNaN(num)) {
+    const strVal = String(dateVal).trim();
+    if (num >= 1 && num <= 31 && strVal.length <= 2) {
+      return Math.round(num);
+    }
+    if (num > 30000 && num < 60000) {
+      const utcMs = Math.round((num - 25569) * 86400 * 1000);
+      const d = new Date(utcMs).getUTCDate();
+      return d >= 1 && d <= 31 ? d : null;
     }
   }
-  if (clean.includes('/')) {
-    const parts = clean.split('/');
-    if (parts.length >= 3) {
-      const d = parseInt(parts[0], 10);
-      return !isNaN(d) && d >= 1 && d <= 31 ? d : null;
-    }
+
+  const clean = String(dateVal).trim();
+  if (!clean) return null;
+
+  // 3. ISO format: YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = clean.match(/^\d{4}[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (isoMatch) {
+    const d = parseInt(isoMatch[2], 10);
+    return d >= 1 && d <= 31 ? d : null;
   }
+
+  // 4. DD/MM/YYYY or DD-MM-YYYY or DD/MM/YY or DD-MM-YY
+  const ddmmyyyy = clean.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2,4})/);
+  if (ddmmyyyy) {
+    const d = parseInt(ddmmyyyy[1], 10);
+    return d >= 1 && d <= 31 ? d : null;
+  }
+
+  // 5. Text date e.g. "04-OKT-2026", "4 Oktober 2026", "04 OKT 26"
+  const textDayMatch = clean.match(/^(\d{1,2})[\s\-_]/);
+  if (textDayMatch) {
+    const d = parseInt(textDayMatch[1], 10);
+    return d >= 1 && d <= 31 ? d : null;
+  }
+
   return null;
 }
 
@@ -171,8 +203,12 @@ export function MonitoringEcView({
   onNavigateToUpload,
   onLoadSampleData,
 }: MonitoringEcViewProps) {
-  const prevLabel = settings.previousMonthLabel || 'AGUSTUS 2026';
-  const currLabel = settings.currentMonthLabel || 'SEPTEMBER 2026';
+  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
+    ? settings.previousMonthLabel 
+    : 'SEPTEMBER 2026';
+  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
+    ? settings.currentMonthLabel 
+    : 'OKTOBER 2026';
 
   // Navigation tab within the Monitoring EC view (Default: Daily Vertical Date Summary)
   const [activeTab, setActiveTab] = useState<'daily' | 'pma' | 'sales'>('daily');

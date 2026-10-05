@@ -69,29 +69,95 @@ export function parseNumeric(val: any): number {
 }
 
 /**
- * Format Date to readable YYYY-MM-DD
+ * Format Date to readable YYYY-MM-DD without any timezone offset corruption
  */
 export function formatDate(val: any): string {
-  if (!val) return '';
+  if (val === null || val === undefined || val === '') return '';
+
+  // 1. If it's a JavaScript Date object (e.g. from SheetJS cellDates: true)
   if (val instanceof Date) {
-    return val.toISOString().split('T')[0];
-  }
-  const str = String(val).trim();
-  // Check Excel serial number (e.g. 45890)
-  const numericVal = Number(str);
-  if (!isNaN(numericVal) && numericVal > 30000 && numericVal < 60000) {
-    const excelEpoch = new Date(1899, 11, 30);
-    const date = new Date(excelEpoch.getTime() + numericVal * 86400000);
-    return date.toISOString().split('T')[0];
+    if (isNaN(val.getTime())) return '';
+    // SheetJS timezone bug correction:
+    // In UTC+7 (WIB) / UTC+8 (WITA), SheetJS subtracts the timezone offset of 1899,
+    // which puts midnight dates at 15:59 or 16:00 on the preceding day in UTC.
+    // Adding 12 hours (midday) safely shifts it into the exact calendar day in UTC.
+    const midday = new Date(val.getTime() + 12 * 3600 * 1000);
+    const y = midday.getUTCFullYear();
+    const m = String(midday.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(midday.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
-  // Standard YYYY-MM-DD or DD/MM/YYYY
-  if (str.includes('/')) {
-    const parts = str.split('/');
-    if (parts.length === 3) {
-      if (parts[2].length === 4) {
-        // DD/MM/YYYY
-        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+  // 2. If it's an Excel serial number e.g. 46299 or "46299"
+  const str = String(val).trim();
+  const numericVal = parseFloat(str);
+  if (!isNaN(numericVal) && numericVal > 30000 && numericVal < 60000) {
+    // 25569 = days between 1900-01-01 and 1970-01-01 (Excel 1900 leap-year system)
+    const utcMs = Math.round((numericVal - 25569) * 86400 * 1000);
+    const date = new Date(utcMs);
+    if (!isNaN(date.getTime())) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const d = String(date.getUTCDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+
+  // 3. ISO format: YYYY-MM-DD or YYYY/MM/DD
+  const isoMatch = str.match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+  if (isoMatch) {
+    const y = isoMatch[1];
+    const m = isoMatch[2].padStart(2, '0');
+    const d = isoMatch[3].padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  // 4. DD/MM/YYYY or DD-MM-YYYY
+  const ddmmyyyy = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/);
+  if (ddmmyyyy) {
+    const d = ddmmyyyy[1].padStart(2, '0');
+    const m = ddmmyyyy[2].padStart(2, '0');
+    const y = ddmmyyyy[3];
+    return `${y}-${m}-${d}`;
+  }
+
+  // 5. DD/MM/YY or DD-MM-YY (2-digit year)
+  const ddmmyy = str.match(/^(\d{1,2})[-\/](\d{1,2})[-\/](\d{2})$/);
+  if (ddmmyy) {
+    const d = ddmmyy[1].padStart(2, '0');
+    const m = ddmmyy[2].padStart(2, '0');
+    let y = parseInt(ddmmyy[3], 10);
+    y = y < 50 ? 2000 + y : 1900 + y;
+    return `${y}-${m}-${d}`;
+  }
+
+  // 6. Text date format e.g. "04-OKT-2026", "4 Oktober 2026", "04-SEP-26"
+  const upper = str.toUpperCase();
+  const ID_MONTHS = [
+    'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
+    'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'
+  ];
+  const SHORT_MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MEI', 'JUN', 'JUL', 'AGU', 'SEP', 'OKT', 'NOV', 'DES'];
+  const ENG_SHORT = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+  const dayMatch = upper.match(/^(\d{1,2})[\s\-_]/);
+  if (dayMatch) {
+    const dayNum = parseInt(dayMatch[1], 10);
+    for (let mi = 0; mi < 12; mi++) {
+      if (upper.includes(ID_MONTHS[mi]) || upper.includes(SHORT_MONTHS[mi]) || upper.includes(ENG_SHORT[mi])) {
+        const year4M = upper.match(/\b(20\d{2}|19\d{2})\b/);
+        let yearNum = 2026;
+        if (year4M) {
+          yearNum = parseInt(year4M[1], 10);
+        } else {
+          const parts = upper.split(/[\s\-_]+/);
+          const lastPart = parts[parts.length - 1];
+          if (/^\d{2}$/.test(lastPart)) {
+            const rawY = parseInt(lastPart, 10);
+            yearNum = rawY < 50 ? 2000 + rawY : 1900 + rawY;
+          }
+        }
+        return `${yearNum}-${String(mi + 1).padStart(2, '0')}-${String(dayNum).padStart(2, '0')}`;
       }
     }
   }
@@ -222,7 +288,33 @@ export function normalizeTransactionRecords(
     const salesmanName = rawSalesmanName || salesmanId;
     const salesmanNik = cleanString(row['NIK SALESMAN'] || row['NIK'] || '');
 
-    const dateStr = formatDate(row[dateCol] || row['TGL'] || row['DATE']);
+    // Date value lookup: read mapped dateCol, then search date aliases
+    let rawDateVal = row[dateCol];
+    if (rawDateVal === undefined || rawDateVal === null || rawDateVal === '') {
+      const DATE_ALIASES = [
+        'TGL', 'TANGGAL', 'DATE', 'TRANSACTION DATE', 'TRANS DATE', 
+        'TGL TRANS', 'TGL FAKTUR', 'INVOICE DATE', 'TANGGAL TRANSAKSI', 
+        'TGL_FAKTUR', 'TGL_TRANS', 'TGL_TRX', 'TRANS_DATE', 'TGL TRN', 
+        'TGL TRX', 'INVOICE_DATE'
+      ];
+      for (const alias of DATE_ALIASES) {
+        if (row[alias] !== undefined && row[alias] !== null && row[alias] !== '') {
+          rawDateVal = row[alias];
+          break;
+        }
+      }
+      if (rawDateVal === undefined || rawDateVal === null || rawDateVal === '') {
+        const rowKeys = Object.keys(row);
+        for (const k of rowKeys) {
+          const cleanK = k.toUpperCase().replace(/[_\-\.\s]+/g, ' ').trim();
+          if (DATE_ALIASES.includes(cleanK) && row[k] !== undefined && row[k] !== null && row[k] !== '') {
+            rawDateVal = row[k];
+            break;
+          }
+        }
+      }
+    }
+    const dateStr = formatDate(rawDateVal);
     const invoiceId = cleanString(row[invoiceCol] || row['NO FAKTUR'] || row['NO_FAKTUR'] || `INV-${i + 1}`);
     const qty = parseNumeric(row[qtyCol] || row['QTY'] || 0);
     const grossVal = parseNumeric(row['VALEU'] || row['GROSS'] || row['VALUE'] || row['VALUE GROSS'] || row['VALEU GROSS'] || row['TOTAL GROSS'] || salesVal);
@@ -462,3 +554,83 @@ export function normalizeMasterOutletRecords(
 
   return Array.from(recordsMap.values());
 }
+
+const MONTH_NAMES_ID = [
+  'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI',
+  'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'
+];
+
+/**
+ * Auto-detect period label (e.g. "SEPTEMBER 2026", "OKTOBER 2026") from transaction dates.
+ */
+export function detectPeriodFromTransactions(
+  transactions: { transactionDate?: string }[],
+  fallback: string = 'AGUSTUS 2026'
+): string {
+  if (!transactions || transactions.length === 0) return fallback;
+  const countMap = new Map<string, number>();
+
+  for (const t of transactions) {
+    if (!t.transactionDate) continue;
+    const str = String(t.transactionDate).trim();
+    let year = '';
+    let month = -1;
+
+    if (str.includes('-')) {
+      const parts = str.split('-');
+      if (parts[0].length === 4) {
+        year = parts[0];
+        month = parseInt(parts[1], 10) - 1;
+      } else if (parts[2] && parts[2].length === 4) {
+        year = parts[2];
+        month = parseInt(parts[1], 10) - 1;
+      }
+    } else if (str.includes('/')) {
+      const parts = str.split('/');
+      if (parts[2] && parts[2].length === 4) {
+        year = parts[2];
+        month = parseInt(parts[1], 10) - 1;
+      } else if (parts[0].length === 4) {
+        year = parts[0];
+        month = parseInt(parts[1], 10) - 1;
+      }
+    }
+
+    if (year && month >= 0 && month < 12) {
+      const key = `${MONTH_NAMES_ID[month]} ${year}`;
+      countMap.set(key, (countMap.get(key) || 0) + 1);
+    }
+  }
+
+  if (countMap.size === 0) return fallback;
+
+  let best = fallback;
+  let max = -1;
+  countMap.forEach((count, key) => {
+    if (count > max) {
+      max = count;
+      best = key;
+    }
+  });
+
+  return best;
+}
+
+/**
+ * Returns the number of days in a given period string (e.g. "SEPTEMBER 2026" -> 30).
+ */
+export function getDaysInPeriod(periodStr: string): number {
+  if (!periodStr) return 31;
+  const upper = periodStr.toUpperCase();
+  if (upper.includes('APR') || upper.includes('JUN') || upper.includes('SEP') || upper.includes('NOV')) {
+    return 30;
+  }
+  if (upper.includes('FEB')) {
+    const yearMatch = upper.match(/\d{4}/);
+    const year = yearMatch ? parseInt(yearMatch[0], 10) : 2026;
+    const isLeap = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    return isLeap ? 29 : 28;
+  }
+  return 31;
+}
+

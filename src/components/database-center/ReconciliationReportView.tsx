@@ -16,20 +16,24 @@ import { formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { exportTableToExcel } from '../../services/exportEngine';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
-import { UserProfile } from '../../types/database';
+import { UserProfile, AppSettings } from '../../types/database';
 import { ShieldAlert, Lock } from 'lucide-react';
 
 interface ReconciliationReportViewProps {
   reconciliation: DetailedReconciliationReport | null;
   userProfile?: UserProfile;
+  settings?: AppSettings;
   onNavigateToUpload: () => void;
 }
 
 export function ReconciliationReportView({
   reconciliation,
   userProfile,
+  settings,
   onNavigateToUpload,
 }: ReconciliationReportViewProps) {
+  const prevLabel = settings?.previousMonthLabel || 'Bulan Lalu';
+  const currLabel = settings?.currentMonthLabel || 'Bulan Ini';
   const isAdmin = userProfile?.role === 'ADMIN';
   const [activeTab, setActiveTab] = useState<'matched_outlets' | 'unmatched_outlets' | 'salesmen' | 'duplicates'>('matched_outlets');
 
@@ -94,7 +98,7 @@ export function ReconciliationReportView({
     },
     {
       key: 'salesAugust',
-      header: 'Sales Agustus 2026',
+      header: `Sales ${prevLabel}`,
       align: 'right',
       accessor: (r) => r.salesAugust,
       render: (r) => (
@@ -105,7 +109,7 @@ export function ReconciliationReportView({
     },
     {
       key: 'salesSeptember',
-      header: 'Sales September 2026',
+      header: `Sales ${currLabel}`,
       align: 'right',
       accessor: (r) => r.salesSeptember,
       render: (r) => (
@@ -207,14 +211,14 @@ export function ReconciliationReportView({
     },
     {
       key: 'actualSalesAugust',
-      header: 'Realisasi Agustus',
+      header: `Realisasi ${prevLabel}`,
       align: 'right',
       accessor: (r) => r.actualSalesAugust,
       render: (r) => <span className="font-mono text-xs text-slate-400">{formatRupiah(r.actualSalesAugust)}</span>,
     },
     {
       key: 'actualSalesSeptember',
-      header: 'Realisasi September',
+      header: `Realisasi ${currLabel}`,
       align: 'right',
       accessor: (r) => r.actualSalesSeptember,
       render: (r) => <span className="font-mono text-xs font-bold text-cyan-300">{formatRupiah(r.actualSalesSeptember)}</span>,
@@ -241,8 +245,8 @@ export function ReconciliationReportView({
       'Salesman ID': m.salesmanId,
       'Salesman Name': m.salesmanName || '-',
       'Status Master': m.isActiveInMaster ? 'AKTIF (OK)' : 'NON AKTIF',
-      'Sales Agustus 2026': m.salesAugust,
-      'Sales September 2026': m.salesSeptember,
+      [`Sales ${prevLabel}`]: m.salesAugust,
+      [`Sales ${currLabel}`]: m.salesSeptember,
     }));
     exportTableToExcel(exportRows, 'Laporan_Rekonsiliasi_Outlet_Matched.xlsx', 'Rekonsiliasi');
   };
@@ -262,7 +266,7 @@ export function ReconciliationReportView({
             </h2>
           </div>
           <p className="text-xs text-slate-400 mt-1">
-            Laporan audit resmi pencocokan data antara Database Transaksi (Agustus & September), Target Salesman, dan Master CB/ROA.
+            Laporan audit resmi pencocokan data antara Database Transaksi ({prevLabel} & {currLabel}), Target Salesman, dan Master CB/ROA.
           </p>
         </div>
 

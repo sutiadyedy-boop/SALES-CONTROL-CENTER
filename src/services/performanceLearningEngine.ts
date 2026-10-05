@@ -18,11 +18,11 @@ import {
   NextBestAction, 
   NextBestActionType,
   OpportunityResult, 
-  OpportunityType,
-  UserProfile 
+  OpportunityType 
 } from '../types/decisionEngine';
 import { 
-  TransactionRecord 
+  TransactionRecord,
+  UserProfile 
 } from '../types/database';
 import { 
   PerformanceResult, 

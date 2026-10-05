@@ -95,8 +95,12 @@ export function buildDecisionContext(
   settings?: Partial<AppSettings>,
   workingDaysConfig?: Partial<WorkingDaysConfig>
 ): DecisionContext {
-  const currLabel = settings?.currentMonthLabel || 'September 2026';
-  const prevLabel = settings?.previousMonthLabel || 'Agustus 2026';
+  const prevLabel = settings?.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
+    ? settings.previousMonthLabel 
+    : 'September 2026';
+  const currLabel = settings?.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
+    ? settings.currentMonthLabel 
+    : 'Oktober 2026';
 
   // 1. Working Days Configuration
   // Default to 26 total, 18 elapsed, or detect from unique transaction dates

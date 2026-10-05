@@ -35,6 +35,7 @@ import {
 import { ControlTowerKPIs } from '../types/analytics';
 import { UserProfile } from '../types/database';
 import { LogoDashboard } from './common/LogoDashboard';
+import { getShortMonthLabel } from '../services/periodDetectionService';
 
 interface SidebarProps {
   currentTab: string;
@@ -49,6 +50,8 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
   userProfile?: UserProfile;
   onLogout?: () => void;
+  previousMonthLabel?: string;
+  currentMonthLabel?: string;
 }
 
 export function Sidebar({
@@ -64,6 +67,8 @@ export function Sidebar({
   onToggleCollapse,
   userProfile,
   onLogout,
+  previousMonthLabel,
+  currentMonthLabel,
 }: SidebarProps) {
   // Support both controlled & uncontrolled collapsed state
   const [internalCollapsed, setInternalCollapsed] = useState(() => {
@@ -102,6 +107,9 @@ export function Sidebar({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [toggleCollapse]);
 
+  const prevShort = getShortMonthLabel(previousMonthLabel || 'SEPTEMBER 2026');
+  const currShort = getShortMonthLabel(currentMonthLabel || 'OKTOBER 2026');
+
   const analyticsItems = [
     { 
       id: 'dashboard', 
@@ -120,7 +128,7 @@ export function Sidebar({
     },
     { 
       id: 'month_comparison', 
-      label: 'Perbandingan Agus vs Sept', 
+      label: `Perbandingan ${prevShort} vs ${currShort}`, 
       icon: TrendingUp, 
       badge: kpis?.growthRate !== null && kpis?.growthRate !== undefined ? `${kpis.growthRate >= 0 ? '+' : ''}${kpis.growthRate.toFixed(1)}%` : null,
       badgeColor: kpis && kpis.growthRate !== null && kpis.growthRate >= 0

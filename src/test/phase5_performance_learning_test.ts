@@ -45,7 +45,7 @@ console.log('===================================================================
 
 // 1. Setup deterministic baseline from authentic data
 const office = createAuthenticOfficeData();
-const calc = computeAnalytics(office.prevTransactions, office.currTransactions, office.targets, office.masterOutlets, office.workingDays);
+const calc = computeAnalytics(office.prevTransactions, office.currTransactions, office.targets, office.masterOutlets, 25);
 const ctx = buildDecisionContext(calc, office.prevTransactions, office.currTransactions, office.targets, office.masterOutlets, {
   currentMonthLabel: 'September 2026',
   previousMonthLabel: 'Agustus 2026',

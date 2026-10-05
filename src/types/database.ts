@@ -164,11 +164,14 @@ export interface UserProfile {
   id: string;
   username: string;
   name: string; // full_name
+  full_name?: string;
   role: UserRole;
   status: UserStatus;
   cabang?: string;
   area?: string;
   salesmanId?: string;
+  salesman_id?: string;
+  email?: string;
   avatar_url?: string;
   createdAt?: string;
   updatedAt?: string;

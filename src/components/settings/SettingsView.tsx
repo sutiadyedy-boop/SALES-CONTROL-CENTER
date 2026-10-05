@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Settings, Save, Shield, Database, Key, CheckCircle2, RotateCcw, SlidersHorizontal, AlertTriangle, ShieldAlert, Lock, Sun, Moon } from 'lucide-react';
+import { Settings, Save, Shield, Database, Key, CheckCircle2, RotateCcw, SlidersHorizontal, AlertTriangle, ShieldAlert, Lock, Sun, Moon, Calendar } from 'lucide-react';
 import { AppSettings, UserProfile, UserRole, InsightThresholds } from '../../types/database';
 import { DEFAULT_THRESHOLDS } from '../../services/storageService';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
@@ -339,6 +339,83 @@ export function SettingsView({
               />
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Card: Konfigurasi Label Periode Komparasi */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
+        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
+          <Calendar className="w-4 h-4 text-cyan-400" />
+          <div>
+            <h3 className="text-sm font-bold text-slate-100">
+              Label Periode Komparasi (Bulan Lalu vs Bulan Ini)
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Menyesuaikan nama bulan & tahun yang ditampilkan di seluruh kartu eksekutif, tabel komparasi, dan grafik kontrol.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+          <div>
+            <label className="text-slate-300 font-semibold block mb-1">
+              Label Bulan Lalu (Database 1):
+            </label>
+            <input
+              type="text"
+              value={formSettings.previousMonthLabel}
+              onChange={e => setFormSettings({
+                ...formSettings,
+                previousMonthLabel: e.target.value.toUpperCase(),
+              })}
+              placeholder="Contoh: SEPTEMBER 2026"
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+            />
+            <span className="text-[10px] text-slate-500 mt-1 block">
+              Default: SEPTEMBER 2026 (atau otomatis terdeteksi dari file)
+            </span>
+          </div>
+
+          <div>
+            <label className="text-slate-300 font-semibold block mb-1">
+              Label Bulan Ini (Database 2 & Target):
+            </label>
+            <input
+              type="text"
+              value={formSettings.currentMonthLabel}
+              onChange={e => setFormSettings({
+                ...formSettings,
+                currentMonthLabel: e.target.value.toUpperCase(),
+              })}
+              placeholder="Contoh: OKTOBER 2026"
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 font-mono focus:outline-none focus:border-cyan-500"
+            />
+            <span className="text-[10px] text-slate-500 mt-1 block">
+              Default: OKTOBER 2026 (atau otomatis terdeteksi dari file)
+            </span>
+          </div>
+        </div>
+
+        <div className="pt-2 flex flex-wrap items-center gap-2 text-[11px]">
+          <span className="text-slate-500">Preset Cepat:</span>
+          {[
+            { prev: 'SEPTEMBER 2026', curr: 'OKTOBER 2026' },
+            { prev: 'OKTOBER 2026', curr: 'NOVEMBER 2026' },
+            { prev: 'AGUSTUS 2026', curr: 'SEPTEMBER 2026' },
+          ].map(p => (
+            <button
+              key={`${p.prev}-${p.curr}`}
+              type="button"
+              onClick={() => setFormSettings({
+                ...formSettings,
+                previousMonthLabel: p.prev,
+                currentMonthLabel: p.curr,
+              })}
+              className="px-2.5 py-1 rounded bg-slate-950 border border-slate-800 hover:border-slate-700 text-slate-300 font-mono transition-colors"
+            >
+              {p.prev} vs {p.curr}
+            </button>
+          ))}
         </div>
       </div>
 

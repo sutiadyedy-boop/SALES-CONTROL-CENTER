@@ -90,8 +90,12 @@ export function synthesizeOpportunities(
   persistedStates: Record<string, PersistedOpportunityState> = {},
   rawTransactions?: { previous: TransactionRecord[]; current: TransactionRecord[] }
 ): OpportunityResult[] {
-  const period = decisionContext?.period || 'SEPTEMBER 2026';
-  const previousPeriod = decisionContext?.previousPeriod || 'AGUSTUS 2026';
+  const period = decisionContext?.period && !decisionContext.period.toUpperCase().includes('AGUSTUS') 
+    ? decisionContext.period 
+    : 'OKTOBER 2026';
+  const previousPeriod = decisionContext?.previousPeriod && !decisionContext.previousPeriod.toUpperCase().includes('AGUSTUS') 
+    ? decisionContext.previousPeriod 
+    : 'SEPTEMBER 2026';
 
   const rawOpportunities: OpportunityResult[] = [];
   const deduplicationMap = new Map<string, boolean>();
