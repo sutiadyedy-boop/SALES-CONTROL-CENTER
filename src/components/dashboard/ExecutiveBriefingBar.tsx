@@ -8,12 +8,14 @@ import {
   CheckCircle2, 
   MessageSquare,
   ChevronDown,
-  Info
+  Info,
+  Send
 } from 'lucide-react';
 import { CalculationResult } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
 import { formatRupiah, formatPercent } from '../../services/smartInsightEngine';
 import { WhatsAppBriefingModal } from './WhatsAppBriefingModal';
+import { WhatsAppSalesmanReportModal } from './WhatsAppSalesmanReportModal';
 import { soundManager } from '../../services/soundManager';
 
 interface ExecutiveBriefingBarProps {
@@ -57,6 +59,7 @@ export function ExecutiveBriefingBar({
   });
 
   const [isBriefingModalOpen, setIsBriefingModalOpen] = useState(false);
+  const [isSalesmanReportModalOpen, setIsSalesmanReportModalOpen] = useState(false);
 
   // Bi-directional reactive synchronization with Target vs Realisasi
   useEffect(() => {
@@ -153,18 +156,35 @@ export function ExecutiveBriefingBar({
           </div>
         </div>
 
-        {/* Quick WhatsApp Action Button */}
-        <button
-          type="button"
-          onClick={() => {
-            soundManager.playClick();
-            setIsBriefingModalOpen(true);
-          }}
-          className="px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition-colors flex items-center gap-2 shadow-sm"
-        >
-          <MessageSquare className="w-4 h-4 text-emerald-400" />
-          <span>Format WhatsApp Briefing</span>
-        </button>
+        {/* Quick WhatsApp Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setIsSalesmanReportModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 cursor-pointer"
+            title="Kirim report pencapaian ke masing-masing salesman via WhatsApp"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Kirim Report WA Salesman</span>
+            <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-950/40 text-white font-mono font-bold">Auto</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setIsBriefingModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/50 text-slate-200 font-semibold text-xs transition-colors flex items-center gap-1.5 shadow-sm cursor-pointer"
+            title="Format WhatsApp morning briefing grup tim"
+          >
+            <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Briefing Grup WA</span>
+          </button>
+        </div>
       </div>
 
       {/* Grid: 4 Core Navigator Cards (Actual Performance Focus) */}
@@ -328,10 +348,19 @@ export function ExecutiveBriefingBar({
         </div>
       </div>
 
-      {/* WhatsApp Modal Mount */}
+      {/* WhatsApp Modal Mounts */}
       <WhatsAppBriefingModal
         isOpen={isBriefingModalOpen}
         onClose={() => setIsBriefingModalOpen(false)}
+        calculation={calculation}
+        settings={settings}
+        totalHariKerja={totalHariKerja}
+        hariKerjaBerjalan={hariKerjaBerjalan}
+      />
+
+      <WhatsAppSalesmanReportModal
+        isOpen={isSalesmanReportModalOpen}
+        onClose={() => setIsSalesmanReportModalOpen(false)}
         calculation={calculation}
         settings={settings}
         totalHariKerja={totalHariKerja}

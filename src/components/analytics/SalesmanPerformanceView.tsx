@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
-import { Users, Award, TrendingUp, AlertTriangle, Zap, Store } from 'lucide-react';
+import { Users, Award, TrendingUp, AlertTriangle, Zap, Store, Send, MessageSquare } from 'lucide-react';
 import { CalculationResult, SalesmanPerformanceItem } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
 import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { WhatsAppSalesmanReportModal } from '../dashboard/WhatsAppSalesmanReportModal';
+import { soundManager } from '../../services/soundManager';
 
 interface SalesmanPerformanceViewProps {
   calculation: CalculationResult | null;
@@ -21,6 +23,32 @@ export function SalesmanPerformanceView({
   onLoadSampleData,
 }: SalesmanPerformanceViewProps) {
   const [selectedSalesman, setSelectedSalesman] = useState<SalesmanPerformanceItem | null>(null);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+
+  const currLabel = settings.currentMonthLabel || 'September 2026';
+  const storageKey = `target_work_days_${currLabel.replace(/\s+/g, '_')}`;
+
+  const [totalHariKerja] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.blnIni === 'number' && parsed.blnIni > 0) return parsed.blnIni;
+      }
+    } catch {}
+    return 26;
+  });
+
+  const [hariKerjaBerjalan] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (typeof parsed.berjalan === 'number' && parsed.berjalan >= 0) return parsed.berjalan;
+      }
+    } catch {}
+    return 18;
+  });
 
   if (!calculation || calculation.salesmanPerformances.length === 0) {
     return (
@@ -34,7 +62,6 @@ export function SalesmanPerformanceView({
   }
 
   const { salesmanPerformances } = calculation;
-  const currLabel = settings.currentMonthLabel || 'September 2026';
 
   const columns: ColumnDef<SalesmanPerformanceItem>[] = [
     {
@@ -153,6 +180,27 @@ export function SalesmanPerformanceView({
         </span>
       ),
     },
+    {
+      key: 'actionWA',
+      header: 'Kirim WA',
+      align: 'center',
+      render: (row) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            soundManager.playClick();
+            setSelectedSalesman(row);
+            setIsWhatsAppModalOpen(true);
+          }}
+          className="px-2 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30 text-[11px] font-semibold flex items-center gap-1 transition-colors mx-auto cursor-pointer"
+          title={`Kirim report WhatsApp ke ${row.salesmanName}`}
+        >
+          <Send className="w-3 h-3" />
+          <span>WA</span>
+        </button>
+      ),
+    },
   ];
 
   return (
@@ -170,6 +218,19 @@ export function SalesmanPerformanceView({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              soundManager.playClick();
+              setIsWhatsAppModalOpen(true);
+            }}
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+            title="Kirim report pencapaian ke masing-masing salesman via WhatsApp"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Kirim Report WA Salesman</span>
+            <span className="px-1.5 py-0.2 rounded text-[10px] bg-slate-950/40 text-white font-mono font-bold">Auto</span>
+          </button>
           <CaptureJpgButton
             targetId="main-capture-area"
             fileName={`Performa_Salesman_${currLabel.replace(/\s+/g, '_')}.jpg`}
@@ -186,6 +247,17 @@ export function SalesmanPerformanceView({
         searchPlaceholder="Cari salesman atau kode..."
         exportFileName={`Salesman_Performance_${currLabel}.xlsx`}
       />
+
+      {calculation && (
+        <WhatsAppSalesmanReportModal
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+          calculation={calculation}
+          settings={settings}
+          totalHariKerja={totalHariKerja}
+          hariKerjaBerjalan={hariKerjaBerjalan}
+        />
+      )}
     </div>
   );
 }

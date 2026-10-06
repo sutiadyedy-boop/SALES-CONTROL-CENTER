@@ -18,7 +18,8 @@ import {
   Info,
   ArrowRight,
   Plus,
-  Minus
+  Minus,
+  Send
 } from 'lucide-react';
 import { CalculationResult, SalesmanPerformanceItem } from '../../types/analytics';
 import { AppSettings, TargetRecord, TransactionRecord } from '../../types/database';
@@ -26,6 +27,7 @@ import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { WhatsAppSalesmanReportModal } from '../dashboard/WhatsAppSalesmanReportModal';
 
 interface TargetRealisasiViewProps {
   calculation: CalculationResult | null;
@@ -46,6 +48,7 @@ export function TargetRealisasiView({
 }: TargetRealisasiViewProps) {
   const [filterType, setFilterType] = useState<'all' | 'achieved' | 'under' | 'no_target'>('all');
   const [tableViewMode, setTableViewMode] = useState<'all' | 'run_rate' | 'standard'>('all');
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
 
   const currLabel = settings.currentMonthLabel || 'September 2026';
 
@@ -428,6 +431,16 @@ export function TargetRealisasiView({
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsWhatsAppModalOpen(true)}
+            className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs transition-all flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
+            title="Kirim report pencapaian ke masing-masing salesman via WhatsApp"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>Kirim Report WA Salesman</span>
+          </button>
+
           <CaptureJpgButton
             targetId="main-capture-area"
             fileName={`Target_vs_Realisasi_${new Date().toISOString().split('T')[0]}.jpg`}
@@ -925,6 +938,17 @@ export function TargetRealisasiView({
         searchPlaceholder="Cari salesman atau kode..."
         exportFileName={`Target_vs_Realisasi_Sisa_${sisaHariKerja}_Hari_Kerja_${currLabel}.xlsx`}
       />
+
+      {calculation && (
+        <WhatsAppSalesmanReportModal
+          isOpen={isWhatsAppModalOpen}
+          onClose={() => setIsWhatsAppModalOpen(false)}
+          calculation={calculation}
+          settings={settings}
+          totalHariKerja={hariKerjaBlnIni}
+          hariKerjaBerjalan={hariKerjaBerjalan}
+        />
+      )}
     </div>
   );
 }
