@@ -23,7 +23,11 @@ import {
   ArrowRight,
   Info,
   X,
-  Layers
+  Layers,
+  ChevronDown,
+  Check,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { CalculationResult, SalesmanPerformanceItem, GlobalFilterState } from '../../types/analytics';
 import { AppSettings, MasterOutletRecord, TransactionRecord } from '../../types/database';
@@ -128,6 +132,241 @@ function matchesFilter(val: string | undefined, filterVal: string | string[] | u
     return val ? filterVal.includes(val) : false;
   }
   return val === filterVal;
+}
+
+interface MultiSelectOption {
+  id: string;
+  label: string;
+  subLabel?: string;
+  count?: number;
+}
+
+interface MultiSelectFilterMenuProps {
+  label: string;
+  options: MultiSelectOption[];
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+  accentColor?: 'cyan' | 'amber' | 'indigo' | 'emerald';
+  placeholder?: string;
+}
+
+function MultiSelectFilterMenu({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  accentColor = 'cyan',
+  placeholder = 'Semua',
+}: MultiSelectFilterMenuProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const isAllSelected = selectedValues.length === 0 || selectedValues.length === options.length;
+  const isFiltered = !isAllSelected;
+
+  const filteredOptions = useMemo(() => {
+    if (!search.trim()) return options;
+    const q = search.toLowerCase();
+    return options.filter(o => o.label.toLowerCase().includes(q) || (o.subLabel && o.subLabel.toLowerCase().includes(q)));
+  }, [options, search]);
+
+  const toggleOption = (id: string) => {
+    if (isAllSelected) {
+      const allIds = options.map(o => o.id);
+      onChange(allIds.filter(item => item !== id));
+    } else {
+      if (selectedValues.includes(id)) {
+        const next = selectedValues.filter(item => item !== id);
+        onChange(next);
+      } else {
+        const next = [...selectedValues, id];
+        if (next.length === options.length) {
+          onChange([]);
+        } else {
+          onChange(next);
+        }
+      }
+    }
+  };
+
+  const selectOnlyOption = (id: string) => {
+    onChange([id]);
+  };
+
+  const selectAll = () => {
+    onChange([]);
+  };
+
+  const activeColorClasses = {
+    cyan: 'border-cyan-500 bg-cyan-950/25 text-cyan-200 ring-1 ring-cyan-500/30',
+    amber: 'border-amber-500 bg-amber-950/25 text-amber-200 ring-1 ring-amber-500/30',
+    indigo: 'border-indigo-500 bg-indigo-950/25 text-indigo-200 ring-1 ring-indigo-500/30',
+    emerald: 'border-emerald-500 bg-emerald-950/25 text-emerald-200 ring-1 ring-emerald-500/30',
+  }[accentColor];
+
+  const badgeColorClasses = {
+    cyan: 'bg-cyan-950 text-cyan-300 border-cyan-800/60',
+    amber: 'bg-amber-950 text-amber-300 border-amber-800/60',
+    indigo: 'bg-indigo-950 text-indigo-300 border-indigo-800/60',
+    emerald: 'bg-emerald-950 text-emerald-300 border-emerald-800/60',
+  }[accentColor];
+
+  const checkboxAccent = {
+    cyan: 'accent-cyan-400',
+    amber: 'accent-amber-400',
+    indigo: 'accent-indigo-400',
+    emerald: 'accent-emerald-400',
+  }[accentColor];
+
+  const displayText = useMemo(() => {
+    if (isAllSelected) {
+      return `${placeholder} (${options.length})`;
+    }
+    if (selectedValues.length === 1) {
+      const match = options.find(o => o.id === selectedValues[0]);
+      return match ? match.label : selectedValues[0];
+    }
+    const sampleNames = selectedValues.slice(0, 2).map(id => options.find(o => o.id === id)?.label || id).join(', ');
+    return `${selectedValues.length} Dipilih (${sampleNames}${selectedValues.length > 2 ? '...' : ''})`;
+  }, [isAllSelected, placeholder, options, selectedValues]);
+
+  return (
+    <div className="space-y-1 relative" ref={containerRef}>
+      <label className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
+        <span className="truncate">{label}:</span>
+        {isFiltered && (
+          <button
+            type="button"
+            onClick={selectAll}
+            className={`text-[10px] hover:underline font-semibold transition-colors cursor-pointer ${
+              accentColor === 'amber' ? 'text-amber-400' : 'text-cyan-400'
+            }`}
+          >
+            Reset
+          </button>
+        )}
+      </label>
+
+      {/* Trigger Button */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(prev => !prev)}
+        className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-left flex items-center justify-between transition-all focus:outline-none cursor-pointer ${
+          isFiltered ? activeColorClasses : 'border-slate-800 text-slate-200 hover:border-slate-700'
+        }`}
+      >
+        <span className="truncate font-medium flex-1 mr-1">{displayText}</span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {isFiltered && (
+            <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded border font-bold ${badgeColorClasses}`}>
+              {selectedValues.length}
+            </span>
+          )}
+          <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </div>
+      </button>
+
+      {/* Popover Dropdown */}
+      {isOpen && (
+        <div className="absolute top-full left-0 z-50 mt-1 w-full min-w-[240px] max-w-[340px] bg-slate-900 border border-slate-700/90 rounded-2xl shadow-2xl p-2.5 space-y-2 animate-in fade-in zoom-in-95">
+          {/* Header Actions */}
+          <div className="flex items-center justify-between pb-1.5 border-b border-slate-800 text-[11px]">
+            <span className="font-semibold text-slate-300">
+              {isAllSelected ? `Semua (${options.length}) Dipilih` : `${selectedValues.length} dari ${options.length} Dipilih`}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={selectAll}
+                className="text-[10px] text-cyan-400 hover:text-cyan-300 hover:underline font-medium cursor-pointer"
+              >
+                Pilih Semua
+              </button>
+              <span className="text-slate-600">|</span>
+              <button
+                type="button"
+                onClick={() => onChange(options.length > 0 ? [options[0].id] : [])}
+                className="text-[10px] text-slate-400 hover:text-white hover:underline cursor-pointer"
+                title="Pilih hanya 1 pertama"
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+
+          {/* Search box if > 5 options */}
+          {options.length > 5 && (
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Cari..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg pl-7 pr-2.5 py-1 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              />
+              <Search className="w-3 h-3 text-slate-500 absolute left-2 top-2" />
+            </div>
+          )}
+
+          {/* Options Checklist */}
+          <div className="max-h-56 overflow-y-auto space-y-1 py-0.5 pr-0.5 custom-scrollbar">
+            {filteredOptions.length === 0 ? (
+              <div className="text-center py-3 text-xs text-slate-500">Tidak ada pilihan yang cocok</div>
+            ) : (
+              filteredOptions.map(opt => {
+                const isChecked = isAllSelected || selectedValues.includes(opt.id);
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => toggleOption(opt.id)}
+                    className={`flex items-center justify-between px-2 py-1.5 rounded-lg text-xs cursor-pointer select-none transition-colors group ${
+                      isChecked ? 'bg-slate-800/80 text-white' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
+                    }`}
+                  >
+                    <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0" onClick={e => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleOption(opt.id)}
+                        className={`w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 focus:ring-0 cursor-pointer ${checkboxAccent}`}
+                      />
+                      <span className={`truncate ${isChecked ? 'font-medium' : ''}`}>
+                        {opt.label}
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectOnlyOption(opt.id);
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-[10px] text-slate-400 hover:text-cyan-300 px-1 py-0.5 rounded hover:bg-slate-700 ml-1 transition-opacity whitespace-nowrap cursor-pointer"
+                      title="Hanya pilih ini"
+                    >
+                      Hanya Ini
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function MonthComparisonView({
@@ -296,36 +535,36 @@ export function MonthComparisonView({
   // ========================================================
   // 1. STATE SINKRONISASI FILTER TERPADU (BERLAKU UNTUK 4 TAB)
   // ========================================================
-  const [selectedSalesman, setSelectedSalesman] = useState<string>(() => {
+  const [selectedSalesmen, setSelectedSalesmen] = useState<string[]>(() => {
     if (filters?.salesmanId) {
-      return Array.isArray(filters.salesmanId) ? filters.salesmanId[0] : filters.salesmanId;
+      return Array.isArray(filters.salesmanId) ? filters.salesmanId : [filters.salesmanId];
     }
-    return 'ALL';
+    return [];
   });
 
   const [selectedOutletType, setSelectedOutletType] = useState<'ALL' | 'ECERAN' | 'NON_ECERAN'>('ALL');
 
-  const [selectedChannel, setSelectedChannel] = useState<string>(() => {
+  const [selectedChannels, setSelectedChannels] = useState<string[]>(() => {
     if (filters?.channel) {
-      return Array.isArray(filters.channel) ? filters.channel[0] : filters.channel;
+      return Array.isArray(filters.channel) ? filters.channel : [filters.channel];
     }
-    return 'ALL';
+    return [];
   });
 
-  const [selectedMarkNew, setSelectedMarkNew] = useState<string>('ALL');
+  const [selectedMarkNewList, setSelectedMarkNewList] = useState<string[]>([]);
 
-  const [selectedArea, setSelectedArea] = useState<string>(() => {
+  const [selectedAreas, setSelectedAreas] = useState<string[]>(() => {
     if (filters?.area) {
-      return Array.isArray(filters.area) ? filters.area[0] : filters.area;
+      return Array.isArray(filters.area) ? filters.area : [filters.area];
     }
-    return 'ALL';
+    return [];
   });
 
-  const [selectedRayon, setSelectedRayon] = useState<string>(() => {
+  const [selectedRayons, setSelectedRayons] = useState<string[]>(() => {
     if (filters?.rayon) {
-      return Array.isArray(filters.rayon) ? filters.rayon[0] : filters.rayon;
+      return Array.isArray(filters.rayon) ? filters.rayon : [filters.rayon];
     }
-    return 'ALL';
+    return [];
   });
 
   const [searchFilter, setSearchFilter] = useState<string>(() => filters?.searchQuery || '');
@@ -336,73 +575,73 @@ export function MonthComparisonView({
   // Sinkronkan jika filters prop dari parent berubah
   useEffect(() => {
     if (filters?.salesmanId !== undefined) {
-      const val = Array.isArray(filters.salesmanId) ? filters.salesmanId[0] : filters.salesmanId;
-      setSelectedSalesman(val || 'ALL');
+      const val = Array.isArray(filters.salesmanId) ? filters.salesmanId : (filters.salesmanId === 'ALL' ? [] : [filters.salesmanId]);
+      setSelectedSalesmen(val);
     }
     if (filters?.channel !== undefined) {
-      const val = Array.isArray(filters.channel) ? filters.channel[0] : filters.channel;
-      setSelectedChannel(val || 'ALL');
+      const val = Array.isArray(filters.channel) ? filters.channel : (filters.channel === 'ALL' ? [] : [filters.channel]);
+      setSelectedChannels(val);
     }
     if (filters?.area !== undefined) {
-      const val = Array.isArray(filters.area) ? filters.area[0] : filters.area;
-      setSelectedArea(val || 'ALL');
+      const val = Array.isArray(filters.area) ? filters.area : (filters.area === 'ALL' ? [] : [filters.area]);
+      setSelectedAreas(val);
     }
     if (filters?.rayon !== undefined) {
-      const val = Array.isArray(filters.rayon) ? filters.rayon[0] : filters.rayon;
-      setSelectedRayon(val || 'ALL');
+      const val = Array.isArray(filters.rayon) ? filters.rayon : (filters.rayon === 'ALL' ? [] : [filters.rayon]);
+      setSelectedRayons(val);
     }
     if (filters?.searchQuery !== undefined) {
       setSearchFilter(filters.searchQuery);
     }
   }, [filters]);
 
-  const handleSalesmanChange = (slsId: string) => {
-    setSelectedSalesman(slsId);
+  const handleSalesmenChange = (slsIds: string[]) => {
+    setSelectedSalesmen(slsIds);
     if (onFilterChange) {
       onFilterChange({
         ...filters,
-        salesmanId: slsId === 'ALL' ? undefined : slsId,
+        salesmanId: slsIds.length === 0 ? undefined : slsIds,
       });
     }
   };
 
-  const handleChannelChange = (chn: string) => {
-    setSelectedChannel(chn);
+  const handleChannelsChange = (chns: string[]) => {
+    setSelectedChannels(chns);
     if (onFilterChange) {
       onFilterChange({
         ...filters,
-        channel: chn === 'ALL' ? undefined : chn,
+        channel: chns.length === 0 ? undefined : chns,
       });
     }
   };
 
-  const handleAreaChange = (area: string) => {
-    setSelectedArea(area);
+  const handleAreasChange = (areas: string[]) => {
+    setSelectedAreas(areas);
     if (onFilterChange) {
       onFilterChange({
         ...filters,
-        area: area === 'ALL' ? undefined : area,
+        area: areas.length === 0 ? undefined : areas,
       });
     }
   };
 
-  const handleRayonChange = (rayon: string) => {
-    setSelectedRayon(rayon);
+  const handleRayonsChange = (rayons: string[]) => {
+    setSelectedRayons(rayons);
     if (onFilterChange) {
       onFilterChange({
         ...filters,
-        rayon: rayon === 'ALL' ? undefined : rayon,
+        rayon: rayons.length === 0 ? undefined : rayons,
       });
     }
   };
 
   const handleResetAllFilters = () => {
-    setSelectedSalesman('ALL');
+    setSelectedSalesmen([]);
     setSelectedOutletType('ALL');
-    setSelectedChannel('ALL');
-    setSelectedMarkNew('ALL');
-    setSelectedArea('ALL');
-    setSelectedRayon('ALL');
+    setSelectedChannels([]);
+    setSelectedMarkNewList([]);
+    setSelectedAreas([]);
+    setSelectedRayons([]);
     setSearchFilter('');
     setOutletStatusFilter('ALL');
     setPrevSelectedDays(Array.from({ length: 31 }, (_, i) => i + 1));
@@ -523,9 +762,9 @@ export function MonthComparisonView({
     fc?: string;
     pma?: string;
   }): boolean => {
-    // 1. Salesman filter
-    if (selectedSalesman !== 'ALL') {
-      if (t.salesmanId !== selectedSalesman && t.salesmanName !== selectedSalesman) return false;
+    // 1. Salesman filter (Multi-select)
+    if (selectedSalesmen.length > 0 && selectedSalesmen.length < salesmenList.length) {
+      if (!selectedSalesmen.includes(t.salesmanId || '') && !selectedSalesmen.includes(t.salesmanName || '')) return false;
     } else if (filters?.salesmanId) {
       if (!matchesFilter(t.salesmanId, filters.salesmanId)) return false;
     }
@@ -535,29 +774,29 @@ export function MonthComparisonView({
     if (selectedOutletType === 'ECERAN' && !isEceran) return false;
     if (selectedOutletType === 'NON_ECERAN' && isEceran) return false;
 
-    // 3. Channel filter
-    if (selectedChannel !== 'ALL') {
-      if (t.channel !== selectedChannel) return false;
+    // 3. Channel filter (Multi-select)
+    if (selectedChannels.length > 0 && selectedChannels.length < allChannels.length) {
+      if (!selectedChannels.includes(t.channel || '')) return false;
     } else if (filters?.channel) {
       if (!matchesFilter(t.channel, filters.channel)) return false;
     }
 
-    // 4. MARK NEW Category filter
-    if (selectedMarkNew !== 'ALL') {
+    // 4. MARK NEW Category filter (Multi-select)
+    if (selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length) {
       const mark = t.markNew ? t.markNew.trim().toUpperCase() : '';
-      if (mark !== selectedMarkNew.trim().toUpperCase()) return false;
+      if (!selectedMarkNewList.some(s => s.trim().toUpperCase() === mark)) return false;
     }
 
-    // 5. Area filter
-    if (selectedArea !== 'ALL') {
-      if (t.area !== selectedArea) return false;
+    // 5. Area filter (Multi-select)
+    if (selectedAreas.length > 0 && selectedAreas.length < allAreas.length) {
+      if (!selectedAreas.includes(t.area || '')) return false;
     } else if (filters?.area) {
       if (!matchesFilter(t.area, filters.area)) return false;
     }
 
-    // 6. Rayon filter
-    if (selectedRayon !== 'ALL') {
-      if (t.rayon !== selectedRayon) return false;
+    // 6. Rayon filter (Multi-select)
+    if (selectedRayons.length > 0 && selectedRayons.length < allRayons.length) {
+      if (!selectedRayons.includes(t.rayon || '')) return false;
     } else if (filters?.rayon) {
       if (!matchesFilter(t.rayon, filters.rayon)) return false;
     }
@@ -660,7 +899,7 @@ export function MonthComparisonView({
       if (d === null) return true;
       return prevSelectedDays.includes(d);
     });
-  }, [enrichedPrevTxs, prevSelectedDays, selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, filters]);
+  }, [enrichedPrevTxs, prevSelectedDays, selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, searchFilter, filters]);
 
   const activeCurrTxs = useMemo(() => {
     return enrichedCurrTxs.filter(t => {
@@ -670,7 +909,7 @@ export function MonthComparisonView({
       if (d === null) return true;
       return currSelectedDays.includes(d);
     });
-  }, [enrichedCurrTxs, currSelectedDays, selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, filters]);
+  }, [enrichedCurrTxs, currSelectedDays, selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, searchFilter, filters]);
 
   // General KPIs (recomputed for the selected date range & filters)
   const totalSalesPrev = useMemo(() => activePrevTxs.reduce((sum, t) => sum + (t.salesValue || 0), 0), [activePrevTxs]);
@@ -691,16 +930,16 @@ export function MonthComparisonView({
   // Active filters count for badges
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (selectedSalesman !== 'ALL') count++;
+    if (selectedSalesmen.length > 0 && selectedSalesmen.length < salesmenList.length) count++;
     if (selectedOutletType !== 'ALL') count++;
-    if (selectedChannel !== 'ALL') count++;
-    if (selectedMarkNew !== 'ALL') count++;
-    if (selectedArea !== 'ALL') count++;
-    if (selectedRayon !== 'ALL') count++;
+    if (selectedChannels.length > 0 && selectedChannels.length < allChannels.length) count++;
+    if (selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length) count++;
+    if (selectedAreas.length > 0 && selectedAreas.length < allAreas.length) count++;
+    if (selectedRayons.length > 0 && selectedRayons.length < allRayons.length) count++;
     if (searchFilter.trim()) count++;
     if (prevSelectedDays.length < 31 || currSelectedDays.length < maxCurrDay) count++;
     return count;
-  }, [selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, prevSelectedDays, currSelectedDays, maxCurrDay]);
+  }, [selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, searchFilter, prevSelectedDays, currSelectedDays, maxCurrDay]);
 
   // ==========================================
   // 1. HARIAN (DAY-BY-DAY) COMPARISON DATASET
@@ -708,11 +947,11 @@ export function MonthComparisonView({
   // ==========================================
   const dailyPrevTxs = useMemo(() => {
     return enrichedPrevTxs.filter(matchesNonDateFilters);
-  }, [enrichedPrevTxs, selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, filters]);
+  }, [enrichedPrevTxs, selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, searchFilter, filters]);
 
   const dailyCurrTxs = useMemo(() => {
     return enrichedCurrTxs.filter(matchesNonDateFilters);
-  }, [enrichedCurrTxs, selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, filters]);
+  }, [enrichedCurrTxs, selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, searchFilter, filters]);
 
   const dailyComparisonData = useMemo(() => {
     const daysMap = new Map<number, {
@@ -918,11 +1157,13 @@ export function MonthComparisonView({
 
   // Filtered Eceran data if specific MARK NEW is selected
   const displayedEceranData = useMemo(() => {
-    if (selectedMarkNew !== 'ALL') {
-      return eceranMarkNewData.filter(d => d.markNew.toUpperCase() === selectedMarkNew.toUpperCase());
+    if (selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length) {
+      return eceranMarkNewData.filter(d => 
+        selectedMarkNewList.some(s => s.trim().toUpperCase() === d.markNew.trim().toUpperCase())
+      );
     }
     return eceranMarkNewData;
-  }, [eceranMarkNewData, selectedMarkNew]);
+  }, [eceranMarkNewData, selectedMarkNewList, allMarkNewCategories.length]);
 
   // ==========================================
   // 3. MONITORING BY OUTLET
@@ -1080,7 +1321,7 @@ export function MonthComparisonView({
         ecCurr: o.omsetCurr > 0,
       };
     });
-  }, [masterOutlets, activePrevTxs, activeCurrTxs, selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, filters]);
+  }, [masterOutlets, activePrevTxs, activeCurrTxs, selectedSalesmen, selectedOutletType, selectedChannels, selectedMarkNewList, selectedAreas, selectedRayons, searchFilter, filters]);
 
   // Filtered Outlets for DataTable (termasuk status button)
   const filteredOutlets = useMemo(() => {
@@ -1207,14 +1448,14 @@ export function MonthComparisonView({
         achievementRate,
       };
     }).sort((a, b) => b.actualCurrent - a.actualCurrent);
-  }, [calculation, activePrevTxs, activeCurrTxs, selectedSalesman, selectedOutletType, selectedChannel, selectedMarkNew, selectedArea, selectedRayon, searchFilter, filters]);
+  }, [calculation, activePrevTxs, activeCurrTxs, selectedSalesmen, selectedOutletType, selectedChannels, selectedMarkNewList, selectedAreas, selectedRayons, searchFilter, filters]);
 
   const filteredSalesmanPerformances = useMemo(() => {
-    if (selectedSalesman !== 'ALL') {
-      return dateAwareSalesmanPerformances.filter(s => s.salesmanId === selectedSalesman);
+    if (selectedSalesmen.length > 0 && selectedSalesmen.length < salesmenList.length) {
+      return dateAwareSalesmanPerformances.filter(s => selectedSalesmen.includes(s.salesmanId));
     }
     return dateAwareSalesmanPerformances;
-  }, [dateAwareSalesmanPerformances, selectedSalesman]);
+  }, [dateAwareSalesmanPerformances, selectedSalesmen, salesmenList.length]);
 
   // ==========================================
   // TABLE COLUMNS
@@ -2292,34 +2533,15 @@ export function MonthComparisonView({
 
         {/* Form Controls Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {/* 1. Filter Salesman */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-              <span>Filter Salesman:</span>
-              {selectedSalesman !== 'ALL' && (
-                <button
-                  onClick={() => handleSalesmanChange('ALL')}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </label>
-            <select
-              value={selectedSalesman}
-              onChange={(e) => handleSalesmanChange(e.target.value)}
-              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-medium ${
-                selectedSalesman !== 'ALL' ? 'border-cyan-500 bg-cyan-950/20 text-cyan-200' : 'border-slate-800'
-              }`}
-            >
-              <option value="ALL">Semua Salesman ({salesmenList.length})</option>
-              {salesmenList.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.id})
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* 1. Filter Salesman - Multi-Select */}
+          <MultiSelectFilterMenu
+            label="Filter Salesman"
+            options={salesmenList.map(s => ({ id: s.id, label: s.name, subLabel: s.id }))}
+            selectedValues={selectedSalesmen}
+            onChange={handleSalesmenChange}
+            accentColor="cyan"
+            placeholder="Semua Salesman"
+          />
 
           {/* 2. Filter Tipe Outlet */}
           <div className="space-y-1">
@@ -2327,8 +2549,9 @@ export function MonthComparisonView({
               <span>Tipe Outlet:</span>
               {selectedOutletType !== 'ALL' && (
                 <button
+                  type="button"
                   onClick={() => setSelectedOutletType('ALL')}
-                  className="text-[10px] text-amber-400 hover:text-amber-300 font-medium"
+                  className="text-[10px] text-amber-400 hover:text-amber-300 font-medium cursor-pointer"
                 >
                   Clear
                 </button>
@@ -2337,8 +2560,8 @@ export function MonthComparisonView({
             <select
               value={selectedOutletType}
               onChange={(e) => setSelectedOutletType(e.target.value as any)}
-              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-medium ${
-                selectedOutletType !== 'ALL' ? 'border-amber-500 bg-amber-950/20 text-amber-300 font-semibold' : 'border-slate-800'
+              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-medium cursor-pointer ${
+                selectedOutletType !== 'ALL' ? 'border-amber-500 bg-amber-950/20 text-amber-300 font-semibold ring-1 ring-amber-500/30' : 'border-slate-800'
               }`}
             >
               <option value="ALL">Semua Tipe (Eceran & Grosir)</option>
@@ -2347,118 +2570,48 @@ export function MonthComparisonView({
             </select>
           </div>
 
-          {/* 3. Filter Kategori By Eceran (MARK NEW) */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-              <span>By Eceran (MARK NEW):</span>
-              {selectedMarkNew !== 'ALL' && (
-                <button
-                  onClick={() => setSelectedMarkNew('ALL')}
-                  className="text-[10px] text-amber-400 hover:text-amber-300 font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </label>
-            <select
-              value={selectedMarkNew}
-              onChange={(e) => setSelectedMarkNew(e.target.value)}
-              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-500 font-medium ${
-                selectedMarkNew !== 'ALL' ? 'border-amber-500 bg-amber-950/20 text-amber-300 font-semibold' : 'border-slate-800'
-              }`}
-            >
-              <option value="ALL">Semua Kategori MARK NEW ({allMarkNewCategories.length})</option>
-              {allMarkNewCategories.map(cat => (
-                <option key={cat} value={cat}>
-                  {cat}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* 3. Filter Kategori By Eceran (MARK NEW) - Multi-Select (Centang > 1) */}
+          <MultiSelectFilterMenu
+            label="By Eceran (MARK NEW)"
+            options={allMarkNewCategories.map(cat => ({ id: cat, label: cat }))}
+            selectedValues={selectedMarkNewList}
+            onChange={(newVals) => setSelectedMarkNewList(newVals)}
+            accentColor="amber"
+            placeholder="Semua Kategori Eceran"
+          />
 
-          {/* 4. Filter Channel */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-              <span>Channel:</span>
-              {selectedChannel !== 'ALL' && (
-                <button
-                  onClick={() => handleChannelChange('ALL')}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </label>
-            <select
-              value={selectedChannel}
-              onChange={(e) => handleChannelChange(e.target.value)}
-              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-medium ${
-                selectedChannel !== 'ALL' ? 'border-cyan-500 bg-cyan-950/20 text-cyan-200' : 'border-slate-800'
-              }`}
-            >
-              <option value="ALL">Semua Channel ({allChannels.length})</option>
-              {allChannels.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
+          {/* 4. Filter Channel - Multi-Select */}
+          <MultiSelectFilterMenu
+            label="Channel"
+            options={allChannels.map(c => ({ id: c, label: c }))}
+            selectedValues={selectedChannels}
+            onChange={handleChannelsChange}
+            accentColor="indigo"
+            placeholder="Semua Channel"
+          />
         </div>
 
         {/* Row 2: Area, Rayon, Search */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-          {/* Area */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-              <span>Area:</span>
-              {selectedArea !== 'ALL' && (
-                <button
-                  onClick={() => handleAreaChange('ALL')}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </label>
-            <select
-              value={selectedArea}
-              onChange={(e) => handleAreaChange(e.target.value)}
-              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-medium ${
-                selectedArea !== 'ALL' ? 'border-cyan-500 bg-cyan-950/20 text-cyan-200' : 'border-slate-800'
-              }`}
-            >
-              <option value="ALL">Semua Area ({allAreas.length})</option>
-              {allAreas.map(a => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
-          </div>
+          {/* Area - Multi-Select */}
+          <MultiSelectFilterMenu
+            label="Area"
+            options={allAreas.map(a => ({ id: a, label: a }))}
+            selectedValues={selectedAreas}
+            onChange={handleAreasChange}
+            accentColor="emerald"
+            placeholder="Semua Area"
+          />
 
-          {/* Rayon */}
-          <div className="space-y-1">
-            <label className="text-[11px] font-semibold text-slate-300 flex items-center justify-between">
-              <span>Rayon:</span>
-              {selectedRayon !== 'ALL' && (
-                <button
-                  onClick={() => handleRayonChange('ALL')}
-                  className="text-[10px] text-cyan-400 hover:text-cyan-300 font-medium"
-                >
-                  Clear
-                </button>
-              )}
-            </label>
-            <select
-              value={selectedRayon}
-              onChange={(e) => handleRayonChange(e.target.value)}
-              className={`w-full bg-slate-950 border rounded-xl px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-medium ${
-                selectedRayon !== 'ALL' ? 'border-cyan-500 bg-cyan-950/20 text-cyan-200' : 'border-slate-800'
-              }`}
-            >
-              <option value="ALL">Semua Rayon ({allRayons.length})</option>
-              {allRayons.map(r => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
+          {/* Rayon - Multi-Select */}
+          <MultiSelectFilterMenu
+            label="Rayon"
+            options={allRayons.map(r => ({ id: r, label: r }))}
+            selectedValues={selectedRayons}
+            onChange={handleRayonsChange}
+            accentColor="cyan"
+            placeholder="Semua Rayon"
+          />
 
           {/* Search Query */}
           <div className="space-y-1">
@@ -2466,8 +2619,9 @@ export function MonthComparisonView({
               <span>Pencarian Cepat:</span>
               {searchFilter && (
                 <button
+                  type="button"
                   onClick={() => setSearchFilter('')}
-                  className="text-[10px] text-rose-400 hover:text-rose-300 font-medium"
+                  className="text-[10px] text-rose-400 hover:text-rose-300 font-medium cursor-pointer"
                 >
                   Clear
                 </button>
@@ -2493,52 +2647,52 @@ export function MonthComparisonView({
             <span>Aktif:</span>
           </span>
 
-          {selectedSalesman !== 'ALL' && (
+          {selectedSalesmen.length > 0 && selectedSalesmen.length < salesmenList.length && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cyan-950 text-cyan-300 border border-cyan-800/60 font-mono text-[11px]">
-              <span>Sales: {salesmenList.find(s => s.id === selectedSalesman)?.name || selectedSalesman}</span>
-              <button onClick={() => handleSalesmanChange('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <span>Sales: {selectedSalesmen.length === 1 ? (salesmenList.find(s => s.id === selectedSalesmen[0])?.name || selectedSalesmen[0]) : `${selectedSalesmen.length} Salesman`}</span>
+              <button type="button" onClick={() => handleSalesmenChange([])} className="hover:text-white" title="Reset filter salesman"><X className="w-3 h-3" /></button>
             </span>
           )}
 
           {selectedOutletType !== 'ALL' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-950 text-amber-300 border border-amber-800/60 text-[11px] font-medium">
               <span>Tipe: {selectedOutletType === 'ECERAN' ? 'Khusus Eceran' : 'Non-Eceran'}</span>
-              <button onClick={() => setSelectedOutletType('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <button type="button" onClick={() => setSelectedOutletType('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
 
-          {selectedMarkNew !== 'ALL' && (
+          {selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-950 text-amber-300 border border-amber-800/60 font-mono text-[11px]">
-              <span>MARK NEW: {selectedMarkNew}</span>
-              <button onClick={() => setSelectedMarkNew('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <span>MARK NEW: {selectedMarkNewList.length === 1 ? selectedMarkNewList[0] : `${selectedMarkNewList.length} Eceran`}</span>
+              <button type="button" onClick={() => setSelectedMarkNewList([])} className="hover:text-white" title="Reset filter eceran"><X className="w-3 h-3" /></button>
             </span>
           )}
 
-          {selectedChannel !== 'ALL' && (
+          {selectedChannels.length > 0 && selectedChannels.length < allChannels.length && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-indigo-950 text-indigo-300 border border-indigo-800/60 text-[11px]">
-              <span>Channel: {selectedChannel}</span>
-              <button onClick={() => handleChannelChange('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <span>Channel: {selectedChannels.length === 1 ? selectedChannels[0] : `${selectedChannels.length} Channel`}</span>
+              <button type="button" onClick={() => handleChannelsChange([])} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
 
-          {selectedArea !== 'ALL' && (
+          {selectedAreas.length > 0 && selectedAreas.length < allAreas.length && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-[11px]">
-              <span>Area: {selectedArea}</span>
-              <button onClick={() => handleAreaChange('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <span>Area: {selectedAreas.length === 1 ? selectedAreas[0] : `${selectedAreas.length} Area`}</span>
+              <button type="button" onClick={() => handleAreasChange([])} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
 
-          {selectedRayon !== 'ALL' && (
+          {selectedRayons.length > 0 && selectedRayons.length < allRayons.length && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-[11px]">
-              <span>Rayon: {selectedRayon}</span>
-              <button onClick={() => handleRayonChange('ALL')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <span>Rayon: {selectedRayons.length === 1 ? selectedRayons[0] : `${selectedRayons.length} Rayon`}</span>
+              <button type="button" onClick={() => handleRayonsChange([])} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
 
           {searchFilter && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-800 text-cyan-300 border border-slate-700 text-[11px]">
               <span>Cari: &ldquo;{searchFilter}&rdquo;</span>
-              <button onClick={() => setSearchFilter('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              <button type="button" onClick={() => setSearchFilter('')} className="hover:text-white"><X className="w-3 h-3" /></button>
             </span>
           )}
 
@@ -2773,79 +2927,6 @@ export function MonthComparisonView({
               </button>
             </div>
           )}
-
-          {/* Eceran Description & Quick Filter Chips */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
-                  <Store className="w-4 h-4 text-amber-400" />
-                  <span>Kategori By Eceran (MARK NEW) & Filter Channel</span>
-                </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Klik kategori MARK NEW di bawah untuk memfilter data eceran secara instan dan sinkron ke seluruh tab.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    setSelectedMarkNew('ALL');
-                    setSelectedOutletType('ALL');
-                  }}
-                  className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium"
-                >
-                  Semua MARK NEW
-                </button>
-                <span className="text-slate-600">|</span>
-                <button
-                  onClick={() => setSelectedOutletType('ECERAN')}
-                  className="text-[11px] text-amber-400 hover:text-amber-300 font-medium"
-                >
-                  Default Eceran Saja
-                </button>
-              </div>
-            </div>
-
-            {/* Quick MARK NEW Chips */}
-            <div className="flex flex-wrap gap-2 pt-1">
-              <button
-                onClick={() => setSelectedMarkNew('ALL')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
-                  selectedMarkNew === 'ALL'
-                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50 shadow-sm'
-                    : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${selectedMarkNew === 'ALL' ? 'bg-amber-400' : 'bg-slate-600'}`} />
-                <span>SEMUA KATEGORI MARK NEW</span>
-              </button>
-
-              {allMarkNewCategories.map(cat => {
-                const isSelected = selectedMarkNew === cat;
-                return (
-                  <button
-                    key={cat}
-                    onClick={() => {
-                      if (isSelected) {
-                        setSelectedMarkNew('ALL');
-                      } else {
-                        setSelectedMarkNew(cat);
-                      }
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 ${
-                      isSelected
-                        ? 'bg-amber-500 text-slate-950 font-bold shadow-sm'
-                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:border-slate-700'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-amber-400'}`} />
-                    <span>{cat}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
 
           {/* 3 CORE KPI CARDS FOR ECERAN (USER REQUIREMENT) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3200,51 +3281,42 @@ export function MonthComparisonView({
               </div>
             </div>
 
-            {/* Dropdowns for Salesman, Channel, dan MARK NEW (Tersinkron) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/80">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 whitespace-nowrap">Salesman:</span>
-                <select
-                  value={selectedSalesman}
-                  onChange={(e) => handleSalesmanChange(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="ALL">Semua Salesman</option>
-                  {salesmenList.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} ({s.id})</option>
-                  ))}
-                </select>
+            {/* Multi-Select Filters for Salesman, Channel, dan MARK NEW (Tersinkron) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-800/80 items-end">
+              <div>
+                <MultiSelectFilterMenu
+                  label="Salesman"
+                  options={salesmenList.map(s => ({ id: s.id, label: s.name, subLabel: s.id }))}
+                  selectedValues={selectedSalesmen}
+                  onChange={handleSalesmenChange}
+                  accentColor="cyan"
+                  placeholder="Semua Salesman"
+                />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 whitespace-nowrap">Channel:</span>
-                <select
-                  value={selectedChannel}
-                  onChange={(e) => handleChannelChange(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="ALL">Semua Channel</option>
-                  {allChannels.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+              <div>
+                <MultiSelectFilterMenu
+                  label="Channel"
+                  options={allChannels.map(c => ({ id: c, label: c }))}
+                  selectedValues={selectedChannels}
+                  onChange={handleChannelsChange}
+                  accentColor="indigo"
+                  placeholder="Semua Channel"
+                />
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 whitespace-nowrap">MARK NEW:</span>
-                <select
-                  value={selectedMarkNew}
-                  onChange={(e) => setSelectedMarkNew(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="ALL">Semua MARK NEW</option>
-                  {allMarkNewCategories.map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+              <div>
+                <MultiSelectFilterMenu
+                  label="MARK NEW (Eceran)"
+                  options={allMarkNewCategories.map(c => ({ id: c, label: c }))}
+                  selectedValues={selectedMarkNewList}
+                  onChange={(newList) => setSelectedMarkNewList(newList)}
+                  accentColor="amber"
+                  placeholder="Semua MARK NEW"
+                />
               </div>
 
-              <div className="flex items-center justify-end text-xs text-slate-400">
+              <div className="flex items-center justify-end text-xs text-slate-400 pb-2">
                 <span>Ditemukan: <strong className="text-cyan-300 font-mono">{filteredOutlets.length}</strong> outlet</span>
               </div>
             </div>
@@ -3273,12 +3345,13 @@ export function MonthComparisonView({
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-emerald-400" />
                 <span>
-                  Analisa Tren Harian tersinkronisasi: Data transaksi harian terfilter berdasarkan Salesman ({selectedSalesman === 'ALL' ? 'Semua' : selectedSalesman}), Tipe Outlet ({selectedOutletType}), Channel ({selectedChannel}), dan MARK NEW ({selectedMarkNew}).
+                  Analisa Tren Harian tersinkronisasi: Data transaksi harian terfilter berdasarkan Salesman ({selectedSalesmen.length === 0 || selectedSalesmen.length === salesmenList.length ? 'Semua' : `${selectedSalesmen.length} Salesman`}), Tipe Outlet ({selectedOutletType}), Channel ({selectedChannels.length === 0 || selectedChannels.length === allChannels.length ? 'Semua' : `${selectedChannels.length} Channel`}), dan MARK NEW ({selectedMarkNewList.length === 0 || selectedMarkNewList.length === allMarkNewCategories.length ? 'Semua' : `${selectedMarkNewList.length} Eceran`}).
                 </span>
               </div>
               <button
+                type="button"
                 onClick={handleResetAllFilters}
-                className="text-[11px] underline hover:text-white"
+                className="text-[11px] underline hover:text-white cursor-pointer"
               >
                 Reset Filter
               </button>

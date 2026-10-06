@@ -47,7 +47,7 @@ export function CaptureJpgButton({
         fileName: defaultName,
         backgroundColor: '#020617', // Dark enterprise background
         scale: 2,
-        quality: 0.95,
+        quality: 0.98,
       });
 
       if (result.success) {
@@ -104,6 +104,9 @@ export function CaptureJpgButton({
         <>
           <Camera className="w-3.5 h-3.5 text-cyan-400" />
           <span>{label}</span>
+          <span className="px-1 py-0.2 rounded text-[9px] font-mono bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-bold">
+            HD
+          </span>
         </>
       )}
     </>

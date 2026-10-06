@@ -27,7 +27,7 @@ export type PerformanceOutcome =
   | 'PENDING' 
   | 'DISMISSED';
 
-export type EntityType = 'OUTLET' | 'SKU' | 'SALESMAN' | 'EC' | 'BRANCH' | 'FORECAST';
+export type EntityType = 'OUTLET' | 'SKU' | 'SALESMAN' | 'MARK_NEW' | 'EC' | 'BRANCH' | 'FORECAST';
 
 export interface PerformanceResult {
   actionId: string;

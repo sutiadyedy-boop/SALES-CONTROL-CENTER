@@ -27,6 +27,7 @@ import {
   updateAdminUser, 
   deleteAdminUser 
 } from '../../services/authService';
+import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
 interface UserManagementViewProps {
   currentUser: UserProfile;
@@ -265,6 +266,12 @@ export function UserManagementView({ currentUser, onNavigateToDashboard }: UserM
         </div>
 
         <div className="flex items-center gap-2.5">
+          <CaptureJpgButton
+            targetId="main-capture-area"
+            fileName={`User_Management_${new Date().toISOString().split('T')[0]}.jpg`}
+            label="Capture JPG"
+          />
+
           <button
             onClick={loadUsers}
             disabled={loading}

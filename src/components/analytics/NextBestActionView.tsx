@@ -53,6 +53,7 @@ import { formatRupiah } from '../../services/smartInsightEngine';
 import { fetchAiExplanation } from '../../services/aiExplanationService';
 import { soundManager } from '../../services/soundManager';
 import { EmptyState } from '../common/EmptyState';
+import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
 interface NextBestActionViewProps {
   actions: NextBestAction[];
@@ -345,6 +346,11 @@ export function NextBestActionView({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <CaptureJpgButton
+              targetId="main-capture-area"
+              fileName={`Next_Best_Action_${new Date().toISOString().split('T')[0]}.jpg`}
+              label="Capture JPG"
+            />
             <button
               onClick={() => onNavigateToTab('decision_center')}
               className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-800/80 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-2 transition-colors shadow-sm"

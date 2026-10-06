@@ -128,7 +128,7 @@ export async function captureElementToJpg(
   const {
     fileName = `Capture_${new Date().toISOString().split('T')[0]}.jpg`,
     backgroundColor = '#020617', // tailwind slate-950
-    quality = 0.95,
+    quality = 0.98, // Crisp high-definition JPEG quality
     scale = 2,
     skipFonts = true,
   } = options;
@@ -146,12 +146,18 @@ export async function captureElementToJpg(
     };
   }
 
-  // Calculate dimensions and pixel ratio
+  // Calculate dimensions and pixel ratio for crystal clear HD rendering
   const scrollWidth = element.scrollWidth || element.offsetWidth || 1200;
   const scrollHeight = element.scrollHeight || element.offsetHeight || 800;
   const totalPixels = scrollWidth * scrollHeight;
-  // Prevent excessive canvas memory on ultra-tall tables
-  const pixelRatio = totalPixels > 4000000 ? 1.5 : (scale || 2);
+  
+  // High-definition pixel ratio: Keep 2x or higher for sharp text and charts
+  let pixelRatio = scale || 2;
+  if (totalPixels > 12000000) {
+    pixelRatio = 1.8;
+  } else {
+    pixelRatio = Math.max(scale || 2, 2);
+  }
 
   // Strategy 1: Modern html-to-image with toJpeg
   try {
@@ -257,7 +263,7 @@ export async function captureElementToJpg(
   try {
     const canvas = await html2canvas(element, {
       backgroundColor,
-      scale: 1.5,
+      scale: 2,
       useCORS: true,
       logging: false,
       allowTaint: false,

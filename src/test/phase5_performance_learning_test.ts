@@ -45,7 +45,7 @@ console.log('===================================================================
 
 // 1. Setup deterministic baseline from authentic data
 const office = createAuthenticOfficeData();
-const calc = computeAnalytics(office.prevTransactions, office.currTransactions, office.targets, office.masterOutlets, 25);
+const calc = computeAnalytics(office.prevTransactions, office.currTransactions, office.targets, office.masterOutlets, {});
 const ctx = buildDecisionContext(calc, office.prevTransactions, office.currTransactions, office.targets, office.masterOutlets, {
   currentMonthLabel: 'September 2026',
   previousMonthLabel: 'Agustus 2026',
@@ -313,10 +313,10 @@ for (let i = 0; i < oppsPre.length; i++) {
 // TEST 10: Role-Based Access Filter Verification
 // -----------------------------------------------------------------------------
 console.log('\n--- TEST 10: Role-Based Access Control ---');
-const adminFilter = filterPerformanceResultsByRole(livePerformanceResults, { id: 'admin-1', role: 'ADMIN', name: 'Admin', email: 'admin@pma.id' });
+const adminFilter = filterPerformanceResultsByRole(livePerformanceResults, { id: 'admin-1', role: 'ADMIN', name: 'Admin', email: 'admin@pma.id', username: 'admin', status: 'ACTIVE' } as any);
 assert(adminFilter.length === livePerformanceResults.length, 'ADMIN sees 100% of performance results');
 
-const salesmanProfile = { id: 'SLS-001', role: 'SALESMAN' as const, name: 'AHMAD HIDAYAT', email: 'ahmad@pma.id', salesman_id: 'SLS-001' };
+const salesmanProfile = { id: 'SLS-001', role: 'SALESMAN' as const, name: 'AHMAD HIDAYAT', email: 'ahmad@pma.id', salesman_id: 'SLS-001', username: 'ahmad', status: 'ACTIVE' } as any;
 const salesmanFilter = filterPerformanceResultsByRole(livePerformanceResults, salesmanProfile);
 assert(salesmanFilter.every(r => r.salesmanId === 'SLS-001' || (r.salesmanName && r.salesmanName.includes('AHMAD'))), 'SALESMAN only sees actions assigned to him');
 

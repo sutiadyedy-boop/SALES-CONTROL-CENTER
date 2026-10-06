@@ -229,7 +229,7 @@ export function PerformanceLearningView({
           </div>
 
           <div className="flex items-center gap-3">
-            <CaptureJpgButton targetId="performance-learning-view" fileName="Performance-Learning-Control-Tower.jpg" />
+            <CaptureJpgButton targetId="main-capture-area" fileName={`Performance_Learning_Control_Tower_${new Date().toISOString().split('T')[0]}.jpg`} />
             {onNavigateToTab && (
               <button
                 onClick={() => onNavigateToTab('opportunity')}

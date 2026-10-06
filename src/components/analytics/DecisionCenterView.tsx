@@ -48,6 +48,7 @@ import {
   askAiAboutDecision 
 } from '../../services/aiExplanationService';
 import { soundManager } from '../../services/soundManager';
+import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
 interface DecisionCenterViewProps {
   context: DecisionContext | null;
@@ -275,6 +276,12 @@ export function DecisionCenterView({
         </div>
 
         <div className="flex items-center gap-3">
+          <CaptureJpgButton
+            targetId="main-capture-area"
+            fileName={`Decision_Center_${(context?.period || 'Period').replace(/\s+/g, '_')}.jpg`}
+            label="Capture JPG"
+          />
+
           {/* Debug / Audit button */}
           <button
             type="button"

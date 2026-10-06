@@ -210,8 +210,8 @@ export function MonitoringEcView({
     ? settings.currentMonthLabel 
     : 'OKTOBER 2026';
 
-  // Navigation tab within the Monitoring EC view (Default: Daily Vertical Date Summary)
-  const [activeTab, setActiveTab] = useState<'daily' | 'pma' | 'sales'>('daily');
+  // Navigation tab within the Monitoring EC view (Default: PMA Monitoring)
+  const [activeTab, setActiveTab] = useState<'pma' | 'sales'>('pma');
 
   // Interactive Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -2341,18 +2341,6 @@ export function MonitoringEcView({
         {/* Tab Selection */}
         <div className="flex items-center gap-2 pt-2 border-t border-slate-800 overflow-x-auto">
           <button
-            onClick={() => setActiveTab('daily')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'daily'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-          >
-            <CalendarDays className="w-3.5 h-3.5 text-amber-400" />
-            <span>📅 Ringkasan EC Harian (Tanggal Vertikal)</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('pma')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'pma'
@@ -2379,23 +2367,6 @@ export function MonitoringEcView({
       </div>
 
       {/* 6. Main Tables Viewport */}
-      {activeTab === 'daily' && (
-        <div className="space-y-6">
-          {/* Table: Ringkasan Performa EC / Toko Transaksi Per Tanggal (Vertikal Tgl 01 s/d 31) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <DataTable<DailyEcSummaryRow>
-              title="Ringkasan Performa EC / Toko Transaksi Per Tanggal (Vertikal Tgl 01 s/d 31)"
-              columns={dailySummaryColumns}
-              data={filteredDailySummary}
-              searchPlaceholder="Cari tanggal..."
-              pageSizeDefault={31}
-              exportFileName={`Ringkasan_Performa_EC_Harian_Vertikal_${prevLabel}_vs_${currLabel}.xlsx`}
-              emptyMessage="Tidak ada data tanggal yang sesuai filter."
-            />
-          </div>
-        </div>
-      )}
-
       {activeTab === 'pma' && (
         <div className="space-y-6">
           {/* Table A: Ringkasan EC Per PMA */}
@@ -2407,18 +2378,6 @@ export function MonitoringEcView({
               searchPlaceholder="Cari PMA..."
               exportFileName={`Ringkasan_EC_Per_PMA_${prevLabel}_vs_${currLabel}.xlsx`}
               emptyMessage="Tidak ada data PMA yang sesuai filter."
-            />
-          </div>
-
-          {/* Table B: EC / Toko Transaksi Per Hari Per PMA */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-            <DataTable<DailyEcPmaRow>
-              title="EC / Toko Transaksi Per Hari Per PMA (Distinct Toko)"
-              columns={dailyPmaColumns}
-              data={filteredDailyPma}
-              searchPlaceholder="Cari tanggal atau PMA..."
-              exportFileName={`EC_Harian_Per_PMA_${prevLabel}_vs_${currLabel}.xlsx`}
-              emptyMessage="Tidak ada data transaksi harian PMA yang sesuai filter."
             />
           </div>
         </div>
