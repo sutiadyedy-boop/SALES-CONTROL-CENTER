@@ -128,7 +128,7 @@ export function Sidebar({
     },
     { 
       id: 'month_comparison', 
-      label: `Perbandingan ${prevShort} vs ${currShort}`, 
+      label: 'Monitoring BL Vs BI', 
       icon: TrendingUp, 
       badge: kpis?.growthRate !== null && kpis?.growthRate !== undefined ? `${kpis.growthRate >= 0 ? '+' : ''}${kpis.growthRate.toFixed(1)}%` : null,
       badgeColor: kpis && kpis.growthRate !== null && kpis.growthRate >= 0

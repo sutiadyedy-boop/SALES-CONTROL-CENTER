@@ -45,7 +45,7 @@ interface HeaderProps {
 const tabLabels: Record<string, string> = {
   dashboard: 'Control_Tower_Dashboard',
   target_realisasi: 'Target_vs_Realisasi',
-  month_comparison: 'Perbandingan_Bulan_Agus_Sept',
+  month_comparison: 'Monitoring_BL_Vs_BI',
   ro_monitoring: 'RO_Monitoring_Penetrasi_Outlet',
   ebp_monitoring: 'Monitoring_EPB',
   monitoring_ec: 'Monitoring_EC_Toko_Transaksi',
