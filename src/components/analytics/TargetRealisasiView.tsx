@@ -28,6 +28,7 @@ import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { WhatsAppSalesmanReportModal } from '../dashboard/WhatsAppSalesmanReportModal';
+import { TargetSpeedometerCluster } from './TargetSpeedometerCluster';
 
 interface TargetRealisasiViewProps {
   calculation: CalculationResult | null;
@@ -780,52 +781,23 @@ export function TargetRealisasiView({
         </div>
       </div>
 
-      {/* 4 Summary Stat Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
-            <span>Total Target</span>
-            <Target className="w-4 h-4 text-amber-400" />
-          </div>
-          <div className="text-base font-bold font-mono text-slate-100 mt-2">
-            {formatRupiah(kpis.totalTarget)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Akumulasi Target Sales</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm border-l-2 border-l-cyan-500">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
-            <span>Total Realisasi</span>
-            <Award className="w-4 h-4 text-cyan-400" />
-          </div>
-          <div className="text-base font-bold font-mono text-cyan-300 mt-2">
-            {formatRupiah(kpis.totalActualCurrent)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Realisasi ({settings.salesValueField})</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
-            <span>Rata-rata Achievement</span>
-            <TrendingUp className="w-4 h-4 text-emerald-400" />
-          </div>
-          <div className="text-base font-bold font-mono text-slate-100 mt-2">
-            {kpis.achievementRate !== null ? `${kpis.achievementRate.toFixed(1)}%` : 'N/A'}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Realisasi / Target × 100</div>
-        </div>
-
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm">
-          <div className="text-xs text-slate-400 flex items-center justify-between">
-            <span>Total Defisit / Surplus</span>
-            <TrendingDown className="w-4 h-4 text-purple-400" />
-          </div>
-          <div className={`text-base font-bold font-mono mt-2 ${kpis.gapValue >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {(kpis.gapValue >= 0 ? '+' : '') + formatRupiah(kpis.gapValue)}
-          </div>
-          <div className="text-[11px] text-slate-500 mt-1">Gap Bersih</div>
-        </div>
-      </div>
+      {/* 3 Speedometer Telemetry Gauges + Gap Bersih Strip (Replaces static cards without changing data) */}
+      <TargetSpeedometerCluster
+        totalTarget={kpis.totalTarget}
+        totalActualCurrent={kpis.totalActualCurrent}
+        achievementRate={kpis.achievementRate}
+        gapValue={kpis.gapValue}
+        salesValueField={settings.salesValueField}
+        hariKerjaBlnIni={hariKerjaBlnIni}
+        hariKerjaBerjalan={hariKerjaBerjalan}
+        sisaHariKerja={sisaHariKerja}
+        timeProgressPct={timeProgressPct}
+        runRateHarianBerjalan={runRateHarianBerjalan}
+        proyeksiAkhirBulan={proyeksiAkhirBulan}
+        proyeksiAchRate={proyeksiAchRate}
+        totalSalesmen={salesmanPerformances.length}
+        achievedSalesmenCount={topAchievers.length}
+      />
 
       {/* Target Not Found Warning if any */}
       {targetNotFound.length > 0 && (
