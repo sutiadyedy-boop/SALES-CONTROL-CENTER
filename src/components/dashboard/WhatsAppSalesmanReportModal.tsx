@@ -49,8 +49,11 @@ import {
   generatePersonalizedSalesmanReport, 
   openDirectWhatsAppWeb, 
   getWhatsAppDirectUrl,
+  getWhatsAppWebDirectUrl,
+  getWhatsAppAppProtocolUrl,
   sendReportViaGateway,
-  cleanIndonesianPhoneNumber
+  cleanIndonesianPhoneNumber,
+  isDummySamplePhone
 } from '../../services/whatsappSalesmanService';
 
 interface WhatsAppSalesmanReportModalProps {
@@ -76,8 +79,17 @@ export function WhatsAppSalesmanReportModal({
   const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Popup blocker notification state
-  const [popupBlockedNotice, setPopupBlockedNotice] = useState<{ url: string; salesmanName: string } | null>(null);
+  // Popup blocker / Direct WhatsApp confirmation banner state
+  const [popupBlockedNotice, setPopupBlockedNotice] = useState<{
+    url: string;
+    webUrl: string;
+    appUrl: string;
+    salesmanName: string;
+    phone: string;
+  } | null>(null);
+
+  // Batch Auto-Sender Mode: 'MANUAL_STEP' (recommended so popups aren't blocked and user hits Enter in WA) or 'AUTO_TIMER'
+  const [directBatchPace, setDirectBatchPace] = useState<'MANUAL_STEP' | 'AUTO_TIMER'>('MANUAL_STEP');
 
   // Self-Test Delivery State
   const [testPhoneNumber, setTestPhoneNumber] = useState<string>(() => {
@@ -186,13 +198,15 @@ export function WhatsAppSalesmanReportModal({
   }, [selectedSalesman, currLabel, prevLabel, totalHariKerja, hariKerjaBerjalan, settings.cabang]);
 
   // Handle single send via Direct WhatsApp
-  const handleDirectSendOne = (salesman: SalesmanPerformanceItem) => {
+  const handleDirectSendOne = (salesman: SalesmanPerformanceItem, preferWebOnly: boolean = false) => {
     soundManager.playClick();
     const contact = contacts[salesman.salesmanId];
     const phone = contact?.phone || '';
 
     if (!phone || phone.trim().length < 8) {
-      alert(`Nomor WhatsApp untuk ${salesman.salesmanName} belum lengkap. Silakan klik nomor telepon untuk mengedit nomor yang valid.`);
+      showToast(`Nomor WhatsApp untuk ${salesman.salesmanName} belum lengkap. Klik nomor untuk mengedit.`, 'warning');
+      setEditingPhoneId(salesman.salesmanId);
+      setTempPhoneInput(phone);
       return;
     }
 
@@ -204,19 +218,24 @@ export function WhatsAppSalesmanReportModal({
       cabang: settings.cabang || 'Cabang Bone',
     });
 
-    const opened = openDirectWhatsAppWeb(phone, reportText);
+    openDirectWhatsAppWeb(phone, reportText, preferWebOnly);
     const directUrl = getWhatsAppDirectUrl(phone, reportText);
+    const webUrl = getWhatsAppWebDirectUrl(phone, reportText);
+    const appUrl = getWhatsAppAppProtocolUrl(phone, reportText);
 
-    if (!opened) {
-      // Browser blocked the popup
-      setPopupBlockedNotice({
-        url: directUrl,
-        salesmanName: salesman.salesmanName,
-      });
-      showToast('Pop-up diblokir oleh browser! Klik tautan manual di bawah.', 'warning');
-    } else {
-      showToast(`Tab WhatsApp untuk ${salesman.salesmanName} telah terbuka. Pastikan tekan tombol panah Kirim (Enter) di WhatsApp!`, 'success');
-    }
+    // Always display the direct action banner so if browser blocked new tab or user didn't see it, they have 1-click direct links & instruction to press Enter
+    setPopupBlockedNotice({
+      url: directUrl,
+      webUrl,
+      appUrl,
+      salesmanName: salesman.salesmanName,
+      phone,
+    });
+
+    showToast(
+      `Chat WhatsApp untuk ${salesman.salesmanName} (${phone}) disiapkan! WAJIB klik tombol panah KIRIM (Enter) di dalam aplikasi WhatsApp agar pesan masuk ke HP salesman.`,
+      'success'
+    );
 
     const log: WhatsAppSendLog = {
       id: `log_${Date.now()}_${salesman.salesmanId}`,
@@ -226,7 +245,7 @@ export function WhatsAppSalesmanReportModal({
       status: 'SUCCESS',
       sentAt: new Date().toISOString(),
       method: 'DIRECT_WEB',
-      notes: `Dibuka via WhatsApp Web (${currLabel}) - Tekan Enter di WA`,
+      notes: `Menunggu tombol Enter / Kirim ditekan di WhatsApp (${currLabel})`,
     };
     appendSendLog(log);
     setSendLogs(prev => [log, ...prev]);
@@ -238,12 +257,12 @@ export function WhatsAppSalesmanReportModal({
     const contact = contacts[salesman.salesmanId];
     const phone = contact?.phone || '';
     if (!phone) {
-      alert(`Nomor WhatsApp untuk ${salesman.salesmanName} belum diisi.`);
+      showToast(`Nomor WhatsApp untuk ${salesman.salesmanName} belum diisi.`, 'warning');
       return;
     }
 
     if (!gatewayConfig.apiKey && gatewayConfig.provider !== 'custom') {
-      alert(`⚠️ Token / API Key WhatsApp Gateway belum diisi!\n\nPesan tidak dapat dikirim ke nomor fisik HP salesman tanpa Token API.\nSilakan buka tab "Pengaturan Gateway" untuk memasukkan Token Fonnte/Wablas Anda, atau gunakan tombol "Kirim via WA Web" untuk mengirim langsung.`);
+      showToast(`Token API Gateway belum diisi! Silakan isi Token Fonnte/Wablas di tab Pengaturan Gateway, atau gunakan tombol "Kirim WA".`, 'warning');
       setActiveTab('gateway');
       return;
     }
@@ -272,9 +291,9 @@ export function WhatsAppSalesmanReportModal({
 
     if (res.success) {
       soundManager.playSuccess();
-      showToast(`Berhasil dikirim via Gateway ke ${salesman.salesmanName}!`, 'success');
+      showToast(`Berhasil dikirim otomatis via Gateway ke ${salesman.salesmanName} (${phone})!`, 'success');
     } else {
-      alert(`Gagal mengirim via Gateway: ${res.message}`);
+      showToast(`Gagal mengirim via Gateway: ${res.message}`, 'warning');
     }
   };
 
@@ -304,7 +323,7 @@ export function WhatsAppSalesmanReportModal({
       showToast('Format pesan berhasil disalin ke clipboard!', 'success');
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      alert('Gagal menyalin teks ke clipboard.');
+      showToast('Gagal menyalin teks ke clipboard.', 'warning');
     }
   };
 
@@ -313,7 +332,10 @@ export function WhatsAppSalesmanReportModal({
     soundManager.playClick();
     const cleaned = cleanIndonesianPhoneNumber(testPhoneNumber);
     if (!cleaned || cleaned.length < 9) {
-      alert('Silakan masukkan nomor WhatsApp Anda yang valid (contoh: 081234567890).');
+      setTestResultNotice({
+        success: false,
+        message: 'Silakan masukkan nomor WhatsApp Anda yang valid terlebih dahulu (contoh: 081234567890).',
+      });
       return;
     }
 
@@ -331,16 +353,21 @@ export function WhatsAppSalesmanReportModal({
     });
 
     if (mode === 'WEB') {
-      const opened = openDirectWhatsAppWeb(cleaned, reportText);
+      openDirectWhatsAppWeb(cleaned, reportText);
       const url = getWhatsAppDirectUrl(cleaned, reportText);
-      if (!opened) {
-        setPopupBlockedNotice({ url, salesmanName: 'Nomor Uji Coba Anda' });
-      } else {
-        setTestResultNotice({
-          success: true,
-          message: `Tab WhatsApp telah terbuka ke nomor ${cleaned}! Silakan klik tombol Kirim (Enter) di WhatsApp untuk melihat hasilnya di HP Anda.`,
-        });
-      }
+      const webUrl = getWhatsAppWebDirectUrl(cleaned, reportText);
+      const appUrl = getWhatsAppAppProtocolUrl(cleaned, reportText);
+      setPopupBlockedNotice({
+        url,
+        webUrl,
+        appUrl,
+        salesmanName: 'Nomor Uji Coba Anda',
+        phone: cleaned,
+      });
+      setTestResultNotice({
+        success: true,
+        message: `Chat WhatsApp ke nomor ${cleaned} telah disiapkan! PENTING: Setelah jendela WhatsApp terbuka, Anda WAJIB menekan tombol panah KIRIM (Enter) di dalam WhatsApp agar pesan benar-benar terkirim.`,
+      });
     } else {
       // Gateway Test
       if (!gatewayConfig.apiKey && gatewayConfig.provider !== 'custom') {
@@ -386,7 +413,13 @@ export function WhatsAppSalesmanReportModal({
     soundManager.playClick();
     const targetSalesmen = salesmanPerformances.filter(s => selectedIdsForBatch.has(s.salesmanId));
     if (targetSalesmen.length === 0) {
-      alert('Pilih minimal 1 salesman untuk dikirimkan report.');
+      showToast('Pilih minimal 1 salesman untuk dikirimkan report.', 'warning');
+      return;
+    }
+
+    if (mode === 'GATEWAY' && (!gatewayConfig.apiKey && gatewayConfig.provider !== 'custom')) {
+      showToast('Token API Gateway belum diisi! Silakan isi Token di Pengaturan Gateway atau gunakan Kirim via WA Web.', 'warning');
+      setActiveTab('gateway');
       return;
     }
 
@@ -398,7 +431,42 @@ export function WhatsAppSalesmanReportModal({
     targetSalesmen.forEach(s => { initialStatus[s.salesmanId] = 'PENDING'; });
     setQueueStatusMap(initialStatus);
     setShowQueueModal(true);
-    setIsQueueRunning(true);
+    setIsQueueRunning(mode === 'GATEWAY' || directBatchPace === 'AUTO_TIMER');
+  };
+
+  // Manual trigger for current item in DIRECT step-by-step queue
+  const handleTriggerCurrentQueueItemDirect = (advanceAfterOpen: boolean = true) => {
+    if (queueIndex >= queueList.length) return;
+    const currentSalesman = queueList[queueIndex];
+    const contact = contacts[currentSalesman.salesmanId];
+    const phone = contact?.phone || '';
+    const report = generatePersonalizedSalesmanReport(currentSalesman, {
+      currLabel,
+      prevLabel,
+      totalHariKerja,
+      hariKerjaBerjalan,
+      cabang: settings.cabang || 'Cabang Bone',
+    });
+
+    openDirectWhatsAppWeb(phone, report);
+
+    const log: WhatsAppSendLog = {
+      id: `log_batch_${Date.now()}_${currentSalesman.salesmanId}`,
+      salesmanId: currentSalesman.salesmanId,
+      salesmanName: currentSalesman.salesmanName,
+      phone,
+      status: 'SUCCESS',
+      sentAt: new Date().toISOString(),
+      method: 'DIRECT_WEB',
+      notes: `Batch Direct WA (${queueIndex + 1}/${queueList.length}) - Pastikan tekan Enter di WA`,
+    };
+    appendSendLog(log);
+    setSendLogs(prev => [log, ...prev]);
+
+    setQueueStatusMap(prev => ({ ...prev, [currentSalesman.salesmanId]: 'SUCCESS' }));
+    if (advanceAfterOpen) {
+      setQueueIndex(idx => idx + 1);
+    }
   };
 
   // Execution of Batch Queue step
@@ -408,7 +476,7 @@ export function WhatsAppSalesmanReportModal({
       const currentSalesman = queueList[queueIndex];
 
       if (queueMode === 'GATEWAY') {
-        // Gateway mode can run with small auto-delay or instant
+        // Gateway mode can run with small auto-delay
         timer = setTimeout(async () => {
           setQueueStatusMap(prev => ({ ...prev, [currentSalesman.salesmanId]: 'SENDING' }));
           const contact = contacts[currentSalesman.salesmanId];
@@ -448,42 +516,14 @@ export function WhatsAppSalesmanReportModal({
           }));
           setQueueIndex(idx => idx + 1);
         }, 1200);
-      } else {
+      } else if (directBatchPace === 'AUTO_TIMER') {
         // Direct WhatsApp Web Mode with countdown timer
         if (countdown > 0) {
           timer = setTimeout(() => {
             setCountdown(prev => prev - 1);
           }, 1000);
         } else {
-          // Open WhatsApp for current salesman
-          setQueueStatusMap(prev => ({ ...prev, [currentSalesman.salesmanId]: 'SENDING' }));
-          const contact = contacts[currentSalesman.salesmanId];
-          const phone = contact?.phone || '';
-          const report = generatePersonalizedSalesmanReport(currentSalesman, {
-            currLabel,
-            prevLabel,
-            totalHariKerja,
-            hariKerjaBerjalan,
-            cabang: settings.cabang || 'Cabang Bone',
-          });
-
-          openDirectWhatsAppWeb(phone, report);
-
-          const log: WhatsAppSendLog = {
-            id: `log_batch_${Date.now()}_${currentSalesman.salesmanId}`,
-            salesmanId: currentSalesman.salesmanId,
-            salesmanName: currentSalesman.salesmanName,
-            phone,
-            status: 'SUCCESS',
-            sentAt: new Date().toISOString(),
-            method: 'DIRECT_WEB',
-            notes: `Batch Direct Web Queue (${queueIndex + 1}/${queueList.length})`,
-          };
-          appendSendLog(log);
-          setSendLogs(prev => [log, ...prev]);
-
-          setQueueStatusMap(prev => ({ ...prev, [currentSalesman.salesmanId]: 'SUCCESS' }));
-          setQueueIndex(idx => idx + 1);
+          handleTriggerCurrentQueueItemDirect(true);
           setCountdown(queueDelaySeconds);
         }
       }
@@ -499,6 +539,7 @@ export function WhatsAppSalesmanReportModal({
     queueIndex, 
     queueList, 
     queueMode, 
+    directBatchPace,
     countdown, 
     queueDelaySeconds, 
     contacts, 
@@ -660,23 +701,43 @@ export function WhatsAppSalesmanReportModal({
         )}
 
         {popupBlockedNotice && (
-          <div className="px-4 py-3 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
-            <div className="flex items-center gap-2.5">
-              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+          <div className="px-4 py-3 bg-emerald-950/60 border-b border-emerald-500/40 text-emerald-100 text-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <strong>Pop-up Browser Terblokir:</strong> Tab WhatsApp untuk <strong>{popupBlockedNotice.salesmanName}</strong> tertahan oleh keamanan browser.
+                <div className="font-bold text-emerald-200">
+                  Konfirmasi Kirim ke {popupBlockedNotice.salesmanName} ({popupBlockedNotice.phone}):
+                </div>
+                <p className="text-[11px] text-slate-300 mt-0.5">
+                  Penting: Setelah WhatsApp terbuka dan teks laporan muncul di kotak ketik, Anda <strong className="text-amber-300 underline">WAJIB menekan tombol Enter / Panah Kirim hijau di dalam WhatsApp</strong> agar pesan benar-benar terkirim ke HP Salesman. Jika tab belum terbuka otomatis, klik salah satu tombol di kanan:
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
               <a
                 href={popupBlockedNotice.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={() => setPopupBlockedNotice(null)}
-                className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow"
+                className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
-                <span>Klik di Sini untuk Buka WhatsApp</span>
+                <span>Buka via wa.me</span>
+              </a>
+              <a
+                href={popupBlockedNotice.webUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                <span>Buka WA Web</span>
+              </a>
+              <a
+                href={popupBlockedNotice.appUrl}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center gap-1.5 transition-all"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Buka App WA</span>
               </a>
               <button 
                 onClick={() => setPopupBlockedNotice(null)}
@@ -1463,9 +1524,16 @@ export function WhatsAppSalesmanReportModal({
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div className="flex items-center gap-2.5 text-emerald-400">
                 <Send className="w-5 h-5" />
-                <h3 className="font-bold text-slate-100 text-sm">
-                  Pengiriman Otomatis ke Semua Salesman
-                </h3>
+                <div>
+                  <h3 className="font-bold text-slate-100 text-sm">
+                    Pengiriman Report ke Semua Salesman ({queueMode === 'GATEWAY' ? 'Gateway API Otomatis' : 'WhatsApp Web / Desktop'})
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    {queueMode === 'DIRECT'
+                      ? 'Mode Anti-Blokir: Klik tombol Buka WA untuk tiap salesman, lalu tekan Enter di WhatsApp'
+                      : 'Mengirim otomatis di background menggunakan API Gateway'}
+                  </p>
+                </div>
               </div>
               <button
                 onClick={() => {
@@ -1477,6 +1545,44 @@ export function WhatsAppSalesmanReportModal({
                 <X className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Mode Switcher for Direct Web */}
+            {queueMode === 'DIRECT' && queueIndex < queueList.length && (
+              <div className="flex items-center justify-between bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs">
+                <span className="text-slate-400 px-2 font-medium">Metode Antrean WA Web:</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDirectBatchPace('MANUAL_STEP');
+                      setIsQueueRunning(false);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      directBatchPace === 'MANUAL_STEP'
+                        ? 'bg-emerald-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    1-per-1 Pasti Masuk (Direkomendasikan)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDirectBatchPace('AUTO_TIMER');
+                      setCountdown(queueDelaySeconds);
+                      setIsQueueRunning(true);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      directBatchPace === 'AUTO_TIMER'
+                        ? 'bg-cyan-500 text-slate-950'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Timer Otomatis ({queueDelaySeconds}d)
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Progress Bar */}
             <div className="space-y-1.5">
@@ -1498,31 +1604,99 @@ export function WhatsAppSalesmanReportModal({
 
             {/* Currently Processing Info */}
             {queueIndex < queueList.length ? (
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-400">Sedang Memproses:</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    {queueMode === 'DIRECT' ? `Countdown: ${countdown}s` : 'Mengirim via Gateway...'}
-                  </span>
-                </div>
-                <div className="text-sm font-bold text-slate-100">
-                  {queueList[queueIndex].salesmanName} ({queueList[queueIndex].salesmanId})
-                </div>
-                <div className="text-xs text-slate-400 font-mono">
-                  No WA: {contacts[queueList[queueIndex].salesmanId]?.phone || 'Belum diisi'} &bull; Ach: {queueList[queueIndex].achievementRate?.toFixed(1) || 0}%
-                </div>
-                {queueMode === 'DIRECT' && (
-                  <p className="text-[11px] text-slate-400 mt-2">
-                    Tab WhatsApp Web akan terbuka otomatis. Pastikan pop-up browser tidak diblokir.
-                  </p>
-                )}
-              </div>
+              (() => {
+                const currentSalesman = queueList[queueIndex];
+                const currentPhone = contacts[currentSalesman.salesmanId]?.phone || '';
+                const currentReport = generatePersonalizedSalesmanReport(currentSalesman, {
+                  currLabel,
+                  prevLabel,
+                  totalHariKerja,
+                  hariKerjaBerjalan,
+                  cabang: settings.cabang || 'Cabang Bone',
+                });
+                const waMeUrl = getWhatsAppDirectUrl(currentPhone, currentReport);
+                const waWebUrl = getWhatsAppWebDirectUrl(currentPhone, currentReport);
+                const waAppUrl = getWhatsAppAppProtocolUrl(currentPhone, currentReport);
+
+                return (
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-400 font-semibold">
+                        Salesman Ke-{queueIndex + 1} dari {queueList.length}:
+                      </span>
+                      <span className="font-mono text-emerald-400 font-bold">
+                        {queueMode === 'GATEWAY'
+                          ? 'Mengirim via Gateway...'
+                          : directBatchPace === 'AUTO_TIMER'
+                          ? `Membuka otomatis dalam: ${countdown}s`
+                          : 'Siap Dikirim'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <div className="text-sm font-bold text-slate-100">
+                          {currentSalesman.salesmanName} ({currentSalesman.salesmanId})
+                        </div>
+                        <div className="text-xs text-cyan-300 font-mono mt-0.5">
+                          No WA Tujuan: <strong>{currentPhone || 'Belum diisi'}</strong> &bull; Ach: {currentSalesman.achievementRate?.toFixed(1) || 0}%
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 border border-slate-800 font-mono text-[11px] text-slate-300">
+                        Realisasi: {formatRupiah(currentSalesman.actualCurrent)}
+                      </span>
+                    </div>
+
+                    {queueMode === 'DIRECT' && (
+                      <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
+                        <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[11px] text-amber-200 leading-relaxed">
+                          💡 <strong>Agar Pesan Masuk ke HP Salesman:</strong> Klik tombol hijau di bawah untuk membuka chat WhatsApp <strong>{currentSalesman.salesmanName}</strong>, lalu <strong>tekan tombol Enter / Kirim di dalam WhatsApp</strong>, kemudian lanjut ke salesman berikutnya.
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                          <a
+                            href={waMeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => handleTriggerCurrentQueueItemDirect(true)}
+                            className="flex-1 min-w-[180px] py-2.5 px-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20 transition-all cursor-pointer"
+                          >
+                            <Send className="w-4 h-4" />
+                            <span>1. Buka WA & Lanjut Berikutnya</span>
+                          </a>
+
+                          <a
+                            href={waWebUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => handleTriggerCurrentQueueItemDirect(true)}
+                            className="py-2.5 px-3 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                            title="Paksa buka di WhatsApp Web Browser"
+                          >
+                            <Globe className="w-3.5 h-3.5" />
+                            <span>Via WA Web</span>
+                          </a>
+
+                          <a
+                            href={waAppUrl}
+                            onClick={() => handleTriggerCurrentQueueItemDirect(true)}
+                            className="py-2.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 border border-emerald-500/40 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                            title="Buka langsung aplikasi WhatsApp Desktop/HP"
+                          >
+                            <Smartphone className="w-3.5 h-3.5" />
+                            <span>App WA</span>
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs text-center space-y-1">
                 <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-1" />
-                <div className="font-bold text-sm text-emerald-200">Seluruh Pengiriman Telah Selesai!</div>
+                <div className="font-bold text-sm text-emerald-200">Seluruh Antrean Salesman Telah Diproses!</div>
                 <p className="text-[11px] text-emerald-400">
-                  Sebanyak {queueList.length} report pencapaian salesman telah diproses ke WhatsApp.
+                  Pastikan Anda telah menekan tombol Enter (Kirim) pada tab WhatsApp yang terbuka agar pesan masuk ke HP masing-masing salesman.
                 </p>
               </div>
             )}
@@ -1531,13 +1705,33 @@ export function WhatsAppSalesmanReportModal({
             <div className="flex items-center justify-between pt-2">
               {queueIndex < queueList.length ? (
                 <>
-                  <button
-                    onClick={() => setIsQueueRunning(prev => !prev)}
-                    className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-                  >
-                    {isQueueRunning ? <Pause className="w-3.5 h-3.5 text-amber-400" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
-                    <span>{isQueueRunning ? 'Jeda Pengiriman' : 'Lanjutkan'}</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {queueMode === 'DIRECT' && directBatchPace === 'MANUAL_STEP' ? (
+                      <>
+                        <button
+                          disabled={queueIndex === 0}
+                          onClick={() => setQueueIndex(idx => Math.max(0, idx - 1))}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 text-xs font-semibold cursor-pointer"
+                        >
+                          &larr; Sebelumnya
+                        </button>
+                        <button
+                          onClick={() => setQueueIndex(idx => idx + 1)}
+                          className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                        >
+                          Lewati Salesman Ini &rarr;
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setIsQueueRunning(prev => !prev)}
+                        className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {isQueueRunning ? <Pause className="w-3.5 h-3.5 text-amber-400" /> : <Play className="w-3.5 h-3.5 text-emerald-400" />}
+                        <span>{isQueueRunning ? 'Jeda Pengiriman' : 'Lanjutkan'}</span>
+                      </button>
+                    )}
+                  </div>
 
                   <button
                     onClick={() => {
@@ -1546,7 +1740,7 @@ export function WhatsAppSalesmanReportModal({
                     }}
                     className="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
                   >
-                    Hentikan
+                    Tutup Antrean
                   </button>
                 </>
               ) : (

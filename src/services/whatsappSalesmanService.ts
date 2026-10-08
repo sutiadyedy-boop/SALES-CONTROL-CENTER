@@ -38,12 +38,22 @@ const DEFAULT_PHONE_PREFIXES = ['0812', '0813', '0821', '0822', '0852', '0853'];
 export function cleanIndonesianPhoneNumber(raw: string): string {
   if (!raw) return '';
   let cleaned = raw.replace(/[^0-9]/g, '');
-  if (cleaned.startsWith('0')) {
+  if (cleaned.startsWith('620')) {
+    cleaned = '62' + cleaned.slice(3);
+  } else if (cleaned.startsWith('0')) {
     cleaned = '62' + cleaned.slice(1);
   } else if (cleaned.startsWith('8')) {
     cleaned = '62' + cleaned;
   }
   return cleaned;
+}
+
+export function isDummySamplePhone(phone: string, salesmanId: string, idx: number = 0): boolean {
+  if (!phone) return true;
+  const cleaned = cleanIndonesianPhoneNumber(phone);
+  const seedNum = (salesmanId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0) + idx) % 10000;
+  const suffix = `${String(seedNum).padStart(4, '0')}${String(idx + 10).padStart(4, '0')}`;
+  return cleaned.endsWith(suffix);
 }
 
 export function loadSalesmanContacts(salesmen: SalesmanPerformanceItem[]): Record<string, SalesmanContact> {
@@ -216,20 +226,45 @@ export function getWhatsAppDirectUrl(phone: string, message: string): string {
   const cleaned = cleanIndonesianPhoneNumber(phone);
   const encoded = encodeURIComponent(message);
   return cleaned 
-    ? `https://api.whatsapp.com/send?phone=${cleaned}&text=${encoded}`
+    ? `https://wa.me/${cleaned}?text=${encoded}`
     : `https://api.whatsapp.com/send?text=${encoded}`;
 }
 
-export function openDirectWhatsAppWeb(phone: string, message: string): boolean {
-  const url = getWhatsAppDirectUrl(phone, message);
+export function getWhatsAppWebDirectUrl(phone: string, message: string): string {
+  const cleaned = cleanIndonesianPhoneNumber(phone);
+  const encoded = encodeURIComponent(message);
+  return cleaned 
+    ? `https://web.whatsapp.com/send?phone=${cleaned}&text=${encoded}`
+    : `https://web.whatsapp.com/send?text=${encoded}`;
+}
+
+export function getWhatsAppAppProtocolUrl(phone: string, message: string): string {
+  const cleaned = cleanIndonesianPhoneNumber(phone);
+  const encoded = encodeURIComponent(message);
+  return cleaned
+    ? `whatsapp://send?phone=${cleaned}&text=${encoded}`
+    : `whatsapp://send?text=${encoded}`;
+}
+
+export function openDirectWhatsAppWeb(phone: string, message: string, preferWebOnly: boolean = false): boolean {
+  const url = preferWebOnly ? getWhatsAppWebDirectUrl(phone, message) : getWhatsAppDirectUrl(phone, message);
   try {
-    const win = window.open(url, '_blank', 'noopener,noreferrer');
-    if (!win || win.closed || typeof win.closed === 'undefined') {
-      return false; // Popup blocked
-    }
+    // Anchor-click method works reliably inside sandboxed iframes where window.open may return null
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
     return true;
   } catch {
-    return false;
+    try {
+      const win = window.open(url, '_blank', 'noopener,noreferrer');
+      return !!win;
+    } catch {
+      return false;
+    }
   }
 }
 

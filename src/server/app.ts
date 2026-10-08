@@ -1017,9 +1017,32 @@ export function createApiRouter(): express.Router {
       if (!response.ok) {
         return res.status(response.status).json({
           success: false,
-          error: `Gateway mengembalikan status ${response.status}`,
+          error: `Gateway mengembalikan status HTTP ${response.status}`,
           details: responseJson,
         });
+      }
+
+      // Inspect provider-specific JSON payload because Fonnte/Wablas/Watzap often return HTTP 200 even when token is invalid or device is disconnected
+      if (responseJson && typeof responseJson === 'object') {
+        const isExplicitFalse =
+          responseJson.status === false ||
+          responseJson.status === 'false' ||
+          responseJson.status === 'error' ||
+          responseJson.success === false ||
+          (typeof responseJson.status === 'number' && responseJson.status >= 400);
+
+        if (isExplicitFalse) {
+          const reason =
+            responseJson.reason ||
+            responseJson.message ||
+            responseJson.error ||
+            'Device WhatsApp Gateway belum terhubung (Disconnected) atau Token API tidak valid.';
+          return res.status(400).json({
+            success: false,
+            error: `Gateway Menolak Pengiriman: ${reason}`,
+            details: responseJson,
+          });
+        }
       }
 
       return res.json({

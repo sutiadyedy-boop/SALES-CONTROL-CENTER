@@ -106,8 +106,18 @@ _Generated automatically via ESM Sales Control Tower_`;
   const handleShareWhatsApp = () => {
     soundManager.playClick();
     const encoded = encodeURIComponent(messageText);
-    const waUrl = `https://api.whatsapp.com/send?text=${encoded}`;
-    window.open(waUrl, '_blank', 'noopener,noreferrer');
+    const waUrl = `https://wa.me/?text=${encoded}`;
+    try {
+      const a = document.createElement('a');
+      a.href = waUrl;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch {
+      window.open(waUrl, '_blank', 'noopener,noreferrer');
+    }
   };
 
   return (
