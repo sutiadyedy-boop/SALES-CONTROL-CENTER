@@ -1683,7 +1683,7 @@ export function MonitoringEcView({
       </div>
 
       {/* 3. Trend EC Harian Chart Visual (Grafik Line) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+      <div id="monitoring-ec-trend-chart-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -1720,6 +1720,13 @@ export function MonitoringEcView({
           </div>
 
           <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+            <div data-capture-ignore="true">
+              <CaptureJpgButton
+                targetId="monitoring-ec-trend-chart-card"
+                fileName={`Trend_EC_Harian_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                label="Capture JPG Full HD"
+              />
+            </div>
             {/* Legend */}
             <div className="flex items-center gap-3 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
               <div className="flex items-center gap-1.5 text-slate-300">
@@ -2125,8 +2132,8 @@ export function MonitoringEcView({
       </div>
 
       {/* 4. Automated Insights Section (🔎 INSIGHT MONITORING EC) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div id="monitoring-ec-insight-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
               <Lightbulb className="w-4 h-4" />
@@ -2140,9 +2147,18 @@ export function MonitoringEcView({
               </p>
             </div>
           </div>
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-            {hariKerjaBerjalan} Hari Kerja Berjalan
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              {hariKerjaBerjalan} Hari Kerja Berjalan
+            </span>
+            <div data-capture-ignore="true">
+              <CaptureJpgButton
+                targetId="monitoring-ec-insight-card"
+                fileName={`Insight_Monitoring_EC_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                label="Capture JPG Full HD"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

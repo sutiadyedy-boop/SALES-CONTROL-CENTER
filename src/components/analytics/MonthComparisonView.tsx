@@ -2831,11 +2831,20 @@ export function MonthComparisonView({
           </div>
 
           {/* Visual Bar Comparison per Salesman */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2 mb-4">
-              <BarChart3 className="w-4 h-4 text-cyan-400" />
-              <span>Visualisasi Perbandingan Omset per Salesman ({prevLabel} vs {currLabel})</span>
-            </h3>
+          <div id="salesman-visual-comparison-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-cyan-400" />
+                <span>Visualisasi Perbandingan Omset per Salesman ({prevLabel} vs {currLabel})</span>
+              </h3>
+              <div data-capture-ignore="true">
+                <CaptureJpgButton
+                  targetId="salesman-visual-comparison-card"
+                  fileName={`Visualisasi_Salesman_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                  label="Capture JPG Full HD"
+                />
+              </div>
+            </div>
 
             <div className="space-y-4">
               {filteredSalesmanPerformances.map(s => {
@@ -3054,15 +3063,24 @@ export function MonthComparisonView({
           </div>
 
           {/* Visual Bar Comparison By Eceran (MARK NEW) */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-100 flex items-center justify-between mb-4">
+          <div id="eceran-visual-comparison-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-100 flex flex-wrap items-center justify-between gap-2 mb-4">
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-amber-400" />
                 <span>Visualisasi Perbandingan Omset By Eceran - Kolom MARK NEW ({prevLabel} vs {currLabel})</span>
               </div>
-              <span className="text-xs font-mono text-slate-400">
-                {eceranMarkNewData.length} Kategori
-              </span>
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-mono text-slate-400">
+                  {eceranMarkNewData.length} Kategori
+                </span>
+                <div data-capture-ignore="true">
+                  <CaptureJpgButton
+                    targetId="eceran-visual-comparison-card"
+                    fileName={`Visualisasi_Eceran_MARK_NEW_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                    label="Capture JPG Full HD"
+                  />
+                </div>
+              </div>
             </h3>
 
             {eceranMarkNewData.length === 0 ? (
@@ -3359,7 +3377,7 @@ export function MonthComparisonView({
           )}
 
           {/* Day-by-Day Visual Chart */}
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
+          <div id="daily-trend-comparison-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
                 <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
@@ -3371,7 +3389,7 @@ export function MonthComparisonView({
                 </p>
               </div>
 
-              <div className="flex items-center gap-4 text-xs font-medium">
+              <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded bg-slate-600 inline-block" />
                   <span className="text-slate-400">{prevLabel}</span>
@@ -3379,6 +3397,13 @@ export function MonthComparisonView({
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded bg-cyan-500 inline-block" />
                   <span className="text-cyan-300">{currLabel}</span>
+                </div>
+                <div data-capture-ignore="true">
+                  <CaptureJpgButton
+                    targetId="daily-trend-comparison-card"
+                    fileName={`Grafik_Penjualan_Harian_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                    label="Capture JPG Full HD"
+                  />
                 </div>
               </div>
             </div>

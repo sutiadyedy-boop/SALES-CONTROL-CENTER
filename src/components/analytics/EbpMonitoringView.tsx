@@ -1286,8 +1286,8 @@ export function EbpMonitoringView({
       </div>
 
       {/* 4. Automated Insights Section (🔎 INSIGHT EPB) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
+      <div id="ebp-insight-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
               <Lightbulb className="w-4 h-4" />
@@ -1301,9 +1301,18 @@ export function EbpMonitoringView({
               </p>
             </div>
           </div>
-          <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-            {numberedFilteredItems.length} Toko Dianalisis
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              {numberedFilteredItems.length} Toko Dianalisis
+            </span>
+            <div data-capture-ignore="true">
+              <CaptureJpgButton
+                targetId="ebp-insight-card"
+                fileName={`Insight_EPB_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                label="Capture JPG Full HD"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -24,7 +24,13 @@ import {
   Globe,
   Radio,
   ExternalLink,
-  Users
+  Users,
+  HelpCircle,
+  AlertTriangle,
+  ShieldAlert,
+  Key,
+  MessageCircle,
+  CheckCircle
 } from 'lucide-react';
 import { SalesmanPerformanceItem, CalculationResult } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
@@ -42,6 +48,7 @@ import {
   appendSendLog, 
   generatePersonalizedSalesmanReport, 
   openDirectWhatsAppWeb, 
+  getWhatsAppDirectUrl,
   sendReportViaGateway,
   cleanIndonesianPhoneNumber
 } from '../../services/whatsappSalesmanService';
@@ -63,11 +70,28 @@ export function WhatsAppSalesmanReportModal({
   totalHariKerja,
   hariKerjaBerjalan,
 }: WhatsAppSalesmanReportModalProps) {
-  const [activeTab, setActiveTab] = useState<'list' | 'preview' | 'gateway' | 'history'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'preview' | 'test' | 'gateway' | 'troubleshoot' | 'history'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'ACHIEVED' | 'UNDER' | 'NO_PHONE'>('ALL');
   const [selectedSalesmanId, setSelectedSalesmanId] = useState<string>('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Popup blocker notification state
+  const [popupBlockedNotice, setPopupBlockedNotice] = useState<{ url: string; salesmanName: string } | null>(null);
+
+  // Self-Test Delivery State
+  const [testPhoneNumber, setTestPhoneNumber] = useState<string>(() => {
+    try {
+      return localStorage.getItem('scc_test_whatsapp_phone') || '';
+    } catch {
+      return '';
+    }
+  });
+  const [testSending, setTestSending] = useState(false);
+  const [testResultNotice, setTestResultNotice] = useState<{ success: boolean; message: string } | null>(null);
+
+  // Toast / Status banner
+  const [toastMessage, setToastMessage] = useState<{ text: string; type: 'success' | 'warning' | 'info' } | null>(null);
 
   // Contacts state
   const { salesmanPerformances, kpis } = calculation;
@@ -114,6 +138,13 @@ export function WhatsAppSalesmanReportModal({
     }
   }, [isOpen, salesmanPerformances]);
 
+  const showToast = (text: string, type: 'success' | 'warning' | 'info' = 'info') => {
+    setToastMessage({ text, type });
+    setTimeout(() => {
+      setToastMessage(prev => prev?.text === text ? null : prev);
+    }, 4500);
+  };
+
   // Filtered salesmen
   const filteredSalesmen = useMemo(() => {
     return salesmanPerformances.filter(s => {
@@ -150,24 +181,42 @@ export function WhatsAppSalesmanReportModal({
       prevLabel,
       totalHariKerja,
       hariKerjaBerjalan,
-      cabang: 'Cabang Bone',
+      cabang: settings.cabang || 'Cabang Bone',
     });
-  }, [selectedSalesman, currLabel, prevLabel, totalHariKerja, hariKerjaBerjalan]);
+  }, [selectedSalesman, currLabel, prevLabel, totalHariKerja, hariKerjaBerjalan, settings.cabang]);
 
   // Handle single send via Direct WhatsApp
   const handleDirectSendOne = (salesman: SalesmanPerformanceItem) => {
     soundManager.playClick();
     const contact = contacts[salesman.salesmanId];
     const phone = contact?.phone || '';
+
+    if (!phone || phone.trim().length < 8) {
+      alert(`Nomor WhatsApp untuk ${salesman.salesmanName} belum lengkap. Silakan klik nomor telepon untuk mengedit nomor yang valid.`);
+      return;
+    }
+
     const reportText = generatePersonalizedSalesmanReport(salesman, {
       currLabel,
       prevLabel,
       totalHariKerja,
       hariKerjaBerjalan,
-      cabang: 'Cabang Bone',
+      cabang: settings.cabang || 'Cabang Bone',
     });
 
-    openDirectWhatsAppWeb(phone, reportText);
+    const opened = openDirectWhatsAppWeb(phone, reportText);
+    const directUrl = getWhatsAppDirectUrl(phone, reportText);
+
+    if (!opened) {
+      // Browser blocked the popup
+      setPopupBlockedNotice({
+        url: directUrl,
+        salesmanName: salesman.salesmanName,
+      });
+      showToast('Pop-up diblokir oleh browser! Klik tautan manual di bawah.', 'warning');
+    } else {
+      showToast(`Tab WhatsApp untuk ${salesman.salesmanName} telah terbuka. Pastikan tekan tombol panah Kirim (Enter) di WhatsApp!`, 'success');
+    }
 
     const log: WhatsAppSendLog = {
       id: `log_${Date.now()}_${salesman.salesmanId}`,
@@ -177,7 +226,7 @@ export function WhatsAppSalesmanReportModal({
       status: 'SUCCESS',
       sentAt: new Date().toISOString(),
       method: 'DIRECT_WEB',
-      notes: `Dibuka via WhatsApp Web/App (${currLabel})`,
+      notes: `Dibuka via WhatsApp Web (${currLabel}) - Tekan Enter di WA`,
     };
     appendSendLog(log);
     setSendLogs(prev => [log, ...prev]);
@@ -193,12 +242,18 @@ export function WhatsAppSalesmanReportModal({
       return;
     }
 
+    if (!gatewayConfig.apiKey && gatewayConfig.provider !== 'custom') {
+      alert(`⚠️ Token / API Key WhatsApp Gateway belum diisi!\n\nPesan tidak dapat dikirim ke nomor fisik HP salesman tanpa Token API.\nSilakan buka tab "Pengaturan Gateway" untuk memasukkan Token Fonnte/Wablas Anda, atau gunakan tombol "Kirim via WA Web" untuk mengirim langsung.`);
+      setActiveTab('gateway');
+      return;
+    }
+
     const reportText = generatePersonalizedSalesmanReport(salesman, {
       currLabel,
       prevLabel,
       totalHariKerja,
       hariKerjaBerjalan,
-      cabang: 'Cabang Bone',
+      cabang: settings.cabang || 'Cabang Bone',
     });
 
     const res = await sendReportViaGateway(gatewayConfig, phone, reportText);
@@ -217,8 +272,10 @@ export function WhatsAppSalesmanReportModal({
 
     if (res.success) {
       soundManager.playSuccess();
+      showToast(`Berhasil dikirim via Gateway ke ${salesman.salesmanName}!`, 'success');
+    } else {
+      alert(`Gagal mengirim via Gateway: ${res.message}`);
     }
-    alert(res.message);
   };
 
   // Save phone number edit
@@ -235,6 +292,7 @@ export function WhatsAppSalesmanReportModal({
     setContacts(updated);
     saveSalesmanContacts(updated);
     setEditingPhoneId(null);
+    showToast(`Nomor telepon berhasil diperbarui (${cleaned})`, 'success');
   };
 
   // Copy single report text
@@ -243,8 +301,68 @@ export function WhatsAppSalesmanReportModal({
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
       soundManager.playSuccess();
+      showToast('Format pesan berhasil disalin ke clipboard!', 'success');
       setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      alert('Gagal menyalin teks ke clipboard.');
+    }
+  };
+
+  // Test send to own phone number
+  const handleSendSelfTest = async (mode: 'WEB' | 'GATEWAY') => {
+    soundManager.playClick();
+    const cleaned = cleanIndonesianPhoneNumber(testPhoneNumber);
+    if (!cleaned || cleaned.length < 9) {
+      alert('Silakan masukkan nomor WhatsApp Anda yang valid (contoh: 081234567890).');
+      return;
+    }
+
+    try {
+      localStorage.setItem('scc_test_whatsapp_phone', cleaned);
     } catch {}
+
+    const sampleSalesman = selectedSalesman || salesmanPerformances[0];
+    const reportText = generatePersonalizedSalesmanReport(sampleSalesman, {
+      currLabel,
+      prevLabel,
+      totalHariKerja,
+      hariKerjaBerjalan,
+      cabang: settings.cabang || 'Cabang Bone',
+    });
+
+    if (mode === 'WEB') {
+      const opened = openDirectWhatsAppWeb(cleaned, reportText);
+      const url = getWhatsAppDirectUrl(cleaned, reportText);
+      if (!opened) {
+        setPopupBlockedNotice({ url, salesmanName: 'Nomor Uji Coba Anda' });
+      } else {
+        setTestResultNotice({
+          success: true,
+          message: `Tab WhatsApp telah terbuka ke nomor ${cleaned}! Silakan klik tombol Kirim (Enter) di WhatsApp untuk melihat hasilnya di HP Anda.`,
+        });
+      }
+    } else {
+      // Gateway Test
+      if (!gatewayConfig.apiKey && gatewayConfig.provider !== 'custom') {
+        setTestResultNotice({
+          success: false,
+          message: `Token / API Key Gateway belum diisi! Silakan isi token di tab Pengaturan Gateway terlebih dahulu.`,
+        });
+        return;
+      }
+
+      setTestSending(true);
+      setTestResultNotice(null);
+      const res = await sendReportViaGateway(gatewayConfig, cleaned, reportText);
+      setTestSending(false);
+
+      setTestResultNotice({
+        success: res.success,
+        message: res.success 
+          ? `Sukses! Pesan tes berhasil dikirim ke nomor WhatsApp Anda (${cleaned}) melalui Gateway.`
+          : `Gagal mengirim tes via Gateway: ${res.message}`,
+      });
+    }
   };
 
   // Toggle selection for batch
@@ -463,7 +581,31 @@ export function WhatsAppSalesmanReportModal({
             }`}
           >
             <Eye className="w-4 h-4" />
-            <span>Pratinjau Pesan WA ({selectedSalesman?.salesmanName || 'Pilih Salesman'})</span>
+            <span>Pratinjau Pesan WA</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('test')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'test'
+                ? 'border-cyan-500 text-cyan-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-cyan-400" />
+            <span>🧪 Tes Kirim ke HP Saya Sendiri</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('troubleshoot')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-2 transition-all whitespace-nowrap cursor-pointer ${
+              activeTab === 'troubleshoot'
+                ? 'border-amber-500 text-amber-300'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <HelpCircle className="w-4 h-4 text-amber-400" />
+            <span>❓ Kenapa Belum Masuk? (Solusi)</span>
           </button>
 
           <button
@@ -475,9 +617,13 @@ export function WhatsAppSalesmanReportModal({
             }`}
           >
             <Radio className="w-4 h-4" />
-            <span>Pengaturan WhatsApp Gateway API</span>
-            {gatewayConfig.enabled && (
+            <span>Pengaturan Gateway API</span>
+            {gatewayConfig.enabled && gatewayConfig.apiKey ? (
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
+            ) : (
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                Setup
+              </span>
             )}
           </button>
 
@@ -494,9 +640,96 @@ export function WhatsAppSalesmanReportModal({
           </button>
         </div>
 
+        {/* Global Toast / Popup Alert Banner */}
+        {toastMessage && (
+          <div className={`px-4 py-2.5 text-xs flex items-center justify-between border-b ${
+            toastMessage.type === 'success' 
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' 
+              : toastMessage.type === 'warning'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              : 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300'
+          }`}>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              <span>{toastMessage.text}</span>
+            </div>
+            <button onClick={() => setToastMessage(null)} className="text-slate-400 hover:text-white">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+
+        {popupBlockedNotice && (
+          <div className="px-4 py-3 bg-amber-500/15 border-b border-amber-500/30 text-amber-200 text-xs flex flex-wrap items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+              <div>
+                <strong>Pop-up Browser Terblokir:</strong> Tab WhatsApp untuk <strong>{popupBlockedNotice.salesmanName}</strong> tertahan oleh keamanan browser.
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={popupBlockedNotice.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setPopupBlockedNotice(null)}
+                className="px-3 py-1 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all shadow"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Klik di Sini untuk Buka WhatsApp</span>
+              </a>
+              <button 
+                onClick={() => setPopupBlockedNotice(null)}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* TAB 1: DAFTAR SALESMAN */}
         {activeTab === 'list' && (
           <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+            {/* Critical Guide Notice Banner */}
+            <div className="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-inner">
+              <div className="flex items-start gap-2.5">
+                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 shrink-0 mt-0.5">
+                  <MessageCircle className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-semibold text-slate-100 flex items-center gap-2">
+                    <span>Panduan Pengiriman WhatsApp & Kenapa Pesan Perlu Dikonfirmasi:</span>
+                    <span className="text-[10px] font-mono px-2 py-0.2 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30">
+                      Wajib Tahu
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                    &bull; <strong>Metode WA Web (Gratis / Standar):</strong> Saat tab terbuka, Anda <strong>wajib menekan tombol panah Kirim (Enter)</strong> di layar WhatsApp agar pesan terkirim.<br />
+                    &bull; <strong>Metode Gateway API (Auto Background):</strong> Bisa kirim 100% otomatis tanpa buka tab, tapi <strong>memerlukan Token API</strong> di tab Pengaturan Gateway.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('test')}
+                  className="px-3 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Tes ke HP Saya</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('troubleshoot')}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <HelpCircle className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Kenapa Belum Masuk?</span>
+                </button>
+              </div>
+            </div>
+
             {/* Filter Bar */}
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/60 border border-slate-800 p-3 rounded-xl">
               <div className="flex items-center gap-2 flex-1 min-w-[200px]">
@@ -694,6 +927,24 @@ export function WhatsAppSalesmanReportModal({
                         </div>
                       )}
 
+                      {/* Copy Report Button */}
+                      <button
+                        onClick={() => {
+                          const text = generatePersonalizedSalesmanReport(s, {
+                            currLabel,
+                            prevLabel,
+                            totalHariKerja,
+                            hariKerjaBerjalan,
+                            cabang: settings.cabang || 'Cabang Bone',
+                          });
+                          handleCopyReport(text, s.salesmanId);
+                        }}
+                        className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs transition-colors cursor-pointer"
+                        title="Salin isi pesan laporan salesman ini"
+                      >
+                        {copiedId === s.salesmanId ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
                       {/* Preview Button */}
                       <button
                         onClick={() => {
@@ -706,6 +957,18 @@ export function WhatsAppSalesmanReportModal({
                         <Eye className="w-3.5 h-3.5 text-cyan-400" />
                         <span className="hidden sm:inline">Pratinjau</span>
                       </button>
+
+                      {/* Gateway Button if enabled and has key */}
+                      {gatewayConfig.enabled && gatewayConfig.apiKey && (
+                        <button
+                          onClick={() => handleGatewaySendOne(s)}
+                          className="px-2.5 py-1 rounded-lg bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-800 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                          title="Kirim otomatis di background via Gateway API"
+                        >
+                          <Radio className="w-3 h-3 text-cyan-400" />
+                          <span>Gateway</span>
+                        </button>
+                      )}
 
                       {/* Direct Send One */}
                       <button
@@ -776,6 +1039,204 @@ export function WhatsAppSalesmanReportModal({
               <span>
                 Pesan ini otomatis memuat data pencapaian riil, target sisa harian, status toko beli (EC), serta 3 rekomendasi taktis harian untuk salesman terpilih.
               </span>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: TES KIRIM KE NOMOR SAYA SENDIRI */}
+        {activeTab === 'test' && (
+          <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 max-w-3xl">
+            <div className="bg-slate-950/70 border border-slate-800 p-5 rounded-2xl space-y-4">
+              <div className="flex items-center gap-3 pb-3 border-b border-slate-800">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                  <Sparkles className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-100">
+                    Uji Coba Kirim Report ke Nomor HP Anda Sendiri
+                  </h4>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Pastikan laporan dapat diterima dengan sempurna sebelum mengirimkan ke seluruh salesman.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="text-xs font-semibold text-slate-300 block mb-1">
+                    Nomor WhatsApp Anda / Nomor Penguji:
+                  </label>
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="relative flex-1">
+                      <Smartphone className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input
+                        type="text"
+                        value={testPhoneNumber}
+                        onChange={(e) => setTestPhoneNumber(e.target.value)}
+                        placeholder="Contoh: 081234567890 atau 6281234567890"
+                        className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+                      />
+                    </div>
+                    <select
+                      value={selectedSalesmanId}
+                      onChange={(e) => setSelectedSalesmanId(e.target.value)}
+                      className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-200 font-semibold focus:outline-none focus:border-cyan-500"
+                    >
+                      {salesmanPerformances.map(s => (
+                        <option key={s.salesmanId} value={s.salesmanId}>
+                          Contoh Data: {s.salesmanName} ({s.achievementRate?.toFixed(1) || 0}%)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {testResultNotice && (
+                  <div className={`p-3 rounded-xl border text-xs flex items-center gap-2 ${
+                    testResultNotice.success
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                  }`}>
+                    {testResultNotice.success ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />}
+                    <span>{testResultNotice.message}</span>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleSendSelfTest('WEB')}
+                    className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Kirim Uji Coba via WA Web (Buka Chat)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={testSending}
+                    onClick={() => handleSendSelfTest('GATEWAY')}
+                    className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white font-bold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md"
+                  >
+                    <Radio className="w-3.5 h-3.5" />
+                    <span>{testSending ? 'Mengirim...' : 'Tes Kirim via Gateway API'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCopyReport(activeReportText, 'test_copy')}
+                    className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    {copiedId === 'test_copy' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>Salin Format Pesan</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Pratinjau Pesan yang akan diterima */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-slate-400">
+                <span className="font-semibold text-slate-200">Pratinjau Pesan yang Akan Diterima di HP Anda:</span>
+                <span className="text-[11px] text-slate-500 font-mono">Format Markdown Resmi WhatsApp</span>
+              </div>
+              <div className="rounded-xl bg-slate-950 border border-slate-800 p-4 font-mono text-xs text-slate-200 whitespace-pre-wrap leading-relaxed select-all max-h-[300px] overflow-y-auto shadow-inner">
+                {activeReportText}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 4: PUSAT BANTUAN & TROUBLESHOOTING */}
+        {activeTab === 'troubleshoot' && (
+          <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 max-w-4xl">
+            <div className="bg-slate-950/70 border border-amber-500/30 p-4 rounded-xl flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
+                <HelpCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-100">
+                  Kenapa Pesan Sudah Dikirim tapi Belum Masuk ke WhatsApp Salesman?
+                </h4>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Berikut adalah 4 penyebab umum serta solusi langsung untuk memastikan laporan terkirim dengan sukses:
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Kasus 1: Belum Menekan Tombol Kirim / Enter */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+                <div className="flex items-center gap-2 text-rose-400">
+                  <span className="w-6 h-6 rounded-full bg-rose-500/10 border border-rose-500/20 flex items-center justify-center font-bold text-xs">1</span>
+                  <h5 className="font-bold text-xs text-slate-100">Belum Tekan Tombol "Kirim" di WhatsApp Web</h5>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Pada metode <strong>Kirim via WA Web</strong>, dashboard menyiapkan chat dan teks laporan secara otomatis di WhatsApp.
+                </p>
+                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-emerald-300 space-y-1">
+                  <strong>✅ Solusi:</strong> Setelah tab WhatsApp terbuka dan teks laporan muncul di kotak chat, Anda <strong>wajib menekan tombol Enter atau ikon panah Kirim (Send) hijau</strong> di WhatsApp. WhatsApp tidak mengizinkan pesan terkirim sendiri tanpa konfirmasi tombol Enter pengguna.
+                </div>
+              </div>
+
+              {/* Kasus 2: Pop-up Browser Terblokir */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+                <div className="flex items-center gap-2 text-amber-400">
+                  <span className="w-6 h-6 rounded-full bg-amber-500/10 border border-amber-500/20 flex items-center justify-center font-bold text-xs">2</span>
+                  <h5 className="font-bold text-xs text-slate-100">Jendela Pop-up WhatsApp Diblokir Browser</h5>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Browser (Chrome, Edge, Safari) sering memblokir pembukaan tab otomatis saat melakukan batch sending berurutan.
+                </p>
+                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-cyan-300 space-y-1">
+                  <strong>✅ Solusi:</strong> Periksa bilah alamat browser di pojok kanan atas. Jika ada ikon pop-up merah, klik dan pilih <em>"Always allow pop-ups for this site"</em> (Selalu izinkan pop-up). Atau gunakan tombol manual "Klik di Sini untuk Buka WhatsApp" yang muncul.
+                </div>
+              </div>
+
+              {/* Kasus 3: Gateway Belum Diisi Token / API Key */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+                <div className="flex items-center gap-2 text-cyan-400">
+                  <span className="w-6 h-6 rounded-full bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center font-bold text-xs">3</span>
+                  <h5 className="font-bold text-xs text-slate-100">Menggunakan Gateway API tapi Token Masih Kosong</h5>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Jika memilih mode <strong>Auto-Blast Gateway</strong>, pesan tidak akan terkirim ke HP fisik jika Token/API Key penyedia (seperti Fonnte atau Wablas) belum dihubungkan.
+                </p>
+                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-amber-300 space-y-1">
+                  <strong>✅ Solusi:</strong> Buka tab <strong>Pengaturan Gateway</strong>, masukkan Token API yang valid dari Fonnte/Wablas, lalu klik Simpan. Atau gunakan tombol <strong>Kirim WA (Web)</strong>.
+                </div>
+              </div>
+
+              {/* Kasus 4: Nomor Telepon Belum Sesuai */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2.5">
+                <div className="flex items-center gap-2 text-indigo-400">
+                  <span className="w-6 h-6 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-xs">4</span>
+                  <h5 className="font-bold text-xs text-slate-100">Nomor Telepon Masih Nomor Sampel / Belum Terdaftar</h5>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Saat pertama kali dibuka, sistem mengisi nomor contoh (dummy). Jika nomor belum diubah ke nomor HP asli salesman, pesan tidak akan sampai ke mereka.
+                </p>
+                <div className="p-2.5 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-indigo-300 space-y-1">
+                  <strong>✅ Solusi:</strong> Di tab <strong>Daftar Salesman</strong>, klik nomor telepon atau ikon pensil di samping nama salesman, masukkan nomor WhatsApp aslinya (misal: 0812xxxxxx), lalu klik Simpan.
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Action Button to Test */}
+            <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-950/60 to-cyan-950/60 border border-emerald-500/30 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-bold text-slate-100">Ingin Menguji Coba Sekarang?</div>
+                <p className="text-[11px] text-slate-400">
+                  Kirimkan pesan uji coba ke nomor WhatsApp Anda sendiri untuk memastikan teks dan sistem berfungsi normal.
+                </p>
+              </div>
+              <button
+                onClick={() => setActiveTab('test')}
+                className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Buka Halaman Uji Coba</span>
+              </button>
             </div>
           </div>
         )}
@@ -875,9 +1336,9 @@ export function WhatsAppSalesmanReportModal({
                 </div>
               )}
 
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-[11px] text-slate-500">
-                  *Jika API Key dikosongkan, pengiriman gateway akan disimulasikan secara aman tanpa error.
+              <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <span className="text-[11px] text-amber-300 font-medium">
+                  *Wajib Diisi: Token API diperlukan agar pesan riil dapat terkirim ke HP salesman via server.
                 </span>
 
                 <button
@@ -886,13 +1347,30 @@ export function WhatsAppSalesmanReportModal({
                     saveGatewayConfig(gatewayConfig);
                     soundManager.playSuccess();
                     setGatewaySavedSuccess(true);
+                    showToast('Pengaturan WhatsApp Gateway berhasil disimpan!', 'success');
                     setTimeout(() => setGatewaySavedSuccess(false), 2500);
                   }}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer shrink-0"
                 >
                   <Save className="w-3.5 h-3.5" />
                   <span>{gatewaySavedSuccess ? 'Tersimpan!' : 'Simpan Pengaturan Gateway'}</span>
                 </button>
+              </div>
+
+              {/* Step-by-step Quick Guide */}
+              <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 space-y-2 mt-2">
+                <div className="font-semibold text-slate-100 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span>Panduan Mudah Integrasi WhatsApp Gateway (Fonnte / Wablas):</span>
+                </div>
+                <ol className="list-decimal list-inside space-y-1.5 text-[11px] text-slate-400">
+                  <li>Buka website <a href="https://fonnte.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 underline font-semibold">Fonnte.com</a> dan buat akun (tersedia free trial).</li>
+                  <li>Di dashboard Fonnte, masuk ke menu <strong>Device</strong> dan <strong>Scan QR WhatsApp</strong> menggunakan nomor WA admin/kantor Anda.</li>
+                  <li>Salin <strong>Token Device</strong> yang diberikan, tempelkan ke kolom <em>API Key / Token Gateway</em> di atas, lalu klik <strong>Simpan Pengaturan Gateway</strong>.</li>
+                </ol>
+                <div className="text-[11px] text-emerald-300 font-medium pt-1">
+                  💡 <em>Setelah token disimpan, fitur "Auto-Blast via Gateway API" akan aktif dan dapat mengirim ratusan report sekaligus secara otomatis di latar belakang!</em>
+                </div>
               </div>
             </div>
           </div>

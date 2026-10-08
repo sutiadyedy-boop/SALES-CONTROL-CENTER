@@ -212,13 +212,25 @@ export function generatePersonalizedSalesmanReport(
   return lines.join('\n');
 }
 
-export function openDirectWhatsAppWeb(phone: string, message: string): void {
+export function getWhatsAppDirectUrl(phone: string, message: string): string {
   const cleaned = cleanIndonesianPhoneNumber(phone);
   const encoded = encodeURIComponent(message);
-  const url = cleaned 
+  return cleaned 
     ? `https://api.whatsapp.com/send?phone=${cleaned}&text=${encoded}`
     : `https://api.whatsapp.com/send?text=${encoded}`;
-  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+export function openDirectWhatsAppWeb(phone: string, message: string): boolean {
+  const url = getWhatsAppDirectUrl(phone, message);
+  try {
+    const win = window.open(url, '_blank', 'noopener,noreferrer');
+    if (!win || win.closed || typeof win.closed === 'undefined') {
+      return false; // Popup blocked
+    }
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function sendReportViaGateway(

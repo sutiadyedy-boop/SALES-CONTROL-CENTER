@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { ChevronDown, ChevronUp, Search, Download, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { exportTableToExcel } from '../../services/exportEngine';
+import { CaptureJpgButton } from './CaptureJpgButton';
 
 export interface ColumnDef<T> {
   key: string;
@@ -38,6 +39,7 @@ export function DataTable<T extends Record<string, any>>({
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(pageSizeDefault);
+  const tableCardRef = useRef<HTMLDivElement>(null);
 
   // Filtered rows
   const filteredData = useMemo(() => {
@@ -109,7 +111,7 @@ export function DataTable<T extends Record<string, any>>({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-sm">
+    <div ref={tableCardRef} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-sm">
       {/* Table Header toolbar */}
       <div className="p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/60">
         <div className="flex items-center gap-3">
@@ -119,9 +121,9 @@ export function DataTable<T extends Record<string, any>>({
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Search box */}
-          <div className="relative">
+          <div className="relative" data-capture-ignore="true">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
@@ -135,10 +137,24 @@ export function DataTable<T extends Record<string, any>>({
             />
           </div>
 
+          {/* Capture JPG Full HD button */}
+          <div data-capture-ignore="true">
+            <CaptureJpgButton
+              targetRef={tableCardRef}
+              fileName={
+                exportFileName
+                  ? exportFileName.replace(/\.(xlsx|csv)$/i, '') + '_Full_HD.jpg'
+                  : `${(title || 'Tabel').replace(/[^a-zA-Z0-9]/g, '_')}_Full_HD.jpg`
+              }
+              label="Capture JPG Full HD"
+            />
+          </div>
+
           {/* Export Excel button */}
           <button
             onClick={handleExport}
             disabled={sortedData.length === 0}
+            data-capture-ignore="true"
             className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-emerald-200 text-xs font-semibold rounded-lg border border-emerald-800/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             title="Export Excel (.xlsx)"
           >

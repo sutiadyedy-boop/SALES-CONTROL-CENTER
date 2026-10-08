@@ -985,12 +985,12 @@ export function createApiRouter(): express.Router {
         });
       }
 
-      // If user hasn't configured a live API key yet, provide a graceful verified simulation response
+      // If user hasn't configured a live API key yet, clearly inform that real sending requires a Gateway API token
       if (!config.apiKey && provider !== 'custom') {
-        return res.json({
-          success: true,
-          simulated: true,
-          message: `[Simulasi Sukses] Pesan terverifikasi siap terkirim ke ${phone} via gateway ${provider.toUpperCase()}`,
+        return res.status(400).json({
+          success: false,
+          isSimulated: true,
+          error: `API Key / Token ${provider.toUpperCase()} belum diisi. Pesan tidak dapat dikirim ke nomor fisik WhatsApp. Silakan isi Token Gateway di tab 'Pengaturan Gateway', atau gunakan metode 'Kirim via WA Web' untuk membuka WhatsApp secara langsung.`,
           phone,
           timestamp: new Date().toISOString(),
         });

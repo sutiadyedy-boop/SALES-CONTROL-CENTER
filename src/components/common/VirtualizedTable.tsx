@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { ChevronDown, ChevronUp, Search, Download, Layers, FileSpreadsheet } from 'lucide-react';
 import { exportTableToExcel } from '../../services/exportEngine';
+import { CaptureJpgButton } from './CaptureJpgButton';
 
 export interface VirtualizedColumnDef<T> {
   key: string;
@@ -45,6 +46,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
   const [scrollTop, setScrollTop] = useState(0);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const tableCardRef = useRef<HTMLDivElement>(null);
 
   // 1. Search filtering
   const filteredData = useMemo(() => {
@@ -127,7 +129,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
   };
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-sm">
+    <div ref={tableCardRef} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden flex flex-col shadow-sm">
       {/* Table Toolbar Header */}
       <div className="px-5 py-3.5 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90">
         <div>
@@ -142,11 +144,11 @@ export function VirtualizedTable<T extends Record<string, any>>({
           {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2.5">
           {actionElement}
 
           {/* Search Box */}
-          <div className="relative">
+          <div className="relative" data-capture-ignore="true">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
               type="text"
@@ -157,10 +159,24 @@ export function VirtualizedTable<T extends Record<string, any>>({
             />
           </div>
 
+          {/* Capture JPG Full HD Button */}
+          <div data-capture-ignore="true">
+            <CaptureJpgButton
+              targetRef={tableCardRef}
+              fileName={
+                exportFileName
+                  ? exportFileName.replace(/\.(xlsx|csv)$/i, '') + '_Full_HD.jpg'
+                  : `${(title || 'Tabel').replace(/[^a-zA-Z0-9]/g, '_')}_Full_HD.jpg`
+              }
+              label="Capture JPG Full HD"
+            />
+          </div>
+
           {/* Export to Excel Button */}
           {exportFileName && sortedData.length > 0 && (
             <button
               onClick={handleExport}
+              data-capture-ignore="true"
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-emerald-200 text-xs font-semibold border border-emerald-800/80 transition-colors shadow-sm"
               title="Export Excel (.xlsx)"
             >
@@ -171,6 +187,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
 
           {/* Virtualization indicator */}
           <div 
+            data-capture-ignore="true"
             className="flex items-center gap-1 text-[10px] text-slate-400 font-mono bg-slate-950/60 px-2 py-1 rounded border border-slate-800"
             title="Tabel tervirtualisasi (hanya merender baris yang terlihat di layar)"
           >

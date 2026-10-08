@@ -15,6 +15,7 @@ import {
 } from '../../types/analytics';
 import { VirtualizedTable, VirtualizedColumnDef } from '../common/VirtualizedTable';
 import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
+import { CaptureJpgButton } from '../common/CaptureJpgButton';
 
 interface ControlTowerTablesProps {
   calculation: CalculationResult;
@@ -424,7 +425,7 @@ export function ControlTowerTables({
   ];
 
   return (
-    <div className="space-y-4">
+    <div id="control-tower-tables-section" className="space-y-4">
       {/* Table Selection Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/80 border border-slate-800 rounded-xl px-5 py-3">
         <div className="flex items-center gap-2">
@@ -437,8 +438,17 @@ export function ControlTowerTables({
           </span>
         </div>
 
-        {/* Navigation Selector */}
-        <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <div data-capture-ignore="true">
+            <CaptureJpgButton
+              targetId="control-tower-tables-section"
+              fileName={`Control_Tower_Tables_${activeTab}_${currentPeriodLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+              label="Capture JPG Full HD"
+            />
+          </div>
+
+          {/* Navigation Selector */}
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800 text-xs">
           <button
             onClick={() => setActiveTab('salesman_ranking')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${
@@ -498,6 +508,7 @@ export function ControlTowerTables({
               {outletsNotTransacted.length}
             </span>
           </button>
+          </div>
         </div>
       </div>
 
