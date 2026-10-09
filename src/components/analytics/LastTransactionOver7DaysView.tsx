@@ -20,7 +20,7 @@ import {
   Square,
 } from 'lucide-react';
 import { CalculationResult, GlobalFilterState } from '../../types/analytics';
-import { AppSettings, MasterOutletRecord, TransactionRecord, UserProfile } from '../../types/database';
+import { AppSettings, MasterOutletRecord, TargetRecord, TransactionRecord, UserProfile } from '../../types/database';
 import { applyRoleAndGlobalFilter } from '../../services/calculationEngine';
 import { formatDate } from '../../services/normalizationEngine';
 import { parseYearMonthFromDate, INDONESIAN_MONTHS } from '../../services/periodDetectionService';
@@ -35,6 +35,7 @@ interface LastTxOver7DaysViewProps {
   prevTransactions: TransactionRecord[];
   currTransactions: TransactionRecord[];
   masterOutlets: MasterOutletRecord[];
+  targets?: TargetRecord[];
   filters?: GlobalFilterState;
   userProfile?: UserProfile;
   onFilterChange?: (newFilters: GlobalFilterState) => void;
@@ -45,6 +46,7 @@ interface LastTxOver7DaysViewProps {
 export interface OutletLastTxItem {
   id: string;
   depo: string;
+  pma?: string;
   salesmanId: string;
   salesmanName: string;
   outletId: string;
@@ -129,6 +131,7 @@ export function LastTransactionOver7DaysView({
   prevTransactions,
   currTransactions,
   masterOutlets,
+  targets = [],
   filters = {},
   userProfile,
   onNavigateToUpload,
@@ -138,9 +141,6 @@ export function LastTransactionOver7DaysView({
   const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
   const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState<boolean>(false);
   const channelDropdownRef = useRef<HTMLDivElement>(null);
-  const [selectedSalesmen, setSelectedSalesmen] = useState<string[]>([]);
-  const [isSalesmanDropdownOpen, setIsSalesmanDropdownOpen] = useState<boolean>(false);
-  const salesmanDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedSourceMonth, setSelectedSourceMonth] = useState<'ALL' | 'BULAN_INI' | 'BULAN_LALU'>('ALL');
   const [selectedSeverity, setSelectedSeverity] = useState<'ALL' | '8_14' | '15_21' | 'OVER_21'>('ALL');
   const [manualCutOffDate, setManualCutOffDate] = useState<string>(''); // Empty = Auto
@@ -149,9 +149,6 @@ export function LastTransactionOver7DaysView({
     const handleClickOutside = (event: MouseEvent) => {
       if (channelDropdownRef.current && !channelDropdownRef.current.contains(event.target as Node)) {
         setIsChannelDropdownOpen(false);
-      }
-      if (salesmanDropdownRef.current && !salesmanDropdownRef.current.contains(event.target as Node)) {
-        setIsSalesmanDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -208,28 +205,96 @@ export function LastTransactionOver7DaysView({
     [effectiveUpdateDateUtc]
   );
 
-  // 2. Build Master Outlet & Salesman Metadata Maps for Depo, Salesman, Area enrichment
+  // 2. Build Master Outlet & Salesman Metadata Maps for Depo, PMA, Area, Cabang enrichment
   const { allOutletsLastTx } = useMemo(() => {
     const filterPredicate = applyRoleAndGlobalFilter(filters, userProfile);
 
-    const masterMap = new Map<string, MasterOutletRecord>();
+    const masterById = new Map<string, MasterOutletRecord>();
+    const masterByName = new Map<string, MasterOutletRecord>();
     const salesmanDepos = new Map<string, string>();
+    const salesmanPmas = new Map<string, string>();
     const salesmanCabangs = new Map<string, string>();
     const salesmanAreas = new Map<string, string>();
     const salesmanNames = new Map<string, string>();
+    const salesmanByName = new Map<string, { id: string; depo?: string; pma?: string; cabang?: string; area?: string }>();
+
+    const isGenericTierPma = (val?: string) => {
+      if (!val) return true;
+      const u = val.trim().toUpperCase();
+      return ['GOLD', 'SILVER', 'BRONZE', 'PLATINUM', 'REGULER', 'REGULAR', 'OK', 'AKTIF', 'ACTIVE', '-'].includes(u);
+    };
+
+    const isGenericDefaultDepo = (val?: string) => {
+      if (!val) return true;
+      const u = val.trim().toUpperCase();
+      return u === 'DEPO BONE PUSAT' || u === 'DEPO UTAMA' || u === '-';
+    };
 
     for (const m of masterOutlets) {
-      masterMap.set(m.outletId, m);
+      if (m.outletId) {
+        masterById.set(m.outletId.trim(), m);
+        masterById.set(m.outletId.trim().toLowerCase(), m);
+      }
+      if (m.outletName) {
+        masterByName.set(m.outletName.trim().toLowerCase(), m);
+      }
       if (m.salesmanId) {
-        if (m.depo && !salesmanDepos.has(m.salesmanId)) salesmanDepos.set(m.salesmanId, m.depo);
-        if (m.cabang && !salesmanCabangs.has(m.salesmanId)) salesmanCabangs.set(m.salesmanId, m.cabang);
-        if (m.area && !salesmanAreas.has(m.salesmanId)) salesmanAreas.set(m.salesmanId, m.area);
-        if (m.salesmanName && !salesmanNames.has(m.salesmanId)) salesmanNames.set(m.salesmanId, m.salesmanName);
+        const sId = m.salesmanId.trim();
+        if (m.depo && !isGenericDefaultDepo(m.depo) && !salesmanDepos.has(sId)) salesmanDepos.set(sId, m.depo.trim());
+        if (m.pma && !isGenericTierPma(m.pma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, m.pma.trim());
+        if (m.cabang && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, m.cabang.trim());
+        if (m.area && !salesmanAreas.has(sId)) salesmanAreas.set(sId, m.area.trim());
+        if (m.salesmanName && !salesmanNames.has(sId)) salesmanNames.set(sId, m.salesmanName.trim());
+
+        if (m.salesmanName) {
+          const sNameKey = m.salesmanName.trim().toLowerCase();
+          if (!salesmanByName.has(sNameKey)) {
+            salesmanByName.set(sNameKey, {
+              id: sId,
+              depo: !isGenericDefaultDepo(m.depo) ? m.depo : undefined,
+              pma: !isGenericTierPma(m.pma) ? m.pma : undefined,
+              cabang: m.cabang,
+              area: m.area,
+            });
+          }
+        }
       }
     }
 
+    // Enrich Salesman Area / PMA / Cabang from Target Database (Database 3) as well
+    for (const trg of targets) {
+      if (trg.salesmanId) {
+        const sId = trg.salesmanId.trim();
+        if (trg.area && !salesmanAreas.has(sId)) salesmanAreas.set(sId, trg.area.trim());
+        if (trg.pma && !isGenericTierPma(trg.pma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, trg.pma.trim());
+        if (trg.cb && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, trg.cb.trim());
+        if (trg.salesmanName && !salesmanNames.has(sId)) salesmanNames.set(sId, trg.salesmanName.trim());
+
+        if (trg.salesmanName) {
+          const sNameKey = trg.salesmanName.trim().toLowerCase();
+          const existing = salesmanByName.get(sNameKey);
+          salesmanByName.set(sNameKey, {
+            id: existing?.id || sId,
+            depo: existing?.depo,
+            pma: existing?.pma || (!isGenericTierPma(trg.pma) ? trg.pma : undefined),
+            cabang: existing?.cabang || trg.cb,
+            area: existing?.area || trg.area,
+          });
+        }
+      }
+    }
+
+    // Also scan transactions to build cross-reference for salesman area/pma/depo
+    for (const tx of [...currTransactions, ...prevTransactions]) {
+      const sId = (tx.salesmanId || '').trim();
+      if (!sId) continue;
+      if (tx.depo && !isGenericDefaultDepo(tx.depo) && !salesmanDepos.has(sId)) salesmanDepos.set(sId, tx.depo.trim());
+      if (tx.pma && !isGenericTierPma(tx.pma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, tx.pma.trim());
+      if (tx.area && !salesmanAreas.has(sId)) salesmanAreas.set(sId, tx.area.trim());
+      if (tx.cabang && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, tx.cabang.trim());
+    }
+
     // Track per-outlet per-date aggregated transactions across both databases
-    // Key: outletId -> Map<isoDate, { totalValue, sourceMonth, salesmanId, salesmanName, outletName, depo, area, rayon, channel, cabang, invoices: Set<string> }>
     interface DailyOutletTx {
       isoDate: string;
       utcTime: number;
@@ -240,6 +305,7 @@ export function LastTransactionOver7DaysView({
       salesmanName: string;
       outletName: string;
       depo: string;
+      pma: string;
       area: string;
       rayon: string;
       channel: string;
@@ -257,36 +323,90 @@ export function LastTransactionOver7DaysView({
     ) => {
       if (!t.outletId || t.salesValue <= 0) return;
 
-      const m = masterMap.get(t.outletId);
-      const slsId = t.salesmanId || m?.salesmanId || '';
-      const slsName = t.salesmanName || m?.salesmanName || salesmanNames.get(slsId) || slsId || '-';
-      const depo =
-        t.depo ||
-        m?.depo ||
-        salesmanDepos.get(slsId) ||
-        t.cabang ||
-        m?.cabang ||
-        salesmanCabangs.get(slsId) ||
+      const cleanId = t.outletId.trim();
+      const m =
+        masterById.get(cleanId) ||
+        masterById.get(cleanId.toLowerCase()) ||
+        (t.outletName ? masterByName.get(t.outletName.trim().toLowerCase()) : undefined);
+
+      const rawSlsName = (t.salesmanName || m?.salesmanName || '').trim();
+      const slsByNameMatch = rawSlsName ? salesmanByName.get(rawSlsName.toLowerCase()) : undefined;
+
+      const slsId = (t.salesmanId || m?.salesmanId || slsByNameMatch?.id || '').trim();
+      const slsName = rawSlsName || salesmanNames.get(slsId) || slsId || '-';
+
+      const area = (
         t.area ||
         m?.area ||
         salesmanAreas.get(slsId) ||
-        'DEPO UTAMA';
-      const area = t.area || m?.area || salesmanAreas.get(slsId) || '';
-      const rayon = t.rayon || m?.rayon || '';
-      const channel = t.channel || m?.channel || '';
-      const cabang = t.cabang || m?.cabang || salesmanCabangs.get(slsId) || '';
-      const outletName = t.outletName || m?.outletName || t.outletId;
+        slsByNameMatch?.area ||
+        ''
+      ).trim();
+
+      const rawPma = (
+        (!isGenericTierPma(t.pma) ? t.pma : '') ||
+        (!isGenericTierPma(m?.pma) ? m?.pma : '') ||
+        salesmanPmas.get(slsId) ||
+        slsByNameMatch?.pma ||
+        ''
+      ).trim();
+
+      const cabang = (
+        t.cabang ||
+        m?.cabang ||
+        salesmanCabangs.get(slsId) ||
+        slsByNameMatch?.cabang ||
+        ''
+      ).trim();
+
+      const explicitDepo = (
+        (!isGenericDefaultDepo(t.depo) ? t.depo : '') ||
+        (!isGenericDefaultDepo(m?.depo) ? m?.depo : '') ||
+        salesmanDepos.get(slsId) ||
+        slsByNameMatch?.depo ||
+        ''
+      ).trim();
+
+      const rayon = (t.rayon || m?.rayon || '').trim();
+      const channel = (t.channel || m?.channel || '').trim();
+      const outletName = (t.outletName || m?.outletName || t.outletId).trim();
+
+      // Resolve primary Depo/PMA display according to Area per Salesman or per Toko:
+      // Prioritize specific Depo / PMA / Area per Toko or Salesman over generic company-wide defaults
+      let resolvedDepoPma = '';
+      if (explicitDepo && area && !explicitDepo.toUpperCase().includes(area.toUpperCase()) && !area.toUpperCase().includes(explicitDepo.toUpperCase())) {
+        resolvedDepoPma = `${explicitDepo} - ${area}`;
+      } else if (rawPma && area && !rawPma.toUpperCase().includes(area.toUpperCase()) && !area.toUpperCase().includes(rawPma.toUpperCase())) {
+        resolvedDepoPma = `${rawPma} - ${area}`;
+      } else if (explicitDepo) {
+        resolvedDepoPma = explicitDepo;
+      } else if (rawPma) {
+        resolvedDepoPma = rawPma;
+      } else if (area && cabang && !area.toUpperCase().includes(cabang.toUpperCase()) && !cabang.toUpperCase().includes(area.toUpperCase())) {
+        resolvedDepoPma = `${cabang} - ${area}`;
+      } else if (area) {
+        resolvedDepoPma = area;
+      } else if (cabang) {
+        resolvedDepoPma = cabang;
+      } else if (rayon) {
+        resolvedDepoPma = rayon;
+      } else {
+        resolvedDepoPma = t.depo || m?.depo || t.pma || m?.pma || '-';
+      }
+
+      const depo = resolvedDepoPma;
+      const pma = rawPma || t.pma || m?.pma || area || cabang || '';
 
       // Check global & RBAC filter
       if (
         !filterPredicate({
           salesmanId: slsId,
-          area,
+          area: area || depo,
           rayon,
           channel,
           fc: t.fc || m?.fc,
-          pma: t.pma || m?.pma,
-          cabang,
+          pma: pma || depo,
+          cabang: cabang || depo,
           depo,
           outletName,
           outletId: t.outletId,
@@ -325,6 +445,7 @@ export function LastTransactionOver7DaysView({
           salesmanName: slsName,
           outletName,
           depo,
+          pma,
           area,
           rayon,
           channel,
@@ -340,7 +461,9 @@ export function LastTransactionOver7DaysView({
           existing.sourceLabel = sourceLabel;
           if (slsId) existing.salesmanId = slsId;
           if (slsName && slsName !== '-') existing.salesmanName = slsName;
-          if (depo) existing.depo = depo;
+          if (depo && depo !== '-') existing.depo = depo;
+          if (pma) existing.pma = pma;
+          if (area) existing.area = area;
         }
       }
     };
@@ -374,6 +497,7 @@ export function LastTransactionOver7DaysView({
       results.push({
         id: `${outletId}-${latestEntry.isoDate}`,
         depo: latestEntry.depo,
+        pma: latestEntry.pma,
         salesmanId: latestEntry.salesmanId,
         salesmanName: latestEntry.salesmanName,
         outletId,
@@ -406,6 +530,7 @@ export function LastTransactionOver7DaysView({
     prevTransactions,
     currTransactions,
     masterOutlets,
+    targets,
     filters,
     userProfile,
     prevLabel,
@@ -422,14 +547,27 @@ export function LastTransactionOver7DaysView({
     return allOutletsLastTx.filter(item => item.daysSinceLastTx > minDaysThreshold);
   }, [allOutletsLastTx, minDaysThreshold]);
 
-  // Unique Channels and Salesmen from baseOver7DaysOutlets for quick local filters
+  // Unique Channels from allOutletsLastTx & baseOver7DaysOutlets for quick local filters
   const uniqueChannels = useMemo(() => {
     const set = new Set<string>();
+    allOutletsLastTx.forEach(item => {
+      const ch = (item.channel || 'GENERAL TRADE').trim();
+      if (ch) set.add(ch);
+    });
     baseOver7DaysOutlets.forEach(item => {
       const ch = (item.channel || 'GENERAL TRADE').trim();
       if (ch) set.add(ch);
     });
     return Array.from(set).sort();
+  }, [allOutletsLastTx, baseOver7DaysOutlets]);
+
+  const channelCountsMap = useMemo(() => {
+    const counts = new Map<string, number>();
+    baseOver7DaysOutlets.forEach(item => {
+      const ch = (item.channel || 'GENERAL TRADE').trim();
+      counts.set(ch, (counts.get(ch) || 0) + 1);
+    });
+    return counts;
   }, [baseOver7DaysOutlets]);
 
   const toggleChannel = (ch: string) => {
@@ -437,36 +575,13 @@ export function LastTransactionOver7DaysView({
       const next = prev.includes(ch) ? prev.filter(c => c !== ch) : [...prev, ch];
       return next;
     });
-    setSelectedSalesmen([]);
   };
-
-  const toggleSalesman = (id: string) => {
-    setSelectedSalesmen(prev => {
-      const next = prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id];
-      return next;
-    });
-  };
-
-  const uniqueSalesmen = useMemo(() => {
-    const map = new Map<string, string>();
-    baseOver7DaysOutlets.forEach(item => {
-      const itemChannel = (item.channel || 'GENERAL TRADE').trim();
-      if (selectedChannels.length > 0 && !selectedChannels.includes(itemChannel)) return;
-      if (item.salesmanId) {
-        map.set(item.salesmanId, item.salesmanName || item.salesmanId);
-      }
-    });
-    return Array.from(map.entries())
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [baseOver7DaysOutlets, selectedChannels]);
 
   // Apply local dropdown filters
   const filteredOutlets = useMemo(() => {
     return baseOver7DaysOutlets.filter(item => {
       const itemChannel = (item.channel || 'GENERAL TRADE').trim();
       if (selectedChannels.length > 0 && !selectedChannels.includes(itemChannel)) return false;
-      if (selectedSalesmen.length > 0 && !selectedSalesmen.includes(item.salesmanId)) return false;
       if (selectedSourceMonth === 'BULAN_INI' && item.lastTxMonthSource !== 'BULAN INI') return false;
       if (selectedSourceMonth === 'BULAN_LALU' && item.lastTxMonthSource !== 'BULAN LALU') return false;
       if (selectedSeverity === '8_14' && (item.daysSinceLastTx < 8 || item.daysSinceLastTx > 14)) return false;
@@ -474,7 +589,7 @@ export function LastTransactionOver7DaysView({
       if (selectedSeverity === 'OVER_21' && item.daysSinceLastTx <= 21) return false;
       return true;
     });
-  }, [baseOver7DaysOutlets, selectedChannels, selectedSalesmen, selectedSourceMonth, selectedSeverity]);
+  }, [baseOver7DaysOutlets, selectedChannels, selectedSourceMonth, selectedSeverity]);
 
   // Summary statistics
   const summaryStats = useMemo(() => {
@@ -558,7 +673,7 @@ export function LastTransactionOver7DaysView({
   }
 
   // Table Columns exactly matching user's 7 points:
-  // 1. Depo
+  // 1. Depo / PMA (Sesuai Area Per Salesman atau Per Toko)
   // 2. Nama Sales
   // 3. Kode Toko
   // 4. Nama Toko
@@ -568,20 +683,42 @@ export function LastTransactionOver7DaysView({
   const columns: ColumnDef<OutletLastTxItem>[] = [
     {
       key: 'depo',
-      header: '1. Depo',
-      width: '150px',
+      header: '1. Depo / PMA (Area)',
+      width: '175px',
       accessor: row => row.depo,
-      render: row => (
-        <div className="flex items-center gap-1.5">
-          <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-          <div>
-            <div className="font-semibold text-slate-200 text-xs">{row.depo}</div>
-            {row.area && row.area !== row.depo && (
-              <div className="text-[10px] text-slate-500 font-mono">{row.area}</div>
-            )}
+      render: row => {
+        const subInfoParts: string[] = [];
+        if (row.area && !row.depo.toUpperCase().includes(row.area.toUpperCase())) {
+          subInfoParts.push(`Area: ${row.area}`);
+        }
+        if (row.pma && !row.depo.toUpperCase().includes(row.pma.toUpperCase()) && row.pma !== row.area) {
+          subInfoParts.push(`PMA: ${row.pma}`);
+        }
+        if (row.cabang && !row.depo.toUpperCase().includes(row.cabang.toUpperCase()) && row.cabang !== row.area) {
+          subInfoParts.push(`CB: ${row.cabang}`);
+        }
+        const subText = subInfoParts.join(' · ');
+
+        return (
+          <div className="flex items-start gap-1.5">
+            <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0 mt-0.5" />
+            <div className="min-w-0">
+              <div className="font-semibold text-slate-100 text-xs leading-tight break-words">
+                {row.depo}
+              </div>
+              {subText ? (
+                <div className="text-[10px] text-cyan-400/80 font-mono mt-0.5 truncate" title={subText}>
+                  {subText}
+                </div>
+              ) : row.rayon ? (
+                <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate" title={row.rayon}>
+                  {row.rayon}
+                </div>
+              ) : null}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       key: 'salesmanName',
@@ -698,8 +835,6 @@ export function LastTransactionOver7DaysView({
     setMinDaysThreshold(7);
     setSelectedChannels([]);
     setIsChannelDropdownOpen(false);
-    setSelectedSalesmen([]);
-    setIsSalesmanDropdownOpen(false);
     setSelectedSourceMonth('ALL');
     setSelectedSeverity('ALL');
     setManualCutOffDate('');
@@ -829,7 +964,7 @@ export function LastTransactionOver7DaysView({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
           {/* 1. Filter Chanel (Multi-select Checkbox Dropdown) */}
           <div className="relative" ref={channelDropdownRef}>
             <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">1. Filter Chanel</label>
@@ -857,24 +992,26 @@ export function LastTransactionOver7DaysView({
                 <div className="p-2 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={e => {
+                      e.stopPropagation();
                       if (selectedChannels.length === uniqueChannels.length) {
                         setSelectedChannels([]);
                       } else {
                         setSelectedChannels([...uniqueChannels]);
                       }
-                      setSelectedSalesmen([]);
                     }}
                     className="text-[10px] font-mono font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
                   >
-                    {selectedChannels.length === uniqueChannels.length ? 'Hapus Semua' : 'Pilih Semua'}
+                    {selectedChannels.length === uniqueChannels.length && uniqueChannels.length > 0
+                      ? 'Hapus Semua'
+                      : 'Pilih Semua'}
                   </button>
                   {selectedChannels.length > 0 && (
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={e => {
+                        e.stopPropagation();
                         setSelectedChannels([]);
-                        setSelectedSalesmen([]);
                       }}
                       className="text-[10px] font-mono text-amber-400 hover:text-amber-300"
                     >
@@ -885,29 +1022,31 @@ export function LastTransactionOver7DaysView({
                 <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
                   {uniqueChannels.map(ch => {
                     const isChecked = selectedChannels.includes(ch);
+                    const count = channelCountsMap.get(ch) || 0;
                     return (
-                      <label
+                      <button
                         key={ch}
-                        onClick={() => toggleChannel(ch)}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs select-none transition-colors ${
+                        type="button"
+                        onClick={e => {
+                          e.stopPropagation();
+                          toggleChannel(ch);
+                        }}
+                        className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs text-left select-none transition-colors ${
                           isChecked
                             ? 'bg-cyan-500/15 text-cyan-200 font-semibold'
                             : 'text-slate-300 hover:bg-slate-800/70'
                         }`}
                       >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}}
-                          className="sr-only"
-                        />
-                        {isChecked ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        )}
-                        <span className="truncate">{ch}</span>
-                      </label>
+                        <div className="flex items-center gap-2 min-w-0">
+                          {isChecked ? (
+                            <CheckSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          ) : (
+                            <Square className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                          )}
+                          <span className="truncate">{ch}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-400 shrink-0">({count})</span>
+                      </button>
                     );
                   })}
                   {uniqueChannels.length === 0 && (
@@ -920,100 +1059,9 @@ export function LastTransactionOver7DaysView({
             )}
           </div>
 
-          {/* 2. Filter Nama Sales (Multi-select Checkbox Dropdown) */}
-          <div className="relative" ref={salesmanDropdownRef}>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">2. Filter Nama Sales</label>
-            <button
-              type="button"
-              onClick={() => setIsSalesmanDropdownOpen(prev => !prev)}
-              className="w-full bg-slate-950 border border-slate-700 hover:border-cyan-500/70 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 flex items-center justify-between gap-2 focus:outline-none focus:border-cyan-500 transition-colors"
-            >
-              <span className="truncate text-left">
-                {selectedSalesmen.length === 0
-                  ? `Semua Salesman (${uniqueSalesmen.length})`
-                  : selectedSalesmen.length === 1
-                  ? (() => {
-                      const found = uniqueSalesmen.find(s => s.id === selectedSalesmen[0]);
-                      return found ? `${found.name} (${found.id})` : selectedSalesmen[0];
-                    })()
-                  : `${selectedSalesmen.length} Salesman Dipilih`}
-              </span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
-                  isSalesmanDropdownOpen ? 'rotate-180 text-cyan-400' : ''
-                }`}
-              />
-            </button>
-
-            {isSalesmanDropdownOpen && (
-              <div className="absolute left-0 right-0 mt-1.5 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
-                <div className="p-2 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (selectedSalesmen.length === uniqueSalesmen.length) {
-                        setSelectedSalesmen([]);
-                      } else {
-                        setSelectedSalesmen(uniqueSalesmen.map(s => s.id));
-                      }
-                    }}
-                    className="text-[10px] font-mono font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
-                  >
-                    {selectedSalesmen.length === uniqueSalesmen.length ? 'Hapus Semua' : 'Pilih Semua'}
-                  </button>
-                  {selectedSalesmen.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSalesmen([])}
-                      className="text-[10px] font-mono text-amber-400 hover:text-amber-300"
-                    >
-                      Reset ({selectedSalesmen.length})
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
-                  {uniqueSalesmen.map(s => {
-                    const isChecked = selectedSalesmen.includes(s.id);
-                    return (
-                      <label
-                        key={s.id}
-                        onClick={() => toggleSalesman(s.id)}
-                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs select-none transition-colors ${
-                          isChecked
-                            ? 'bg-cyan-500/15 text-cyan-200 font-semibold'
-                            : 'text-slate-300 hover:bg-slate-800/70'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isChecked}
-                          onChange={() => {}}
-                          className="sr-only"
-                        />
-                        {isChecked ? (
-                          <CheckSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        )}
-                        <span className="truncate">
-                          {s.name} <span className="text-[10px] font-mono text-slate-400">({s.id})</span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                  {uniqueSalesmen.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[11px] text-slate-500 font-mono">
-                      Tidak ada salesman tersedia
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* 3. Filter Bulan Transaksi Terakhir */}
+          {/* 2. Filter Bulan Transaksi Terakhir */}
           <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">3. Sumber Bulan Trx Terakhir</label>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">2. Sumber Bulan Trx Terakhir</label>
             <select
               value={selectedSourceMonth}
               onChange={e => setSelectedSourceMonth(e.target.value as any)}
@@ -1025,9 +1073,9 @@ export function LastTransactionOver7DaysView({
             </select>
           </div>
 
-          {/* 4. Filter Kelompok Rentang Hari */}
+          {/* 3. Filter Kelompok Rentang Hari */}
           <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">4. Kategori Rentang Hari</label>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">3. Kategori Rentang Hari</label>
             <select
               value={selectedSeverity}
               onChange={e => setSelectedSeverity(e.target.value as any)}
@@ -1040,10 +1088,10 @@ export function LastTransactionOver7DaysView({
             </select>
           </div>
 
-          {/* 5. Batas Minimum Hari (Default > 7 Hari) */}
+          {/* 4. Batas Minimum Hari (Default > 7 Hari) */}
           <div>
             <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
-              5. Batas Rentang (&gt; X Hari)
+              4. Batas Rentang (&gt; X Hari)
             </label>
             <div className="flex items-center gap-1.5">
               <input
@@ -1058,10 +1106,10 @@ export function LastTransactionOver7DaysView({
             </div>
           </div>
 
-          {/* 6. Tanggal Update Harian (Auto / Custom Override) */}
+          {/* 5. Tanggal Update Harian (Auto / Custom Override) */}
           <div>
             <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
-              6. Tgl Update Harian (Auto)
+              5. Tgl Update Harian (Auto)
             </label>
             <div className="flex items-center gap-1">
               <input
@@ -1093,19 +1141,19 @@ export function LastTransactionOver7DaysView({
         columns={columns}
         data={filteredOutlets}
         pageSizeDefault={25}
-        searchPlaceholder="Cari depo, nama sales, kode toko, atau nama toko..."
+        searchPlaceholder="Cari depo/PMA, area, nama sales, kode toko, atau nama toko..."
         exportFileName={`List_Toko_Rentang_Transaksi_Diatas_${minDaysThreshold}_Hari_${effectiveUpdateDateIso}.xlsx`}
         emptyMessage={`Tidak ada toko dengan rentang transaksi terakhir di atas ${minDaysThreshold} hari pada filter ini.`}
       />
 
-      {/* Rekapitulasi Per Salesman & Depo */}
+      {/* Rekapitulasi Per Salesman & Depo/PMA */}
       {salesmanSummary.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
           <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-cyan-400" />
               <h3 className="text-sm font-bold text-slate-100">
-                Rekapitulasi Jumlah Toko Rentang &gt; {minDaysThreshold} Hari per Salesman &amp; Depo
+                Rekapitulasi Jumlah Toko Rentang &gt; {minDaysThreshold} Hari per Salesman &amp; Depo / PMA (Area)
               </h3>
             </div>
             <span className="text-xs font-mono text-slate-400">
@@ -1116,7 +1164,7 @@ export function LastTransactionOver7DaysView({
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 text-[10px] uppercase font-mono">
-                  <th className="py-2.5 px-4">Depo</th>
+                  <th className="py-2.5 px-4">Depo / PMA (Area)</th>
                   <th className="py-2.5 px-4">Nama Sales</th>
                   <th className="py-2.5 px-4 text-center">Total Toko &gt; {minDaysThreshold} Hr</th>
                   <th className="py-2.5 px-4 text-center">Trx Terakhir Bulan Ini</th>

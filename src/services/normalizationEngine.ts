@@ -320,8 +320,30 @@ export function normalizeTransactionRecords(
     const grossVal = parseNumeric(row['VALEU'] || row['GROSS'] || row['VALUE'] || row['VALUE GROSS'] || row['VALEU GROSS'] || row['TOTAL GROSS'] || salesVal);
     const productCode = cleanString(row['KODE BARANG'] || row['KD_BRG'] || row['ITEM CODE'] || '');
     const productName = cleanString(row['NAMA BARANG'] || row['NM_BRG'] || row['ITEM NAME'] || '');
-    const area = cleanString(row[mapping['area'] || ''] || row['AREA'] || row['WILAYAH'] || row['KOTA'] || row['REGION'] || row['PMA / AREA'] || row['AREA / PMA'] || '');
-    const pma = cleanString(row[mapping['pma'] || ''] || row['PMA'] || row['STATUS PMA'] || row['PMA STATUS'] || '');
+    const area = cleanString(
+      row[mapping['area'] || ''] ||
+      row['AREA'] ||
+      row['WILAYAH'] ||
+      row['KOTA'] ||
+      row['REGION'] ||
+      row['PMA / AREA'] ||
+      row['AREA / PMA'] ||
+      row['AREA SALES'] ||
+      row['AREA_SALES'] ||
+      ''
+    );
+    const pma = cleanString(
+      row[mapping['pma'] || ''] ||
+      row['PMA'] ||
+      row['NAMA PMA'] ||
+      row['DEPO/PMA'] ||
+      row['DEPO / PMA'] ||
+      row['PMA / DEPO'] ||
+      row['PMA/DEPO'] ||
+      row['STATUS PMA'] ||
+      row['PMA STATUS'] ||
+      ''
+    );
     const rayon = cleanString(row[mapping['rayon'] || ''] || row['RAYON'] || row['SEKTOR'] || '');
     const channel = cleanString(row[mapping['channel'] || ''] || row['CHANNEL'] || '');
     let rawMarkNew = cleanString(
@@ -347,8 +369,21 @@ export function normalizeTransactionRecords(
     }
     const markNew = rawMarkNew;
     const fc = cleanString(row[mapping['fc'] || ''] || row['FC'] || '');
-    const cabang = cleanString(row[mapping['cabang'] || ''] || row['CABANG'] || row['CB'] || '');
-    const depo = cleanString(row[mapping['depo'] || ''] || row['DEPO'] || '');
+    const cabang = cleanString(
+      row[mapping['cabang'] || ''] ||
+      row['CABANG'] ||
+      row['CB'] ||
+      row['NAMA CABANG'] ||
+      ''
+    );
+    const depo = cleanString(
+      row[mapping['depo'] || ''] ||
+      row['DEPO'] ||
+      row['NAMA DEPO'] ||
+      row['DEPO/PMA'] ||
+      row['DEPO / PMA'] ||
+      ''
+    );
 
     // Duplicate check key based on settings:
     // IMPORTANT: Multiple line items belonging to the same invoice MUST NOT be dropped as duplicates!
@@ -522,14 +557,40 @@ export function normalizeMasterOutletRecords(
     }
 
     const channel = cleanString(row[channelCol] || row['CHANNEL'] || '');
-    const rayon = cleanString(row[rayonCol] || row['RAYON'] || '');
-    const area = cleanString(row[areaCol] || row['AREA'] || '');
+    const rayon = cleanString(row[rayonCol] || row['RAYON'] || row['SEKTOR'] || '');
+    const area = cleanString(
+      row[areaCol] ||
+      row['AREA'] ||
+      row['WILAYAH'] ||
+      row['KOTA'] ||
+      row['REGION'] ||
+      row['PMA / AREA'] ||
+      row['AREA / PMA'] ||
+      ''
+    );
     const fc = cleanString(row[fcCol] || row['FC'] || '');
-    const pma = cleanString(row[pmaCol] || row['PMA'] || '');
+    const pma = cleanString(
+      row[pmaCol] ||
+      row['PMA'] ||
+      row['NAMA PMA'] ||
+      row['DEPO/PMA'] ||
+      row['DEPO / PMA'] ||
+      row['PMA / DEPO'] ||
+      row['STATUS PMA'] ||
+      ''
+    );
     const sc = cleanString(row[scCol] || row['SC'] || '');
     const salesmanId = cleanString(row[salesmanIdCol] || row['KD_SLS'] || row['KODE SALESMAN'] || '');
     const salesmanName = cleanString(row[salesmanNameCol] || row['NAMA_SLS'] || row['NAMA SALESMAN'] || '');
-    const cabang = cleanString(row[cabangCol] || row['CABANG'] || '');
+    const cabang = cleanString(row[cabangCol] || row['CABANG'] || row['CB'] || '');
+    const depo = cleanString(
+      row[mapping['depo'] || ''] ||
+      row['DEPO'] ||
+      row['NAMA DEPO'] ||
+      row['DEPO/PMA'] ||
+      row['DEPO / PMA'] ||
+      ''
+    );
 
     // Deduplicate master by OUTLET_ID, updating if newer or keeping first
     if (!recordsMap.has(outletId)) {
@@ -547,6 +608,7 @@ export function normalizeMasterOutletRecords(
         pma,
         area,
         cabang,
+        depo: depo || undefined,
         sourceFile: sourceFileName,
       });
     }

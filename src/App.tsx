@@ -1268,6 +1268,7 @@ export default function App() {
                 prevTransactions={prevTransactions}
                 currTransactions={currTransactions}
                 masterOutlets={masterOutlets}
+                targets={targets}
                 filters={filters}
                 userProfile={userProfile}
                 onFilterChange={setFilters}
