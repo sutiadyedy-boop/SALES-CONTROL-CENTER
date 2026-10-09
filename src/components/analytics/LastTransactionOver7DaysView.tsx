@@ -1172,57 +1172,39 @@ export function LastTransactionOver7DaysView({
                   <th className="py-2.5 px-4 text-right">Total Nilai Trx Terakhir</th>
                   <th className="py-2.5 px-4 text-center">Rata-rata Rentang</th>
                   <th className="py-2.5 px-4 text-center">Rentang Terlama</th>
-                  <th className="py-2.5 px-4 text-center" data-capture-ignore="true">Aksi Filter</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
-                {salesmanSummary.map(s => {
-                  const isSelected = selectedSalesmen.includes(s.salesmanId);
-                  return (
-                    <tr
-                      key={`${s.depo}-${s.salesmanId}`}
-                      className={`hover:bg-slate-800/40 transition-colors ${
-                        isSelected ? 'bg-cyan-950/30' : ''
-                      }`}
-                    >
-                      <td className="py-2.5 px-4 font-semibold text-slate-300">{s.depo}</td>
-                      <td className="py-2.5 px-4">
-                        <div className="font-semibold text-slate-100">{s.salesmanName}</div>
-                        <div className="text-[10px] font-mono text-cyan-400/80">{s.salesmanId}</div>
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-mono font-bold text-amber-300">
-                        {s.totalToko} Toko
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-mono text-cyan-300">
-                        {s.fromCurrMonth} Toko
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-mono text-rose-300">
-                        {s.fromPrevMonth} Toko
-                      </td>
-                      <td className="py-2.5 px-4 text-right font-mono font-semibold text-emerald-300">
-                        {formatRupiah(s.totalLastTxValue)}
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-mono text-slate-300">
-                        {s.avgDays} Hari
-                      </td>
-                      <td className="py-2.5 px-4 text-center font-mono font-bold text-rose-400">
-                        {s.maxDays} Hari
-                      </td>
-                      <td className="py-2.5 px-4 text-center" data-capture-ignore="true">
-                        <button
-                          onClick={() => toggleSalesman(s.salesmanId)}
-                          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border transition-colors ${
-                            isSelected
-                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
-                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                          }`}
-                        >
-                          {isSelected ? 'Hapus Filter' : 'Pilih Sales'}
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {salesmanSummary.map(s => (
+                  <tr
+                    key={`${s.depo}-${s.salesmanId}`}
+                    className="hover:bg-slate-800/40 transition-colors"
+                  >
+                    <td className="py-2.5 px-4 font-semibold text-slate-300">{s.depo}</td>
+                    <td className="py-2.5 px-4">
+                      <div className="font-semibold text-slate-100">{s.salesmanName}</div>
+                      <div className="text-[10px] font-mono text-cyan-400/80">{s.salesmanId}</div>
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-mono font-bold text-amber-300">
+                      {s.totalToko} Toko
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-mono text-cyan-300">
+                      {s.fromCurrMonth} Toko
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-mono text-rose-300">
+                      {s.fromPrevMonth} Toko
+                    </td>
+                    <td className="py-2.5 px-4 text-right font-mono font-semibold text-emerald-300">
+                      {formatRupiah(s.totalLastTxValue)}
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-mono text-slate-300">
+                      {s.avgDays} Hari
+                    </td>
+                    <td className="py-2.5 px-4 text-center font-mono font-bold text-rose-400">
+                      {s.maxDays} Hari
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
