@@ -1,0 +1,1037 @@
+import React, { useState, useMemo } from 'react';
+import {
+  Clock,
+  Store,
+  Calendar,
+  DollarSign,
+  AlertTriangle,
+  Users,
+  Building2,
+  Filter,
+  RotateCcw,
+  CheckCircle2,
+  CalendarClock,
+  ArrowUpRight,
+  Search,
+  Sparkles,
+  FileSpreadsheet,
+} from 'lucide-react';
+import { CalculationResult, GlobalFilterState } from '../../types/analytics';
+import { AppSettings, MasterOutletRecord, TransactionRecord, UserProfile } from '../../types/database';
+import { applyRoleAndGlobalFilter } from '../../services/calculationEngine';
+import { formatDate } from '../../services/normalizationEngine';
+import { parseYearMonthFromDate, INDONESIAN_MONTHS } from '../../services/periodDetectionService';
+import { formatRupiah } from '../../services/smartInsightEngine';
+import { DataTable, ColumnDef } from '../common/DataTable';
+import { EmptyState } from '../common/EmptyState';
+import { CaptureJpgButton } from '../common/CaptureJpgButton';
+
+interface LastTxOver7DaysViewProps {
+  calculation: CalculationResult | null;
+  settings: AppSettings;
+  prevTransactions: TransactionRecord[];
+  currTransactions: TransactionRecord[];
+  masterOutlets: MasterOutletRecord[];
+  filters?: GlobalFilterState;
+  userProfile?: UserProfile;
+  onFilterChange?: (newFilters: GlobalFilterState) => void;
+  onNavigateToUpload: () => void;
+  onLoadSampleData: () => void;
+}
+
+export interface OutletLastTxItem {
+  id: string;
+  depo: string;
+  salesmanId: string;
+  salesmanName: string;
+  outletId: string;
+  outletName: string;
+  lastTxDate: string; // YYYY-MM-DD
+  lastTxFormatted: string; // e.g. 12 Okt 2026
+  lastTxMonthSource: 'BULAN INI' | 'BULAN LALU';
+  lastTxMonthLabel: string;
+  lastTxValue: number;
+  daysSinceLastTx: number;
+  dailyUpdateDate: string; // YYYY-MM-DD
+  area?: string;
+  rayon?: string;
+  channel?: string;
+  cabang?: string;
+  totalInvoicesOnLastDate: number;
+}
+
+const SHORT_ID_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+function parseStrictUtcDate(dateVal: string | undefined, fallbackYearMonth?: { year: number; month: number }): Date | null {
+  if (!dateVal) return null;
+  const cleaned = formatDate(dateVal);
+  if (!cleaned) return null;
+
+  // Match YYYY-MM-DD
+  const iso = cleaned.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    const y = parseInt(iso[1], 10);
+    const m = parseInt(iso[2], 10);
+    const d = parseInt(iso[3], 10);
+    if (y >= 2000 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+      return new Date(Date.UTC(y, m - 1, d));
+    }
+  }
+
+  // Fallback if only day number was provided (e.g. "15") and we have period year/month
+  const dayOnly = String(dateVal).trim().match(/^(\d{1,2})$/);
+  if (dayOnly && fallbackYearMonth) {
+    const d = parseInt(dayOnly[1], 10);
+    if (d >= 1 && d <= 31) {
+      return new Date(Date.UTC(fallbackYearMonth.year, fallbackYearMonth.month - 1, d));
+    }
+  }
+
+  return null;
+}
+
+function toIsoDateString(utcDate: Date): string {
+  const y = utcDate.getUTCFullYear();
+  const m = String(utcDate.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(utcDate.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function formatHumanDateId(isoDate: string): string {
+  const match = isoDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return isoDate;
+  const y = match[1];
+  const mIdx = parseInt(match[2], 10) - 1;
+  const d = parseInt(match[3], 10);
+  const mName = SHORT_ID_MONTHS[mIdx] || match[2];
+  return `${String(d).padStart(2, '0')} ${mName} ${y}`;
+}
+
+function detectYearMonthFromLabel(label: string, defaultYear = 2026, defaultMonth = 10): { year: number; month: number } {
+  if (!label) return { year: defaultYear, month: defaultMonth };
+  const upper = label.toUpperCase();
+  const yMatch = upper.match(/\b(20\d{2})\b/);
+  const year = yMatch ? parseInt(yMatch[1], 10) : defaultYear;
+  for (let i = 0; i < INDONESIAN_MONTHS.length; i++) {
+    if (upper.includes(INDONESIAN_MONTHS[i])) {
+      return { year, month: i + 1 };
+    }
+  }
+  return { year, month: defaultMonth };
+}
+
+export function LastTransactionOver7DaysView({
+  calculation,
+  settings,
+  prevTransactions,
+  currTransactions,
+  masterOutlets,
+  filters = {},
+  userProfile,
+  onNavigateToUpload,
+  onLoadSampleData,
+}: LastTxOver7DaysViewProps) {
+  const [minDaysThreshold, setMinDaysThreshold] = useState<number>(7);
+  const [selectedDepo, setSelectedDepo] = useState<string>('ALL');
+  const [selectedChannel, setSelectedChannel] = useState<string>('ALL');
+  const [selectedSalesman, setSelectedSalesman] = useState<string>('ALL');
+  const [selectedSourceMonth, setSelectedSourceMonth] = useState<'ALL' | 'BULAN_INI' | 'BULAN_LALU'>('ALL');
+  const [selectedSeverity, setSelectedSeverity] = useState<'ALL' | '8_14' | '15_21' | 'OVER_21'>('ALL');
+  const [manualCutOffDate, setManualCutOffDate] = useState<string>(''); // Empty = Auto
+
+  const hasTransactions = prevTransactions.length > 0 || currTransactions.length > 0;
+
+  const prevLabel = settings.previousMonthLabel || 'SEPTEMBER 2026';
+  const currLabel = settings.currentMonthLabel || 'OKTOBER 2026';
+
+  const prevYM = useMemo(() => detectYearMonthFromLabel(prevLabel, 2026, 9), [prevLabel]);
+  const currYM = useMemo(() => detectYearMonthFromLabel(currLabel, 2026, 10), [currLabel]);
+
+  // 1. Auto-detect Tanggal Update Harian (Maximum transaction date in Current Month, fallback to Previous Month)
+  const autoDetectedUpdateDate = useMemo(() => {
+    let maxUtc: Date | null = null;
+
+    for (const t of currTransactions) {
+      if (t.salesValue <= 0) continue;
+      const d = parseStrictUtcDate(t.transactionDate, currYM);
+      if (d && (!maxUtc || d.getTime() > maxUtc.getTime())) {
+        maxUtc = d;
+      }
+    }
+
+    if (!maxUtc) {
+      for (const t of prevTransactions) {
+        if (t.salesValue <= 0) continue;
+        const d = parseStrictUtcDate(t.transactionDate, prevYM);
+        if (d && (!maxUtc || d.getTime() > maxUtc.getTime())) {
+          maxUtc = d;
+        }
+      }
+    }
+
+    if (!maxUtc) {
+      const now = new Date();
+      return new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+    }
+    return maxUtc;
+  }, [currTransactions, prevTransactions, currYM, prevYM]);
+
+  const effectiveUpdateDateUtc = useMemo(() => {
+    if (manualCutOffDate) {
+      const parsed = parseStrictUtcDate(manualCutOffDate);
+      if (parsed) return parsed;
+    }
+    return autoDetectedUpdateDate;
+  }, [manualCutOffDate, autoDetectedUpdateDate]);
+
+  const effectiveUpdateDateIso = useMemo(
+    () => toIsoDateString(effectiveUpdateDateUtc),
+    [effectiveUpdateDateUtc]
+  );
+
+  // 2. Build Master Outlet & Salesman Metadata Maps for Depo, Salesman, Area enrichment
+  const { allOutletsLastTx } = useMemo(() => {
+    const filterPredicate = applyRoleAndGlobalFilter(filters, userProfile);
+
+    const masterMap = new Map<string, MasterOutletRecord>();
+    const salesmanDepos = new Map<string, string>();
+    const salesmanCabangs = new Map<string, string>();
+    const salesmanAreas = new Map<string, string>();
+    const salesmanNames = new Map<string, string>();
+
+    for (const m of masterOutlets) {
+      masterMap.set(m.outletId, m);
+      if (m.salesmanId) {
+        if (m.depo && !salesmanDepos.has(m.salesmanId)) salesmanDepos.set(m.salesmanId, m.depo);
+        if (m.cabang && !salesmanCabangs.has(m.salesmanId)) salesmanCabangs.set(m.salesmanId, m.cabang);
+        if (m.area && !salesmanAreas.has(m.salesmanId)) salesmanAreas.set(m.salesmanId, m.area);
+        if (m.salesmanName && !salesmanNames.has(m.salesmanId)) salesmanNames.set(m.salesmanId, m.salesmanName);
+      }
+    }
+
+    // Track per-outlet per-date aggregated transactions across both databases
+    // Key: outletId -> Map<isoDate, { totalValue, sourceMonth, salesmanId, salesmanName, outletName, depo, area, rayon, channel, cabang, invoices: Set<string> }>
+    interface DailyOutletTx {
+      isoDate: string;
+      utcTime: number;
+      totalValue: number;
+      sourceMonth: 'BULAN INI' | 'BULAN LALU';
+      sourceLabel: string;
+      salesmanId: string;
+      salesmanName: string;
+      outletName: string;
+      depo: string;
+      area: string;
+      rayon: string;
+      channel: string;
+      cabang: string;
+      invoices: Set<string>;
+    }
+
+    const outletDailyMap = new Map<string, Map<string, DailyOutletTx>>();
+
+    const processTransaction = (
+      t: TransactionRecord,
+      sourceMonth: 'BULAN INI' | 'BULAN LALU',
+      sourceLabel: string,
+      fallbackYM: { year: number; month: number }
+    ) => {
+      if (!t.outletId || t.salesValue <= 0) return;
+
+      const m = masterMap.get(t.outletId);
+      const slsId = t.salesmanId || m?.salesmanId || '';
+      const slsName = t.salesmanName || m?.salesmanName || salesmanNames.get(slsId) || slsId || '-';
+      const depo =
+        t.depo ||
+        m?.depo ||
+        salesmanDepos.get(slsId) ||
+        t.cabang ||
+        m?.cabang ||
+        salesmanCabangs.get(slsId) ||
+        t.area ||
+        m?.area ||
+        salesmanAreas.get(slsId) ||
+        'DEPO UTAMA';
+      const area = t.area || m?.area || salesmanAreas.get(slsId) || '';
+      const rayon = t.rayon || m?.rayon || '';
+      const channel = t.channel || m?.channel || '';
+      const cabang = t.cabang || m?.cabang || salesmanCabangs.get(slsId) || '';
+      const outletName = t.outletName || m?.outletName || t.outletId;
+
+      // Check global & RBAC filter
+      if (
+        !filterPredicate({
+          salesmanId: slsId,
+          area,
+          rayon,
+          channel,
+          fc: t.fc || m?.fc,
+          pma: t.pma || m?.pma,
+          cabang,
+          depo,
+          outletName,
+          outletId: t.outletId,
+        })
+      ) {
+        return;
+      }
+
+      const utcDate = parseStrictUtcDate(t.transactionDate, fallbackYM);
+      if (!utcDate) return;
+
+      // Ignore future dates beyond cut-off if manual cut-off is set earlier
+      if (manualCutOffDate && utcDate.getTime() > effectiveUpdateDateUtc.getTime()) {
+        return;
+      }
+
+      const isoDate = toIsoDateString(utcDate);
+
+      let dateMap = outletDailyMap.get(t.outletId);
+      if (!dateMap) {
+        dateMap = new Map<string, DailyOutletTx>();
+        outletDailyMap.set(t.outletId, dateMap);
+      }
+
+      const existing = dateMap.get(isoDate);
+      if (!existing) {
+        const invSet = new Set<string>();
+        if (t.invoiceId) invSet.add(t.invoiceId);
+        dateMap.set(isoDate, {
+          isoDate,
+          utcTime: utcDate.getTime(),
+          totalValue: t.salesValue,
+          sourceMonth,
+          sourceLabel,
+          salesmanId: slsId,
+          salesmanName: slsName,
+          outletName,
+          depo,
+          area,
+          rayon,
+          channel,
+          cabang,
+          invoices: invSet,
+        });
+      } else {
+        existing.totalValue += t.salesValue;
+        if (t.invoiceId) existing.invoices.add(t.invoiceId);
+        // Prefer BULAN INI metadata if same date appears or update latest salesman/depo
+        if (sourceMonth === 'BULAN INI') {
+          existing.sourceMonth = 'BULAN INI';
+          existing.sourceLabel = sourceLabel;
+          if (slsId) existing.salesmanId = slsId;
+          if (slsName && slsName !== '-') existing.salesmanName = slsName;
+          if (depo) existing.depo = depo;
+        }
+      }
+    };
+
+    // Process Previous Month first, then Current Month
+    for (const t of prevTransactions) {
+      processTransaction(t, 'BULAN LALU', prevLabel, prevYM);
+    }
+    for (const t of currTransactions) {
+      processTransaction(t, 'BULAN INI', currLabel, currYM);
+    }
+
+    // For each outlet, pick the latest transaction date
+    const results: OutletLastTxItem[] = [];
+    const updateMs = effectiveUpdateDateUtc.getTime();
+
+    for (const [outletId, dateMap] of outletDailyMap.entries()) {
+      let latestEntry: DailyOutletTx | null = null;
+      for (const entry of dateMap.values()) {
+        if (!latestEntry || entry.utcTime > latestEntry.utcTime) {
+          latestEntry = entry;
+        } else if (entry.utcTime === latestEntry.utcTime && entry.sourceMonth === 'BULAN INI') {
+          latestEntry = entry;
+        }
+      }
+
+      if (!latestEntry) continue;
+
+      const diffDays = Math.max(0, Math.round((updateMs - latestEntry.utcTime) / (1000 * 60 * 60 * 24)));
+
+      results.push({
+        id: `${outletId}-${latestEntry.isoDate}`,
+        depo: latestEntry.depo,
+        salesmanId: latestEntry.salesmanId,
+        salesmanName: latestEntry.salesmanName,
+        outletId,
+        outletName: latestEntry.outletName,
+        lastTxDate: latestEntry.isoDate,
+        lastTxFormatted: formatHumanDateId(latestEntry.isoDate),
+        lastTxMonthSource: latestEntry.sourceMonth,
+        lastTxMonthLabel: latestEntry.sourceLabel,
+        lastTxValue: latestEntry.totalValue,
+        daysSinceLastTx: diffDays,
+        dailyUpdateDate: effectiveUpdateDateIso,
+        area: latestEntry.area,
+        rayon: latestEntry.rayon,
+        channel: latestEntry.channel,
+        cabang: latestEntry.cabang,
+        totalInvoicesOnLastDate: latestEntry.invoices.size || 1,
+      });
+    }
+
+    // Sort by longest rentang hari descending, then highest lastTxValue descending
+    results.sort((a, b) => {
+      if (b.daysSinceLastTx !== a.daysSinceLastTx) {
+        return b.daysSinceLastTx - a.daysSinceLastTx;
+      }
+      return b.lastTxValue - a.lastTxValue;
+    });
+
+    return { allOutletsLastTx: results };
+  }, [
+    prevTransactions,
+    currTransactions,
+    masterOutlets,
+    filters,
+    userProfile,
+    prevLabel,
+    currLabel,
+    prevYM,
+    currYM,
+    manualCutOffDate,
+    effectiveUpdateDateUtc,
+    effectiveUpdateDateIso,
+  ]);
+
+  // Filter outlets strictly > minDaysThreshold (default > 7 hari, i.e., 8 days or more)
+  const baseOver7DaysOutlets = useMemo(() => {
+    return allOutletsLastTx.filter(item => item.daysSinceLastTx > minDaysThreshold);
+  }, [allOutletsLastTx, minDaysThreshold]);
+
+  // Unique Depos, Channels, and Salesmen from baseOver7DaysOutlets for quick local filters
+  const uniqueDepos = useMemo(() => {
+    const set = new Set<string>();
+    baseOver7DaysOutlets.forEach(item => {
+      if (item.depo) set.add(item.depo);
+    });
+    return Array.from(set).sort();
+  }, [baseOver7DaysOutlets]);
+
+  const uniqueChannels = useMemo(() => {
+    const set = new Set<string>();
+    baseOver7DaysOutlets.forEach(item => {
+      if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) return;
+      const ch = (item.channel || 'GENERAL TRADE').trim();
+      if (ch) set.add(ch);
+    });
+    return Array.from(set).sort();
+  }, [baseOver7DaysOutlets, selectedDepo]);
+
+  const uniqueSalesmen = useMemo(() => {
+    const map = new Map<string, string>();
+    baseOver7DaysOutlets.forEach(item => {
+      if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) return;
+      if (selectedChannel !== 'ALL' && (item.channel || 'GENERAL TRADE').trim() !== selectedChannel) return;
+      if (item.salesmanId) {
+        map.set(item.salesmanId, item.salesmanName || item.salesmanId);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [baseOver7DaysOutlets, selectedDepo, selectedChannel]);
+
+  // Apply local dropdown filters
+  const filteredOutlets = useMemo(() => {
+    return baseOver7DaysOutlets.filter(item => {
+      if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) return false;
+      if (selectedChannel !== 'ALL' && (item.channel || 'GENERAL TRADE').trim() !== selectedChannel) return false;
+      if (selectedSalesman !== 'ALL' && item.salesmanId !== selectedSalesman) return false;
+      if (selectedSourceMonth === 'BULAN_INI' && item.lastTxMonthSource !== 'BULAN INI') return false;
+      if (selectedSourceMonth === 'BULAN_LALU' && item.lastTxMonthSource !== 'BULAN LALU') return false;
+      if (selectedSeverity === '8_14' && (item.daysSinceLastTx < 8 || item.daysSinceLastTx > 14)) return false;
+      if (selectedSeverity === '15_21' && (item.daysSinceLastTx < 15 || item.daysSinceLastTx > 21)) return false;
+      if (selectedSeverity === 'OVER_21' && item.daysSinceLastTx <= 21) return false;
+      return true;
+    });
+  }, [baseOver7DaysOutlets, selectedDepo, selectedChannel, selectedSalesman, selectedSourceMonth, selectedSeverity]);
+
+  // Summary statistics
+  const summaryStats = useMemo(() => {
+    const totalOutlets = filteredOutlets.length;
+    const totalLastTxValue = filteredOutlets.reduce((acc, o) => acc + o.lastTxValue, 0);
+    const fromCurrMonth = filteredOutlets.filter(o => o.lastTxMonthSource === 'BULAN INI').length;
+    const fromPrevMonth = filteredOutlets.filter(o => o.lastTxMonthSource === 'BULAN LALU').length;
+    const avgDays =
+      totalOutlets > 0
+        ? Math.round(filteredOutlets.reduce((acc, o) => acc + o.daysSinceLastTx, 0) / totalOutlets)
+        : 0;
+    const maxDays = totalOutlets > 0 ? Math.max(...filteredOutlets.map(o => o.daysSinceLastTx)) : 0;
+
+    return {
+      totalOutlets,
+      totalLastTxValue,
+      fromCurrMonth,
+      fromPrevMonth,
+      avgDays,
+      maxDays,
+    };
+  }, [filteredOutlets]);
+
+  // Summary breakdown per Salesman
+  const salesmanSummary = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        depo: string;
+        salesmanId: string;
+        salesmanName: string;
+        totalToko: number;
+        fromCurrMonth: number;
+        fromPrevMonth: number;
+        totalLastTxValue: number;
+        avgDays: number;
+        maxDays: number;
+        sumDays: number;
+      }
+    >();
+
+    for (const o of filteredOutlets) {
+      const key = `${o.depo}__${o.salesmanId}`;
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, {
+          depo: o.depo,
+          salesmanId: o.salesmanId,
+          salesmanName: o.salesmanName,
+          totalToko: 1,
+          fromCurrMonth: o.lastTxMonthSource === 'BULAN INI' ? 1 : 0,
+          fromPrevMonth: o.lastTxMonthSource === 'BULAN LALU' ? 1 : 0,
+          totalLastTxValue: o.lastTxValue,
+          avgDays: o.daysSinceLastTx,
+          maxDays: o.daysSinceLastTx,
+          sumDays: o.daysSinceLastTx,
+        });
+      } else {
+        existing.totalToko++;
+        if (o.lastTxMonthSource === 'BULAN INI') existing.fromCurrMonth++;
+        else existing.fromPrevMonth++;
+        existing.totalLastTxValue += o.lastTxValue;
+        existing.sumDays += o.daysSinceLastTx;
+        existing.avgDays = Math.round(existing.sumDays / existing.totalToko);
+        if (o.daysSinceLastTx > existing.maxDays) existing.maxDays = o.daysSinceLastTx;
+      }
+    }
+
+    return Array.from(map.values()).sort((a, b) => b.totalToko - a.totalToko || b.totalLastTxValue - a.totalLastTxValue);
+  }, [filteredOutlets]);
+
+  if (!hasTransactions) {
+    return (
+      <EmptyState
+        title="DATA TRANSAKSI BELUM TERSEDIA"
+        description="Upload Database Bulan Lalu dan/atau Bulan Ini untuk menampilkan List Toko dengan Rentang Transaksi Terakhir di atas 7 Hari."
+        onNavigateToUpload={onNavigateToUpload}
+        onLoadSampleData={onLoadSampleData}
+      />
+    );
+  }
+
+  // Table Columns exactly matching user's 7 points:
+  // 1. Depo
+  // 2. Nama Sales
+  // 3. Kode Toko
+  // 4. Nama Toko
+  // 5. Tgl Transaksi Terakhir (Ambil Tgl Transaksi dari Data Base bulan lalu dan Bulan ini, tergantung Transaksi Terakhirnya di bulan berapa itu yang di munculkan)
+  // 6. Nilai Transaksi Terakhir
+  // 7. Rentang Hari dari Tgl Transaksi Terakhir ke Tgl Update harian (Auto)
+  const columns: ColumnDef<OutletLastTxItem>[] = [
+    {
+      key: 'depo',
+      header: '1. Depo',
+      width: '150px',
+      accessor: row => row.depo,
+      render: row => (
+        <div className="flex items-center gap-1.5">
+          <Building2 className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+          <div>
+            <div className="font-semibold text-slate-200 text-xs">{row.depo}</div>
+            {row.area && row.area !== row.depo && (
+              <div className="text-[10px] text-slate-500 font-mono">{row.area}</div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'salesmanName',
+      header: '2. Nama Sales',
+      width: '180px',
+      accessor: row => row.salesmanName,
+      render: row => (
+        <div>
+          <div className="font-semibold text-slate-100 text-xs">{row.salesmanName}</div>
+          <div className="text-[10px] text-cyan-400/80 font-mono">{row.salesmanId}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'outletId',
+      header: '3. Kode Toko',
+      width: '130px',
+      accessor: row => row.outletId,
+      render: row => (
+        <span className="font-mono font-bold text-cyan-400 text-xs bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/50">
+          {row.outletId}
+        </span>
+      ),
+    },
+    {
+      key: 'outletName',
+      header: '4. Nama Toko',
+      accessor: row => row.outletName,
+      render: row => (
+        <div>
+          <div className="font-semibold text-slate-100 text-xs">{row.outletName}</div>
+          <div className="text-[10px] text-slate-400 font-mono">
+            {row.channel || 'GENERAL TRADE'} {row.rayon ? `· ${row.rayon}` : ''}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'lastTxDate',
+      header: '5. Tgl Transaksi Terakhir',
+      align: 'center',
+      width: '195px',
+      accessor: row => row.lastTxDate,
+      render: row => {
+        const isCurrentMonth = row.lastTxMonthSource === 'BULAN INI';
+        return (
+          <div className="flex flex-col items-center">
+            <div className="font-mono font-bold text-slate-100 text-xs flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-amber-400" />
+              <span>{row.lastTxFormatted}</span>
+            </div>
+            <span
+              className={`mt-1 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
+                isCurrentMonth
+                  ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                  : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+              }`}
+            >
+              {row.lastTxMonthSource} ({row.lastTxMonthLabel})
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'lastTxValue',
+      header: '6. Nilai Transaksi Terakhir',
+      align: 'right',
+      width: '175px',
+      accessor: row => row.lastTxValue,
+      render: row => (
+        <div className="text-right">
+          <div className="font-mono font-bold text-emerald-300 text-xs">
+            {formatRupiah(row.lastTxValue)}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">
+            {row.totalInvoicesOnLastDate} Faktur pada tgl tsb
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'daysSinceLastTx',
+      header: '7. Rentang Hari (Ke Tgl Update Harian)',
+      align: 'center',
+      width: '215px',
+      accessor: row => row.daysSinceLastTx,
+      render: row => {
+        const d = row.daysSinceLastTx;
+        const badgeStyle =
+          d > 21
+            ? 'bg-rose-500/20 text-rose-300 border-rose-500/40 shadow-[0_0_12px_rgba(244,63,94,0.2)]'
+            : d >= 15
+            ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+            : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+
+        const severityLabel = d > 21 ? 'KRITIS (>21 Hr)' : d >= 15 ? 'WASPADA (15-21 Hr)' : 'FOLLOW UP (8-14 Hr)';
+
+        return (
+          <div className="flex flex-col items-center">
+            <span className={`px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold border ${badgeStyle}`}>
+              {d} Hari
+            </span>
+            <span className="text-[9px] text-slate-400 font-mono mt-1">
+              {severityLabel} · s/d {formatHumanDateId(row.dailyUpdateDate)}
+            </span>
+          </div>
+        );
+      },
+    },
+  ];
+
+  const handleResetLocalFilters = () => {
+    setMinDaysThreshold(7);
+    setSelectedDepo('ALL');
+    setSelectedChannel('ALL');
+    setSelectedSalesman('ALL');
+    setSelectedSourceMonth('ALL');
+    setSelectedSeverity('ALL');
+    setManualCutOffDate('');
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Header Banner */}
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 sm:p-5 shadow-lg relative overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase tracking-wider">
+                RETENTION & VISIT RADAR
+              </span>
+              <span className="text-[11px] font-mono text-cyan-400 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" />
+                Auto Cut-Off Update Harian: <strong>{formatHumanDateId(effectiveUpdateDateIso)}</strong>
+              </span>
+            </div>
+            <h2 className="text-lg sm:text-xl font-extrabold text-slate-100 mt-1.5 flex items-center gap-2.5">
+              <CalendarClock className="w-6 h-6 text-amber-400 shrink-0" />
+              <span>List Toko dengan Rentang Transaksi Terakhir di Atas {minDaysThreshold} Hari</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-1 max-w-3xl">
+              Mendeteksi toko yang belum melakukan repeat order lebih dari{' '}
+              <span className="text-amber-300 font-semibold font-mono">{minDaysThreshold} hari</span> dihitung otomatis dari{' '}
+              <span className="text-slate-200 font-semibold">Tanggal Transaksi Terakhir</span> (gabungan Database Bulan Lalu{' '}
+              <span className="font-mono text-amber-300">{prevLabel}</span> &amp; Bulan Ini{' '}
+              <span className="font-mono text-cyan-300">{currLabel}</span>) menuju{' '}
+              <span className="text-emerald-300 font-semibold">Tanggal Update Harian ({formatHumanDateId(effectiveUpdateDateIso)})</span>.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+            <CaptureJpgButton
+              targetId="main-capture-area"
+              fileName={`List_Toko_Rentang_Transaksi_Diatas_${minDaysThreshold}_Hari_${effectiveUpdateDateIso}.jpg`}
+              label="Capture JPG"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 5 KPI Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+        <div className="bg-slate-900 border border-slate-800 border-l-4 border-l-amber-500 rounded-xl p-4 shadow-sm">
+          <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between">
+            <span>TOTAL TOKO &gt; {minDaysThreshold} HARI</span>
+            <Store className="w-4 h-4 text-amber-400" />
+          </div>
+          <div className="text-2xl font-extrabold font-mono text-amber-400 mt-1.5">
+            {summaryStats.totalOutlets.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">Toko</span>
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">
+            Dari total {allOutletsLastTx.length.toLocaleString('id-ID')} toko pernah transaksi
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 border-l-4 border-l-cyan-500 rounded-xl p-4 shadow-sm">
+          <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between">
+            <span>TRX TERAKHIR BULAN INI</span>
+            <Calendar className="w-4 h-4 text-cyan-400" />
+          </div>
+          <div className="text-2xl font-extrabold font-mono text-cyan-300 mt-1.5">
+            {summaryStats.fromCurrMonth.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">Toko</span>
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">
+            Sudah order di {currLabel}, jeda &gt; {minDaysThreshold} hr
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 border-l-4 border-l-rose-500 rounded-xl p-4 shadow-sm">
+          <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between">
+            <span>TRX TERAKHIR BULAN LALU</span>
+            <AlertTriangle className="w-4 h-4 text-rose-400" />
+          </div>
+          <div className="text-2xl font-extrabold font-mono text-rose-400 mt-1.5">
+            {summaryStats.fromPrevMonth.toLocaleString('id-ID')} <span className="text-xs font-normal text-slate-400">Toko</span>
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">
+            Terakhir order di {prevLabel} (Belum RO BI)
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 border-l-4 border-l-emerald-500 rounded-xl p-4 shadow-sm">
+          <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between">
+            <span>TOTAL NILAI TRX TERAKHIR</span>
+            <DollarSign className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div className="text-xl font-extrabold font-mono text-emerald-300 mt-1.5 truncate" title={formatRupiah(summaryStats.totalLastTxValue)}>
+            {formatRupiah(summaryStats.totalLastTxValue)}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">
+            Akumulasi nilai order terakhir toko
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 border-l-4 border-l-indigo-500 rounded-xl p-4 shadow-sm">
+          <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between">
+            <span>TGL UPDATE HARIAN (AUTO)</span>
+            <Clock className="w-4 h-4 text-indigo-400" />
+          </div>
+          <div className="text-lg font-extrabold font-mono text-indigo-300 mt-1.5">
+            {formatHumanDateId(effectiveUpdateDateIso)}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-1 font-mono">
+            Rata-rata jeda: <strong className="text-slate-300">{summaryStats.avgDays} hr</strong> (Maks {summaryStats.maxDays} hr)
+          </div>
+        </div>
+      </div>
+
+      {/* Control & Filter Panel */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 shadow-sm space-y-3" data-capture-ignore="true">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-2.5">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-200">
+            <Filter className="w-4 h-4 text-cyan-400" />
+            <span>Filter &amp; Parameter Rentang Hari Transaksi Terakhir</span>
+          </div>
+          <button
+            onClick={handleResetLocalFilters}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold border border-slate-700 transition-colors"
+          >
+            <RotateCcw className="w-3 h-3" />
+            <span>Reset Filter</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
+          {/* 1. Filter Depo */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">1. Filter Depo</label>
+            <select
+              value={selectedDepo}
+              onChange={e => {
+                setSelectedDepo(e.target.value);
+                setSelectedSalesman('ALL');
+              }}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ALL">Semua Depo ({uniqueDepos.length})</option>
+              {uniqueDepos.map(d => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 2. Filter Chanel */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">2. Filter Chanel</label>
+            <select
+              value={selectedChannel}
+              onChange={e => {
+                setSelectedChannel(e.target.value);
+                setSelectedSalesman('ALL');
+              }}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ALL">Semua Chanel ({uniqueChannels.length})</option>
+              {uniqueChannels.map(ch => (
+                <option key={ch} value={ch}>
+                  {ch}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 3. Filter Salesman */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">3. Filter Nama Sales</label>
+            <select
+              value={selectedSalesman}
+              onChange={e => setSelectedSalesman(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ALL">Semua Salesman ({uniqueSalesmen.length})</option>
+              {uniqueSalesmen.map(s => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.id})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* 4. Filter Bulan Transaksi Terakhir */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">4. Sumber Bulan Trx Terakhir</label>
+            <select
+              value={selectedSourceMonth}
+              onChange={e => setSelectedSourceMonth(e.target.value as any)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ALL">Bulan Lalu &amp; Bulan Ini (Semua)</option>
+              <option value="BULAN_INI">Hanya Bulan Ini ({currLabel})</option>
+              <option value="BULAN_LALU">Hanya Bulan Lalu ({prevLabel})</option>
+            </select>
+          </div>
+
+          {/* 5. Filter Kelompok Rentang Hari */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">5. Kategori Rentang Hari</label>
+            <select
+              value={selectedSeverity}
+              onChange={e => setSelectedSeverity(e.target.value as any)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+            >
+              <option value="ALL">Semua Di Atas {minDaysThreshold} Hari</option>
+              <option value="8_14">8 – 14 Hari (Follow Up)</option>
+              <option value="15_21">15 – 21 Hari (Waspada)</option>
+              <option value="OVER_21">&gt; 21 Hari (Kritis)</option>
+            </select>
+          </div>
+
+          {/* 6. Batas Minimum Hari (Default > 7 Hari) */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+              6. Batas Rentang (&gt; X Hari)
+            </label>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                min={1}
+                max={60}
+                value={minDaysThreshold}
+                onChange={e => setMinDaysThreshold(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs font-mono font-bold text-amber-300 focus:outline-none focus:border-amber-500"
+              />
+              <span className="text-xs text-slate-400 font-mono shrink-0">Hari</span>
+            </div>
+          </div>
+
+          {/* 7. Tanggal Update Harian (Auto / Custom Override) */}
+          <div>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
+              7. Tgl Update Harian (Auto)
+            </label>
+            <div className="flex items-center gap-1">
+              <input
+                type="date"
+                value={manualCutOffDate || effectiveUpdateDateIso}
+                onChange={e => setManualCutOffDate(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-xs font-mono text-emerald-300 focus:outline-none focus:border-emerald-500"
+                title="Otomatis mengikuti tanggal transaksi terbaru di database. Klik untuk simulasi tanggal lain."
+              />
+              {manualCutOffDate && (
+                <button
+                  onClick={() => setManualCutOffDate('')}
+                  className="px-1.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-amber-300 rounded border border-slate-700 shrink-0"
+                  title="Kembalikan ke Auto Tanggal Update Harian"
+                >
+                  Auto
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main DataTable: 7 Columns Required by User */}
+      <DataTable
+        title={`Daftar Toko dengan Rentang Transaksi Terakhir > ${minDaysThreshold} Hari (s/d Update ${formatHumanDateId(
+          effectiveUpdateDateIso
+        )})`}
+        columns={columns}
+        data={filteredOutlets}
+        pageSizeDefault={25}
+        searchPlaceholder="Cari depo, nama sales, kode toko, atau nama toko..."
+        exportFileName={`List_Toko_Rentang_Transaksi_Diatas_${minDaysThreshold}_Hari_${effectiveUpdateDateIso}.xlsx`}
+        emptyMessage={`Tidak ada toko dengan rentang transaksi terakhir di atas ${minDaysThreshold} hari pada filter ini.`}
+      />
+
+      {/* Rekapitulasi Per Salesman & Depo */}
+      {salesmanSummary.length > 0 && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+          <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+            <div className="flex items-center gap-2">
+              <Users className="w-4 h-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-slate-100">
+                Rekapitulasi Jumlah Toko Rentang &gt; {minDaysThreshold} Hari per Salesman &amp; Depo
+              </h3>
+            </div>
+            <span className="text-xs font-mono text-slate-400">
+              {salesmanSummary.length} Salesman Terkait
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800 bg-slate-950/70 text-slate-400 text-[10px] uppercase font-mono">
+                  <th className="py-2.5 px-4">Depo</th>
+                  <th className="py-2.5 px-4">Nama Sales</th>
+                  <th className="py-2.5 px-4 text-center">Total Toko &gt; {minDaysThreshold} Hr</th>
+                  <th className="py-2.5 px-4 text-center">Trx Terakhir Bulan Ini</th>
+                  <th className="py-2.5 px-4 text-center">Trx Terakhir Bulan Lalu</th>
+                  <th className="py-2.5 px-4 text-right">Total Nilai Trx Terakhir</th>
+                  <th className="py-2.5 px-4 text-center">Rata-rata Rentang</th>
+                  <th className="py-2.5 px-4 text-center">Rentang Terlama</th>
+                  <th className="py-2.5 px-4 text-center" data-capture-ignore="true">Aksi Filter</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60">
+                {salesmanSummary.map(s => {
+                  const isSelected = selectedSalesman === s.salesmanId;
+                  return (
+                    <tr
+                      key={`${s.depo}-${s.salesmanId}`}
+                      className={`hover:bg-slate-800/40 transition-colors ${
+                        isSelected ? 'bg-cyan-950/30' : ''
+                      }`}
+                    >
+                      <td className="py-2.5 px-4 font-semibold text-slate-300">{s.depo}</td>
+                      <td className="py-2.5 px-4">
+                        <div className="font-semibold text-slate-100">{s.salesmanName}</div>
+                        <div className="text-[10px] font-mono text-cyan-400/80">{s.salesmanId}</div>
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-mono font-bold text-amber-300">
+                        {s.totalToko} Toko
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-mono text-cyan-300">
+                        {s.fromCurrMonth} Toko
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-mono text-rose-300">
+                        {s.fromPrevMonth} Toko
+                      </td>
+                      <td className="py-2.5 px-4 text-right font-mono font-semibold text-emerald-300">
+                        {formatRupiah(s.totalLastTxValue)}
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-mono text-slate-300">
+                        {s.avgDays} Hari
+                      </td>
+                      <td className="py-2.5 px-4 text-center font-mono font-bold text-rose-400">
+                        {s.maxDays} Hari
+                      </td>
+                      <td className="py-2.5 px-4 text-center" data-capture-ignore="true">
+                        <button
+                          onClick={() =>
+                            setSelectedSalesman(isSelected ? 'ALL' : s.salesmanId)
+                          }
+                          className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border transition-colors ${
+                            isSelected
+                              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+                              : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                          }`}
+                        >
+                          {isSelected ? 'Tampilkan Semua' : 'Lihat Toko'}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

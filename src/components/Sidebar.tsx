@@ -30,7 +30,8 @@ import {
   Image as ImageIcon,
   LogOut,
   Cpu,
-  Award
+  Award,
+  CalendarClock
 } from 'lucide-react';
 import { ControlTowerKPIs } from '../types/analytics';
 import { UserProfile } from '../types/database';
@@ -155,6 +156,13 @@ export function Sidebar({
       icon: Activity, 
       badge: 'PMA & Sales',
       badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono'
+    },
+    { 
+      id: 'last_tx_over_7_days', 
+      label: 'List Toko dengan Rentang Transaksi Terakhir diatas 7 Hari', 
+      icon: CalendarClock, 
+      badge: '> 7 Hr',
+      badgeColor: 'bg-amber-500/20 text-amber-300 border border-amber-500/30 font-mono'
     },
     { 
       id: 'drop_outlets', 
@@ -402,9 +410,13 @@ export function Sidebar({
                   }`}
                   title={isCollapsed ? item.label : undefined}
                 >
-                  <div className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+                  <div className={`flex items-center min-w-0 ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
                     <Icon className={`w-4 h-4 transition-colors shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`} />
-                    {!isCollapsed && <span className="truncate">{item.label}</span>}
+                    {!isCollapsed && (
+                      <span className={item.label.length > 26 ? 'text-left leading-tight text-[11px] line-clamp-2' : 'truncate'}>
+                        {item.label}
+                      </span>
+                    )}
                   </div>
 
                   {!isCollapsed ? (

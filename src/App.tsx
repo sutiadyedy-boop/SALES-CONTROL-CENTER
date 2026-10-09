@@ -8,6 +8,7 @@ import { MonthComparisonView } from './components/analytics/MonthComparisonView'
 import { RoMonitoringView } from './components/analytics/RoMonitoringView';
 import { EbpMonitoringView } from './components/analytics/EbpMonitoringView';
 import { MonitoringEcView } from './components/analytics/MonitoringEcView';
+import { LastTransactionOver7DaysView } from './components/analytics/LastTransactionOver7DaysView';
 import { DropOutletView } from './components/analytics/DropOutletView';
 import { NewOutletView } from './components/analytics/NewOutletView';
 import { SalesmanPerformanceView } from './components/analytics/SalesmanPerformanceView';
@@ -1087,6 +1088,7 @@ export default function App() {
     'ro_monitoring',
     'ebp_monitoring',
     'monitoring_ec',
+    'last_tx_over_7_days',
     'drop_outlets',
     'new_outlets',
     'salesman_performance',
@@ -1253,6 +1255,21 @@ export default function App() {
                 prevTransactions={prevTransactions}
                 settings={settings}
                 filters={filters}
+                onFilterChange={setFilters}
+                onNavigateToUpload={() => setCurrentTab('database')}
+                onLoadSampleData={populateSampleFiles}
+              />
+            )}
+
+            {currentTab === 'last_tx_over_7_days' && (
+              <LastTransactionOver7DaysView
+                calculation={analytics}
+                settings={settings}
+                prevTransactions={prevTransactions}
+                currTransactions={currTransactions}
+                masterOutlets={masterOutlets}
+                filters={filters}
+                userProfile={userProfile}
                 onFilterChange={setFilters}
                 onNavigateToUpload={() => setCurrentTab('database')}
                 onLoadSampleData={populateSampleFiles}

@@ -49,6 +49,7 @@ const tabLabels: Record<string, string> = {
   ro_monitoring: 'RO_Monitoring_Penetrasi_Outlet',
   ebp_monitoring: 'Monitoring_EPB',
   monitoring_ec: 'Monitoring_EC_Toko_Transaksi',
+  last_tx_over_7_days: 'List_Toko_Rentang_Transaksi_Terakhir_Diatas_7_Hari',
   drop_outlets: 'Drop_Outlets',
   new_outlets: 'New_Active_Outlets',
   salesman_performance: 'Performa_Salesman',
