@@ -205,6 +205,18 @@ export function LastTransactionOver7DaysView({
     [effectiveUpdateDateUtc]
   );
 
+  const isGenericTierPma = (val?: string) => {
+    if (!val) return true;
+    const u = String(val).trim().toUpperCase();
+    return ['GOLD', 'SILVER', 'BRONZE', 'PLATINUM', 'REGULER', 'REGULAR', 'OK', 'AKTIF', 'ACTIVE', '-'].includes(u);
+  };
+
+  const isGenericDefaultDepo = (val?: string) => {
+    if (!val) return true;
+    const u = String(val).trim().toUpperCase();
+    return u === 'DEPO BONE PUSAT' || u === 'DEPO UTAMA' || u === '-';
+  };
+
   // 2. Build Master Outlet & Salesman Metadata Maps for Depo, PMA, Area, Cabang enrichment
   const { allOutletsLastTx } = useMemo(() => {
     const filterPredicate = applyRoleAndGlobalFilter(filters, userProfile);
@@ -218,43 +230,40 @@ export function LastTransactionOver7DaysView({
     const salesmanNames = new Map<string, string>();
     const salesmanByName = new Map<string, { id: string; depo?: string; pma?: string; cabang?: string; area?: string }>();
 
-    const isGenericTierPma = (val?: string) => {
-      if (!val) return true;
-      const u = val.trim().toUpperCase();
-      return ['GOLD', 'SILVER', 'BRONZE', 'PLATINUM', 'REGULER', 'REGULAR', 'OK', 'AKTIF', 'ACTIVE', '-'].includes(u);
-    };
-
-    const isGenericDefaultDepo = (val?: string) => {
-      if (!val) return true;
-      const u = val.trim().toUpperCase();
-      return u === 'DEPO BONE PUSAT' || u === 'DEPO UTAMA' || u === '-';
-    };
-
     for (const m of masterOutlets) {
-      if (m.outletId) {
-        masterById.set(m.outletId.trim(), m);
-        masterById.set(m.outletId.trim().toLowerCase(), m);
-      }
-      if (m.outletName) {
-        masterByName.set(m.outletName.trim().toLowerCase(), m);
-      }
-      if (m.salesmanId) {
-        const sId = m.salesmanId.trim();
-        if (m.depo && !isGenericDefaultDepo(m.depo) && !salesmanDepos.has(sId)) salesmanDepos.set(sId, m.depo.trim());
-        if (m.pma && !isGenericTierPma(m.pma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, m.pma.trim());
-        if (m.cabang && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, m.cabang.trim());
-        if (m.area && !salesmanAreas.has(sId)) salesmanAreas.set(sId, m.area.trim());
-        if (m.salesmanName && !salesmanNames.has(sId)) salesmanNames.set(sId, m.salesmanName.trim());
+      const mOutletId = m.outletId ? String(m.outletId).trim() : '';
+      const mOutletName = m.outletName ? String(m.outletName).trim() : '';
+      const mSalesmanId = m.salesmanId ? String(m.salesmanId).trim() : '';
+      const mSalesmanName = m.salesmanName ? String(m.salesmanName).trim() : '';
+      const mDepo = m.depo ? String(m.depo).trim() : '';
+      const mPma = m.pma ? String(m.pma).trim() : '';
+      const mCabang = m.cabang ? String(m.cabang).trim() : '';
+      const mArea = m.area ? String(m.area).trim() : '';
 
-        if (m.salesmanName) {
-          const sNameKey = m.salesmanName.trim().toLowerCase();
+      if (mOutletId) {
+        masterById.set(mOutletId, m);
+        masterById.set(mOutletId.toLowerCase(), m);
+      }
+      if (mOutletName) {
+        masterByName.set(mOutletName.toLowerCase(), m);
+      }
+      if (mSalesmanId) {
+        const sId = mSalesmanId;
+        if (mDepo && !isGenericDefaultDepo(mDepo) && !salesmanDepos.has(sId)) salesmanDepos.set(sId, mDepo);
+        if (mPma && !isGenericTierPma(mPma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, mPma);
+        if (mCabang && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, mCabang);
+        if (mArea && !salesmanAreas.has(sId)) salesmanAreas.set(sId, mArea);
+        if (mSalesmanName && !salesmanNames.has(sId)) salesmanNames.set(sId, mSalesmanName);
+
+        if (mSalesmanName) {
+          const sNameKey = mSalesmanName.toLowerCase();
           if (!salesmanByName.has(sNameKey)) {
             salesmanByName.set(sNameKey, {
               id: sId,
-              depo: !isGenericDefaultDepo(m.depo) ? m.depo : undefined,
-              pma: !isGenericTierPma(m.pma) ? m.pma : undefined,
-              cabang: m.cabang,
-              area: m.area,
+              depo: !isGenericDefaultDepo(mDepo) ? mDepo : undefined,
+              pma: !isGenericTierPma(mPma) ? mPma : undefined,
+              cabang: mCabang || undefined,
+              area: mArea || undefined,
             });
           }
         }
@@ -263,36 +272,51 @@ export function LastTransactionOver7DaysView({
 
     // Enrich Salesman Area / PMA / Cabang from Target Database (Database 3) as well
     for (const trg of targets) {
-      if (trg.salesmanId) {
-        const sId = trg.salesmanId.trim();
-        if (trg.area && !salesmanAreas.has(sId)) salesmanAreas.set(sId, trg.area.trim());
-        if (trg.pma && !isGenericTierPma(trg.pma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, trg.pma.trim());
-        if (trg.cb && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, trg.cb.trim());
-        if (trg.salesmanName && !salesmanNames.has(sId)) salesmanNames.set(sId, trg.salesmanName.trim());
+      const tSalesmanId = trg.salesmanId ? String(trg.salesmanId).trim() : '';
+      const tSalesmanName = trg.salesmanName ? String(trg.salesmanName).trim() : '';
+      const tArea = trg.area ? String(trg.area).trim() : '';
+      const tPma = trg.pma ? String(trg.pma).trim() : '';
+      const tCb = trg.cb ? String(trg.cb).trim() : '';
 
-        if (trg.salesmanName) {
-          const sNameKey = trg.salesmanName.trim().toLowerCase();
+      if (tSalesmanId) {
+        const sId = tSalesmanId;
+        if (tArea && !salesmanAreas.has(sId)) salesmanAreas.set(sId, tArea);
+        if (tPma && !isGenericTierPma(tPma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, tPma);
+        if (tCb && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, tCb);
+        if (tSalesmanName && !salesmanNames.has(sId)) salesmanNames.set(sId, tSalesmanName);
+
+        if (tSalesmanName) {
+          const sNameKey = tSalesmanName.toLowerCase();
           const existing = salesmanByName.get(sNameKey);
           salesmanByName.set(sNameKey, {
             id: existing?.id || sId,
             depo: existing?.depo,
-            pma: existing?.pma || (!isGenericTierPma(trg.pma) ? trg.pma : undefined),
-            cabang: existing?.cabang || trg.cb,
-            area: existing?.area || trg.area,
+            pma: existing?.pma || (!isGenericTierPma(tPma) ? tPma : undefined),
+            cabang: existing?.cabang || tCb || undefined,
+            area: existing?.area || tArea || undefined,
           });
         }
       }
     }
 
     // Also scan transactions to build cross-reference for salesman area/pma/depo
-    for (const tx of [...currTransactions, ...prevTransactions]) {
-      const sId = (tx.salesmanId || '').trim();
-      if (!sId) continue;
-      if (tx.depo && !isGenericDefaultDepo(tx.depo) && !salesmanDepos.has(sId)) salesmanDepos.set(sId, tx.depo.trim());
-      if (tx.pma && !isGenericTierPma(tx.pma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, tx.pma.trim());
-      if (tx.area && !salesmanAreas.has(sId)) salesmanAreas.set(sId, tx.area.trim());
-      if (tx.cabang && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, tx.cabang.trim());
-    }
+    const scanTxForMetadata = (txList: TransactionRecord[]) => {
+      for (const tx of txList) {
+        const sId = String(tx.salesmanId || '').trim();
+        if (!sId) continue;
+        const txDepo = tx.depo ? String(tx.depo).trim() : '';
+        const txPma = tx.pma ? String(tx.pma).trim() : '';
+        const txArea = tx.area ? String(tx.area).trim() : '';
+        const txCabang = tx.cabang ? String(tx.cabang).trim() : '';
+
+        if (txDepo && !isGenericDefaultDepo(txDepo) && !salesmanDepos.has(sId)) salesmanDepos.set(sId, txDepo);
+        if (txPma && !isGenericTierPma(txPma) && !salesmanPmas.has(sId)) salesmanPmas.set(sId, txPma);
+        if (txArea && !salesmanAreas.has(sId)) salesmanAreas.set(sId, txArea);
+        if (txCabang && !salesmanCabangs.has(sId)) salesmanCabangs.set(sId, txCabang);
+      }
+    };
+    scanTxForMetadata(currTransactions);
+    scanTxForMetadata(prevTransactions);
 
     // Track per-outlet per-date aggregated transactions across both databases
     interface DailyOutletTx {
@@ -321,21 +345,23 @@ export function LastTransactionOver7DaysView({
       sourceLabel: string,
       fallbackYM: { year: number; month: number }
     ) => {
-      if (!t.outletId || t.salesValue <= 0) return;
+      if (!t.outletId || !(Number(t.salesValue) > 0)) return;
 
-      const cleanId = t.outletId.trim();
+      const cleanId = String(t.outletId).trim();
+      if (!cleanId) return;
+
       const m =
         masterById.get(cleanId) ||
         masterById.get(cleanId.toLowerCase()) ||
-        (t.outletName ? masterByName.get(t.outletName.trim().toLowerCase()) : undefined);
+        (t.outletName ? masterByName.get(String(t.outletName).trim().toLowerCase()) : undefined);
 
-      const rawSlsName = (t.salesmanName || m?.salesmanName || '').trim();
+      const rawSlsName = String(t.salesmanName || m?.salesmanName || '').trim();
       const slsByNameMatch = rawSlsName ? salesmanByName.get(rawSlsName.toLowerCase()) : undefined;
 
-      const slsId = (t.salesmanId || m?.salesmanId || slsByNameMatch?.id || '').trim();
+      const slsId = String(t.salesmanId || m?.salesmanId || slsByNameMatch?.id || '').trim();
       const slsName = rawSlsName || salesmanNames.get(slsId) || slsId || '-';
 
-      const area = (
+      const area = String(
         t.area ||
         m?.area ||
         salesmanAreas.get(slsId) ||
@@ -343,7 +369,7 @@ export function LastTransactionOver7DaysView({
         ''
       ).trim();
 
-      const rawPma = (
+      const rawPma = String(
         (!isGenericTierPma(t.pma) ? t.pma : '') ||
         (!isGenericTierPma(m?.pma) ? m?.pma : '') ||
         salesmanPmas.get(slsId) ||
@@ -351,7 +377,7 @@ export function LastTransactionOver7DaysView({
         ''
       ).trim();
 
-      const cabang = (
+      const cabang = String(
         t.cabang ||
         m?.cabang ||
         salesmanCabangs.get(slsId) ||
@@ -359,7 +385,7 @@ export function LastTransactionOver7DaysView({
         ''
       ).trim();
 
-      const explicitDepo = (
+      const explicitDepo = String(
         (!isGenericDefaultDepo(t.depo) ? t.depo : '') ||
         (!isGenericDefaultDepo(m?.depo) ? m?.depo : '') ||
         salesmanDepos.get(slsId) ||
@@ -367,9 +393,9 @@ export function LastTransactionOver7DaysView({
         ''
       ).trim();
 
-      const rayon = (t.rayon || m?.rayon || '').trim();
-      const channel = (t.channel || m?.channel || '').trim();
-      const outletName = (t.outletName || m?.outletName || t.outletId).trim();
+      const rayon = String(t.rayon || m?.rayon || '').trim();
+      const channel = String(t.channel || m?.channel || '').trim();
+      const outletName = String(t.outletName || m?.outletName || cleanId).trim();
 
       // Resolve primary Depo/PMA display according to Area per Salesman or per Toko:
       // Prioritize specific Depo / PMA / Area per Toko or Salesman over generic company-wide defaults
@@ -594,14 +620,24 @@ export function LastTransactionOver7DaysView({
   // Summary statistics
   const summaryStats = useMemo(() => {
     const totalOutlets = filteredOutlets.length;
-    const totalLastTxValue = filteredOutlets.reduce((acc, o) => acc + o.lastTxValue, 0);
-    const fromCurrMonth = filteredOutlets.filter(o => o.lastTxMonthSource === 'BULAN INI').length;
-    const fromPrevMonth = filteredOutlets.filter(o => o.lastTxMonthSource === 'BULAN LALU').length;
-    const avgDays =
-      totalOutlets > 0
-        ? Math.round(filteredOutlets.reduce((acc, o) => acc + o.daysSinceLastTx, 0) / totalOutlets)
-        : 0;
-    const maxDays = totalOutlets > 0 ? Math.max(...filteredOutlets.map(o => o.daysSinceLastTx)) : 0;
+    let totalLastTxValue = 0;
+    let fromCurrMonth = 0;
+    let fromPrevMonth = 0;
+    let sumDays = 0;
+    let maxDays = 0;
+
+    for (let i = 0; i < totalOutlets; i++) {
+      const o = filteredOutlets[i];
+      totalLastTxValue += o.lastTxValue || 0;
+      if (o.lastTxMonthSource === 'BULAN INI') fromCurrMonth++;
+      else fromPrevMonth++;
+      sumDays += o.daysSinceLastTx || 0;
+      if (o.daysSinceLastTx > maxDays) {
+        maxDays = o.daysSinceLastTx;
+      }
+    }
+
+    const avgDays = totalOutlets > 0 ? Math.round(sumDays / totalOutlets) : 0;
 
     return {
       totalOutlets,
