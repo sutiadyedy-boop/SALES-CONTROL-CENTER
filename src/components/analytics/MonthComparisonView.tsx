@@ -2072,41 +2072,41 @@ export function MonthComparisonView({
       )}
 
       {/* 2. Pilihan Tanggal Perbandingan Harian Terpisah untuk Masing-Masing Bulan */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm space-y-5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-800">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm space-y-2.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2 pb-2 border-b border-slate-800">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-cyan-400" />
-            <div>
-              <span className="text-sm font-bold text-slate-100">
+            <Calendar className="w-4 h-4 text-cyan-400 shrink-0" />
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span className="text-xs font-bold text-slate-100">
                 Pilihan Tanggal Perbandingan Harian (Terpisah untuk Masing-Masing Bulan)
               </span>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Pilih satu atau lebih dari 1 tanggal secara independen untuk {prevLabel} dan {currLabel}.
-              </p>
+              <span className="text-[10px] text-slate-400">
+                · Pilih satu atau lebih dari 1 tanggal secara independen untuk {prevLabel} dan {currLabel}.
+              </span>
             </div>
           </div>
 
           {/* Quick sync options */}
-          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <div className="flex flex-wrap items-center gap-1 text-[10px]">
             <button
               onClick={() => {
                 setPrevSelectedDays(Array.from({ length: 31 }, (_, i) => i + 1));
                 setCurrSelectedDays(Array.from({ length: 31 }, (_, i) => i + 1));
               }}
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-all"
+              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium transition-all"
             >
               Pilih Semua Kedua Bulan
             </button>
             <button
               onClick={() => setPrevSelectedDays([...currSelectedDays])}
-              className="px-2.5 py-1 rounded-lg bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/40 font-medium transition-all"
+              className="px-2 py-0.5 rounded bg-indigo-950/60 hover:bg-indigo-900/80 text-indigo-300 border border-indigo-800/40 font-medium transition-all"
               title="Salin tanggal terpilih dari Bulan Ini ke Bulan Lalu"
             >
               Samakan ({currLabel} &rarr; {prevLabel})
             </button>
             <button
               onClick={() => setCurrSelectedDays([...prevSelectedDays])}
-              className="px-2.5 py-1 rounded-lg bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/40 font-medium transition-all"
+              className="px-2 py-0.5 rounded bg-cyan-950/60 hover:bg-cyan-900/80 text-cyan-300 border border-cyan-800/40 font-medium transition-all"
               title="Salin tanggal terpilih dari Bulan Lalu ke Bulan Ini"
             >
               Samakan ({prevLabel} &rarr; {currLabel})
@@ -2115,45 +2115,45 @@ export function MonthComparisonView({
         </div>
 
         {/* DUA PANEL TERPISAH: BULAN LALU & BULAN INI */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2.5">
           {/* ========================================= */}
           {/* PANEL KIRI: BULAN LALU ({prevLabel})     */}
           {/* ========================================= */}
-          <div className="bg-slate-950/80 border border-indigo-900/40 rounded-xl p-4 space-y-3 relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-indigo-400" />
-                <span className="font-bold text-xs text-indigo-200">
+          <div className="bg-slate-950/80 border border-indigo-900/40 rounded-lg p-2.5 space-y-1.5 relative">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-indigo-400" />
+                <span className="font-bold text-[11px] text-indigo-200">
                   Tanggal {prevLabel} (Bulan Lalu)
                 </span>
               </div>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/50 font-semibold">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 border border-indigo-800/50 font-semibold">
                 {prevSelectedDays.length === 31 ? 'Semua (31 Hari)' : `${prevSelectedDays.length} Hari Aktif`}
               </span>
             </div>
 
             {/* Database Detection Summary */}
             {prevTransactedDays.size > 0 && (
-              <div className="text-[11px] text-indigo-200/90 bg-indigo-950/70 border border-indigo-800/60 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_#818cf8]" />
-                  <span>Database {prevLabel}: <strong className="text-white">{prevTransactedDays.size} tanggal</strong> ada transaksi (Tgl {Array.from(prevTransactedDays).sort((a, b) => a - b).join(', ')})</span>
+              <div className="text-[10px] text-indigo-200/90 bg-indigo-950/70 border border-indigo-800/60 rounded px-2 py-1 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_#818cf8] shrink-0" />
+                  <span className="truncate">Database {prevLabel}: <strong className="text-white">{prevTransactedDays.size} tanggal</strong> ada transaksi (Tgl {Array.from(prevTransactedDays).sort((a, b) => a - b).join(', ')})</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setPrevSelectedDays(Array.from(prevTransactedDays).sort((a, b) => a - b))}
-                  className="text-[10px] text-indigo-300 hover:text-white underline font-semibold ml-2 cursor-pointer"
+                  className="text-[10px] text-indigo-300 hover:text-white underline font-semibold shrink-0 cursor-pointer"
                 >
                   Pilih Tgl Transaksi
                 </button>
               </div>
             )}
 
-            {/* Presets Bulan Lalu */}
-            <div className="flex flex-wrap items-center gap-1 text-[11px]">
+            {/* Presets & Custom Range in Compact Row for Bulan Lalu */}
+            <div className="flex flex-wrap items-center gap-1 text-[10px]">
               <button
                 onClick={() => setPrevSelectedDays(Array.from(prevTransactedDays).sort((a, b) => a - b))}
-                className="px-2 py-0.5 rounded bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 border border-indigo-700/60 font-semibold transition-all flex items-center gap-1 shadow-sm"
+                className="px-1.5 py-0.5 rounded bg-indigo-900/60 hover:bg-indigo-800/80 text-indigo-200 border border-indigo-700/60 font-semibold transition-all flex items-center gap-1"
                 title={`Pilih hanya ${prevTransactedDays.size} tanggal yang ada transaksi`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_#818cf8]" />
@@ -2161,7 +2161,7 @@ export function MonthComparisonView({
               </button>
               <button
                 onClick={() => setPrevSelectedDays(Array.from({ length: 31 }, (_, i) => i + 1))}
-                className={`px-2 py-0.5 rounded font-medium transition-all ${
+                className={`px-1.5 py-0.5 rounded font-medium transition-all ${
                   prevSelectedDays.length === 31
                     ? 'bg-indigo-600 text-white font-bold'
                     : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
@@ -2171,91 +2171,92 @@ export function MonthComparisonView({
               </button>
               <button
                 onClick={() => setPrevSelectedDays(Array.from({ length: maxCurrDay }, (_, i) => i + 1))}
-                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition-all"
+                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 font-medium transition-all"
                 title={`Pilih Tgl 1 s/d ${maxCurrDay}`}
               >
                 Cut-Off (1-{maxCurrDay})
               </button>
               <button
                 onClick={() => setPrevSelectedDays([1, 2, 3, 4, 5, 6, 7])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M1
               </button>
               <button
                 onClick={() => setPrevSelectedDays([8, 9, 10, 11, 12, 13, 14])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M2
               </button>
               <button
                 onClick={() => setPrevSelectedDays([15, 16, 17, 18, 19, 20, 21])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M3
               </button>
               <button
                 onClick={() => setPrevSelectedDays([22, 23, 24, 25, 26, 27, 28])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M4
               </button>
+
+              {/* Inline Custom Range input for Bulan Lalu */}
+              <div className="flex items-center gap-1 text-[10px] text-slate-400 ml-1">
+                <span>Rentang:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={prevRangeEnd}
+                  value={prevRangeStart}
+                  onChange={(e) => setPrevRangeStart(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+                  className="w-9 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-center text-indigo-300 font-mono"
+                />
+                <span>-</span>
+                <input
+                  type="number"
+                  min={prevRangeStart}
+                  max={31}
+                  value={prevRangeEnd}
+                  onChange={(e) => setPrevRangeEnd(Math.max(prevRangeStart, Math.min(31, parseInt(e.target.value) || 31)))}
+                  className="w-9 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-center text-indigo-300 font-mono"
+                />
+                <button
+                  onClick={() => {
+                    const days: number[] = [];
+                    for (let i = prevRangeStart; i <= prevRangeEnd; i++) days.push(i);
+                    setPrevSelectedDays(days);
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-indigo-950 text-indigo-300 hover:bg-indigo-900 border border-indigo-800/50 font-medium"
+                >
+                  Terapkan
+                </button>
+              </div>
+
               <button
                 onClick={() => setPrevSelectedDays([])}
-                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-rose-400 border border-slate-800 font-medium transition-all ml-auto"
+                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-rose-400 border border-slate-800 font-medium transition-all ml-auto"
               >
                 Bersihkan
               </button>
             </div>
 
-            {/* Custom Range input for Bulan Lalu */}
-            <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
-              <span>Rentang:</span>
-              <input
-                type="number"
-                min={1}
-                max={prevRangeEnd}
-                value={prevRangeStart}
-                onChange={(e) => setPrevRangeStart(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
-                className="w-12 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-center text-indigo-300 font-mono"
-              />
-              <span>s/d</span>
-              <input
-                type="number"
-                min={prevRangeStart}
-                max={31}
-                value={prevRangeEnd}
-                onChange={(e) => setPrevRangeEnd(Math.max(prevRangeStart, Math.min(31, parseInt(e.target.value) || 31)))}
-                className="w-12 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-center text-indigo-300 font-mono"
-              />
-              <button
-                onClick={() => {
-                  const days: number[] = [];
-                  for (let i = prevRangeStart; i <= prevRangeEnd; i++) days.push(i);
-                  setPrevSelectedDays(days);
-                }}
-                className="px-2 py-0.5 rounded bg-indigo-950 text-indigo-300 hover:bg-indigo-900 border border-indigo-800/50 font-medium"
-              >
-                Terapkan
-              </button>
-            </div>
-
             {/* 31-Day Selector Grid for Bulan Lalu */}
-            <div className="pt-1 space-y-1.5">
-              <div className="text-[10px] text-slate-400 flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="text-[9px] text-slate-400 flex items-center justify-between">
                 <span>Pilih tanggal (bisa lebih dari 1):</span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <span className="flex items-center gap-1 text-indigo-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 shadow-[0_0_6px_#818cf8]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 shadow-[0_0_6px_#818cf8]" />
                     Terang: Ada Transaksi ({prevTransactedDays.size} hari)
                   </span>
                   <span className="flex items-center gap-1 text-slate-600">
-                    <span className="w-2 h-2 rounded-full bg-slate-800 border border-slate-700" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-700" />
                     Gelap: Tidak Ada
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-8 sm:grid-cols-11 md:grid-cols-16 gap-1">
+              <div className="grid grid-cols-11 sm:grid-cols-16 gap-0.5">
                 {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
                   const isSelected = prevSelectedDays.includes(day);
                   const hasTx = prevTransactedDays.has(day);
@@ -2264,9 +2265,9 @@ export function MonthComparisonView({
                   let btnClass = '';
                   if (hasTx) {
                     if (isSelected) {
-                      btnClass = 'bg-indigo-600 text-white font-black shadow-[0_0_14px_rgba(99,102,241,0.75)] border-2 border-indigo-200 ring-2 ring-indigo-400/80 scale-[1.05] z-10 cursor-pointer';
+                      btnClass = 'bg-indigo-600 text-white font-black shadow-[0_0_10px_rgba(99,102,241,0.7)] border border-indigo-200 ring-1 ring-indigo-400/80 z-10 cursor-pointer';
                     } else {
-                      btnClass = 'bg-indigo-950/80 text-indigo-200 font-bold border-2 border-indigo-500/80 hover:border-indigo-400 hover:bg-indigo-900/60 shadow-[0_0_8px_rgba(99,102,241,0.3)] cursor-pointer';
+                      btnClass = 'bg-indigo-950/80 text-indigo-200 font-bold border border-indigo-500/80 hover:border-indigo-400 hover:bg-indigo-900/60 cursor-pointer';
                     }
                   } else {
                     if (isSelected) {
@@ -2280,7 +2281,7 @@ export function MonthComparisonView({
                     <button
                       key={day}
                       onClick={() => togglePrevDay(day)}
-                      className={`h-7 rounded text-[10px] font-mono transition-all relative ${btnClass}`}
+                      className={`h-5 rounded text-[9px] font-mono transition-all relative ${btnClass}`}
                       title={
                         hasTx
                           ? `Tgl ${day} ${prevLabel}: ${formatRupiah(salesVal)} (Ada Transaksi)\nKlik untuk ${isSelected ? 'batalkan pilihan' : 'pilih'}`
@@ -2289,7 +2290,7 @@ export function MonthComparisonView({
                     >
                       {day}
                       {hasTx && (
-                        <span className={`absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-300 shadow-[0_0_6px_#fde047]' : 'bg-indigo-400 shadow-[0_0_6px_#818cf8]'}`} />
+                        <span className={`absolute bottom-0.5 right-0.5 w-1 h-1 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-indigo-400'}`} />
                       )}
                     </button>
                   );
@@ -2301,41 +2302,41 @@ export function MonthComparisonView({
           {/* ========================================= */}
           {/* PANEL KANAN: BULAN INI ({currLabel})     */}
           {/* ========================================= */}
-          <div className="bg-slate-950/80 border border-cyan-900/40 rounded-xl p-4 space-y-3 relative">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-                <span className="font-bold text-xs text-cyan-200">
+          <div className="bg-slate-950/80 border border-cyan-900/40 rounded-lg p-2.5 space-y-1.5 relative">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+                <span className="font-bold text-[11px] text-cyan-200">
                   Tanggal {currLabel} (Bulan Ini)
                 </span>
               </div>
-              <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50 font-semibold">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800/50 font-semibold">
                 {currSelectedDays.length === 31 ? 'Semua (31 Hari)' : `${currSelectedDays.length} Hari Aktif`}
               </span>
             </div>
 
             {/* Database Detection Summary */}
             {currTransactedDays.size > 0 && (
-              <div className="text-[11px] text-cyan-200/90 bg-cyan-950/70 border border-cyan-800/60 rounded-lg px-2.5 py-1.5 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
-                  <span>Database {currLabel}: <strong className="text-white">{currTransactedDays.size} tanggal</strong> ada transaksi (Tgl {Array.from(currTransactedDays).sort((a, b) => a - b).join(', ')})</span>
+              <div className="text-[10px] text-cyan-200/90 bg-cyan-950/70 border border-cyan-800/60 rounded px-2 py-1 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee] shrink-0" />
+                  <span className="truncate">Database {currLabel}: <strong className="text-white">{currTransactedDays.size} tanggal</strong> ada transaksi (Tgl {Array.from(currTransactedDays).sort((a, b) => a - b).join(', ')})</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setCurrSelectedDays(Array.from(currTransactedDays).sort((a, b) => a - b))}
-                  className="text-[10px] text-cyan-300 hover:text-white underline font-semibold ml-2 cursor-pointer"
+                  className="text-[10px] text-cyan-300 hover:text-white underline font-semibold shrink-0 cursor-pointer"
                 >
                   Pilih Tgl Transaksi
                 </button>
               </div>
             )}
 
-            {/* Presets Bulan Ini */}
-            <div className="flex flex-wrap items-center gap-1 text-[11px]">
+            {/* Presets & Custom Range in Compact Row for Bulan Ini */}
+            <div className="flex flex-wrap items-center gap-1 text-[10px]">
               <button
                 onClick={() => setCurrSelectedDays(Array.from(currTransactedDays).sort((a, b) => a - b))}
-                className="px-2 py-0.5 rounded bg-cyan-900/60 hover:bg-cyan-800/80 text-cyan-200 border border-cyan-700/60 font-semibold transition-all flex items-center gap-1 shadow-sm"
+                className="px-1.5 py-0.5 rounded bg-cyan-900/60 hover:bg-cyan-800/80 text-cyan-200 border border-cyan-700/60 font-semibold transition-all flex items-center gap-1"
                 title={`Pilih hanya ${currTransactedDays.size} tanggal yang ada transaksi`}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
@@ -2343,7 +2344,7 @@ export function MonthComparisonView({
               </button>
               <button
                 onClick={() => setCurrSelectedDays(Array.from({ length: 31 }, (_, i) => i + 1))}
-                className={`px-2 py-0.5 rounded font-medium transition-all ${
+                className={`px-1.5 py-0.5 rounded font-medium transition-all ${
                   currSelectedDays.length === 31
                     ? 'bg-cyan-500 text-slate-950 font-bold'
                     : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
@@ -2353,7 +2354,7 @@ export function MonthComparisonView({
               </button>
               <button
                 onClick={() => setCurrSelectedDays(Array.from({ length: maxCurrDay }, (_, i) => i + 1))}
-                className={`px-2 py-0.5 rounded font-medium transition-all ${
+                className={`px-1.5 py-0.5 rounded font-medium transition-all ${
                   currSelectedDays.length === maxCurrDay && currSelectedDays[0] === 1
                     ? 'bg-cyan-500 text-slate-950 font-bold'
                     : 'bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800'
@@ -2364,84 +2365,85 @@ export function MonthComparisonView({
               </button>
               <button
                 onClick={() => setCurrSelectedDays([1, 2, 3, 4, 5, 6, 7])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M1
               </button>
               <button
                 onClick={() => setCurrSelectedDays([8, 9, 10, 11, 12, 13, 14])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M2
               </button>
               <button
                 onClick={() => setCurrSelectedDays([15, 16, 17, 18, 19, 20, 21])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M3
               </button>
               <button
                 onClick={() => setCurrSelectedDays([22, 23, 24, 25, 26, 27, 28])}
-                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
+                className="px-1 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-slate-400 border border-slate-800 font-mono"
               >
                 M4
               </button>
+
+              {/* Inline Custom Range input for Bulan Ini */}
+              <div className="flex items-center gap-1 text-[10px] text-slate-400 ml-1">
+                <span>Rentang:</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={currRangeEnd}
+                  value={currRangeStart}
+                  onChange={(e) => setCurrRangeStart(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
+                  className="w-9 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-center text-cyan-300 font-mono"
+                />
+                <span>-</span>
+                <input
+                  type="number"
+                  min={currRangeStart}
+                  max={31}
+                  value={currRangeEnd}
+                  onChange={(e) => setCurrRangeEnd(Math.max(currRangeStart, Math.min(31, parseInt(e.target.value) || 31)))}
+                  className="w-9 bg-slate-900 border border-slate-800 rounded px-1 py-0.5 text-center text-cyan-300 font-mono"
+                />
+                <button
+                  onClick={() => {
+                    const days: number[] = [];
+                    for (let i = currRangeStart; i <= currRangeEnd; i++) days.push(i);
+                    setCurrSelectedDays(days);
+                  }}
+                  className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-300 hover:bg-cyan-900 border border-cyan-800/50 font-medium"
+                >
+                  Terapkan
+                </button>
+              </div>
+
               <button
                 onClick={() => setCurrSelectedDays([])}
-                className="px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-rose-400 border border-slate-800 font-medium transition-all ml-auto"
+                className="px-1.5 py-0.5 rounded bg-slate-900 hover:bg-slate-800 text-rose-400 border border-slate-800 font-medium transition-all ml-auto"
               >
                 Bersihkan
               </button>
             </div>
 
-            {/* Custom Range input for Bulan Ini */}
-            <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-400">
-              <span>Rentang:</span>
-              <input
-                type="number"
-                min={1}
-                max={currRangeEnd}
-                value={currRangeStart}
-                onChange={(e) => setCurrRangeStart(Math.max(1, Math.min(31, parseInt(e.target.value) || 1)))}
-                className="w-12 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-center text-cyan-300 font-mono"
-              />
-              <span>s/d</span>
-              <input
-                type="number"
-                min={currRangeStart}
-                max={31}
-                value={currRangeEnd}
-                onChange={(e) => setCurrRangeEnd(Math.max(currRangeStart, Math.min(31, parseInt(e.target.value) || 31)))}
-                className="w-12 bg-slate-900 border border-slate-800 rounded px-1.5 py-0.5 text-center text-cyan-300 font-mono"
-              />
-              <button
-                onClick={() => {
-                  const days: number[] = [];
-                  for (let i = currRangeStart; i <= currRangeEnd; i++) days.push(i);
-                  setCurrSelectedDays(days);
-                }}
-                className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 hover:bg-cyan-900 border border-cyan-800/50 font-medium"
-              >
-                Terapkan
-              </button>
-            </div>
-
             {/* 31-Day Selector Grid for Bulan Ini */}
-            <div className="pt-1 space-y-1.5">
-              <div className="text-[10px] text-slate-400 flex items-center justify-between">
+            <div className="space-y-1">
+              <div className="text-[9px] text-slate-400 flex items-center justify-between">
                 <span>Pilih tanggal (bisa lebih dari 1):</span>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <span className="flex items-center gap-1 text-cyan-300 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee]" />
                     Terang/Menyala: Ada Transaksi ({currTransactedDays.size} hari)
                   </span>
                   <span className="flex items-center gap-1 text-slate-600">
-                    <span className="w-2 h-2 rounded-full bg-slate-800 border border-slate-700" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-800 border border-slate-700" />
                     Gelap: Tidak Ada
                   </span>
                 </div>
               </div>
-              <div className="grid grid-cols-8 sm:grid-cols-11 md:grid-cols-16 gap-1">
+              <div className="grid grid-cols-11 sm:grid-cols-16 gap-0.5">
                 {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
                   const isSelected = currSelectedDays.includes(day);
                   const hasTx = currTransactedDays.has(day);
@@ -2451,9 +2453,9 @@ export function MonthComparisonView({
                   let btnClass = '';
                   if (hasTx) {
                     if (isSelected) {
-                      btnClass = 'bg-cyan-400 text-slate-950 font-black shadow-[0_0_16px_rgba(34,211,238,0.85)] border-2 border-cyan-100 ring-2 ring-cyan-300/80 scale-[1.05] z-10 cursor-pointer';
+                      btnClass = 'bg-cyan-400 text-slate-950 font-black shadow-[0_0_10px_rgba(34,211,238,0.8)] border border-cyan-100 ring-1 ring-cyan-300/80 z-10 cursor-pointer';
                     } else {
-                      btnClass = 'bg-cyan-950/80 text-cyan-200 font-bold border-2 border-cyan-500/80 hover:border-cyan-400 hover:bg-cyan-900/60 shadow-[0_0_8px_rgba(34,211,238,0.3)] cursor-pointer';
+                      btnClass = 'bg-cyan-950/80 text-cyan-200 font-bold border border-cyan-500/80 hover:border-cyan-400 hover:bg-cyan-900/60 cursor-pointer';
                     }
                   } else {
                     if (isSelected) {
@@ -2467,8 +2469,8 @@ export function MonthComparisonView({
                     <button
                       key={day}
                       onClick={() => toggleCurrDay(day)}
-                      className={`h-7 rounded text-[10px] font-mono transition-all relative ${btnClass} ${
-                        isCutoff ? 'ring-2 ring-amber-400/90' : ''
+                      className={`h-5 rounded text-[9px] font-mono transition-all relative ${btnClass} ${
+                        isCutoff ? 'ring-1 ring-amber-400/90' : ''
                       }`}
                       title={
                         hasTx
@@ -2478,7 +2480,7 @@ export function MonthComparisonView({
                     >
                       {day}
                       {hasTx && (
-                        <span className={`absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-slate-950 shadow-[0_0_4px_#000]' : 'bg-cyan-400 shadow-[0_0_6px_#22d3ee]'}`} />
+                        <span className={`absolute bottom-0.5 right-0.5 w-1 h-1 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-cyan-400'}`} />
                       )}
                     </button>
                   );
@@ -3058,97 +3060,6 @@ export function MonthComparisonView({
                 }`}>
                   ({formatPercent(eceranDropSizeGrowth)})
                 </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Visual Bar Comparison By Eceran (MARK NEW) */}
-          <div id="eceran-visual-comparison-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-            <h3 className="text-sm font-bold text-slate-100 flex flex-wrap items-center justify-between gap-2 mb-4">
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-amber-400" />
-                <span>Visualisasi Perbandingan Omset By Eceran - Kolom MARK NEW ({prevLabel} vs {currLabel})</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="text-xs font-mono text-slate-400">
-                  {eceranMarkNewData.length} Kategori
-                </span>
-                <div data-capture-ignore="true">
-                  <CaptureJpgButton
-                    targetId="eceran-visual-comparison-card"
-                    fileName={`Visualisasi_Eceran_MARK_NEW_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
-                    label="Capture JPG Full HD"
-                  />
-                </div>
-              </div>
-            </h3>
-
-            {eceranMarkNewData.length === 0 ? (
-              <div className="text-center py-6 text-xs text-slate-500 font-mono">
-                Tidak ada data eceran untuk rentang tanggal yang dipilih.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {eceranMarkNewData.map(item => {
-                  const maxVal = Math.max(
-                    ...eceranMarkNewData.map(d => Math.max(d.omsetPrev, d.omsetCurr)),
-                    1
-                  );
-                  const prevWidth = (item.omsetPrev / maxVal) * 100;
-                  const currWidth = (item.omsetCurr / maxVal) * 100;
-
-                  return (
-                    <div key={item.markNew} className="space-y-1.5">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-200 flex items-center gap-1.5">
-                          <Store className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{item.markNew}</span>
-                          <span className="text-[10px] text-slate-500 font-mono font-normal">
-                            ({item.totalOutlets} Outlet &bull; {item.ecCurr} EC)
-                          </span>
-                        </span>
-                        <div className="flex items-center gap-3 font-mono text-xs">
-                          <span className="text-slate-400">{formatRupiah(item.omsetPrev)}</span>
-                          <span className="text-slate-600">&rarr;</span>
-                          <span className="font-bold text-amber-300">{formatRupiah(item.omsetCurr)}</span>
-                          <span className={`text-[11px] font-bold ${item.growthOmset !== null && item.growthOmset >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                            ({formatPercent(item.growthOmset)})
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-1">
-                        {/* Previous month bar */}
-                        <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden flex items-center">
-                          <div
-                            className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                            style={{ width: `${prevWidth}%` }}
-                            title={`${prevLabel}: ${formatRupiah(item.omsetPrev)}`}
-                          />
-                        </div>
-                        {/* Current month bar */}
-                        <div className="w-full bg-slate-950 rounded-full h-2 overflow-hidden flex items-center">
-                          <div
-                            className="bg-amber-400 h-full rounded-full transition-all duration-500"
-                            style={{ width: `${currWidth}%` }}
-                            title={`${currLabel}: ${formatRupiah(item.omsetCurr)}`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            <div className="flex items-center gap-4 mt-6 pt-4 border-t border-slate-800 text-xs text-slate-400 justify-end">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-2 rounded bg-indigo-600 inline-block" />
-                <span>{prevLabel}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-2 rounded bg-amber-400 inline-block" />
-                <span>{currLabel}</span>
               </div>
             </div>
           </div>
