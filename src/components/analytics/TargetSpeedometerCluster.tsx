@@ -154,16 +154,17 @@ export function TargetSpeedometerCluster({
         {/* ================================================================= */}
         {/* SPEEDOMETER 1: TOTAL TARGET                                       */}
         {/* ================================================================= */}
-        <div className="bg-slate-900 border border-slate-800 hover:border-amber-500/40 rounded-xl p-5 shadow-lg flex flex-col justify-between relative overflow-hidden transition-colors">
+        <div className="bg-slate-900/95 border border-amber-500/40 hover:border-amber-400 rounded-xl p-5 shadow-[0_0_28px_rgba(245,158,11,0.16)] flex flex-col justify-between relative overflow-hidden transition-all">
+          <div className="absolute -top-16 -right-16 w-40 h-40 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
           {/* Top Bar */}
           <div className="flex items-start justify-between gap-2 z-10">
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400/90 block">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-amber-400 font-bold block">
                 01 · Kuota Benchmark
               </span>
               <h4 className="text-base font-bold text-slate-100 mt-0.5">Total Target</h4>
             </div>
-            <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400">
+            <div className="p-2 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-300 shadow-[0_0_12px_rgba(245,158,11,0.35)]">
               <Target className="w-4 h-4" />
             </div>
           </div>
@@ -173,12 +174,12 @@ export function TargetSpeedometerCluster({
             <svg viewBox="0 0 260 165" className="w-full max-w-[270px] overflow-visible">
               <defs>
                 <linearGradient id="targetGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.35" />
-                  <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.85" />
-                  <stop offset="100%" stopColor="#f59e0b" stopOpacity="1" />
+                  <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.45" />
+                  <stop offset="50%" stopColor="#fbbf24" stopOpacity="0.9" />
+                  <stop offset="100%" stopColor="#fde047" stopOpacity="1" />
                 </linearGradient>
-                <filter id="glowAmber" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
+                <filter id="glowAmber" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="4" result="blur" />
                   <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
               </defs>
@@ -187,7 +188,8 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, outerR, -120, 120)}
                 fill="none"
-                stroke="#1e293b"
+                stroke="#fbbf24"
+                strokeOpacity="0.35"
                 strokeWidth="2"
                 strokeDasharray="3 3"
               />
@@ -196,7 +198,7 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, trackR, -120, 120)}
                 fill="none"
-                stroke="#0f172a"
+                stroke="#020617"
                 strokeWidth="14"
                 strokeLinecap="round"
               />
@@ -218,7 +220,7 @@ export function TargetSpeedometerCluster({
                 d={describeArc(cx, cy, trackR, -120, 120)}
                 fill="none"
                 stroke="#f59e0b"
-                strokeOpacity="0.3"
+                strokeOpacity="0.35"
                 strokeWidth="14"
                 strokeLinecap="round"
               />
@@ -227,7 +229,7 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, innerR, -120, 120)}
                 fill="none"
-                stroke="#334155"
+                stroke="#475569"
                 strokeWidth="1"
               />
 
@@ -245,7 +247,7 @@ export function TargetSpeedometerCluster({
                       y1={p1.y}
                       x2={p2.x}
                       y2={p2.y}
-                      stroke={isMajor ? '#fbbf24' : '#475569'}
+                      stroke={isMajor ? '#fde047' : '#475569'}
                       strokeWidth={isMajor ? '2' : '1'}
                     />
                     {isMajor && (
@@ -253,7 +255,7 @@ export function TargetSpeedometerCluster({
                         x={labelPos.x}
                         y={labelPos.y + 3}
                         textAnchor="middle"
-                        className="fill-slate-400 font-mono text-[9px] font-semibold"
+                        className="fill-amber-300/90 font-mono text-[9px] font-bold"
                       >
                         {val}%
                       </text>
@@ -286,38 +288,39 @@ export function TargetSpeedometerCluster({
                   transformOrigin: `${cx}px ${cy}px`,
                   transition: 'transform 700ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
+                filter="url(#glowAmber)"
               >
                 <polygon
                   points={`${cx - 3.5},${cy} ${cx},${cy - (trackR - 4)} ${cx + 3.5},${cy}`}
-                  fill="#fbbf24"
+                  fill="#fde047"
                 />
                 <polygon
                   points={`${cx - 2},${cy} ${cx},${cy + 14} ${cx + 2},${cy}`}
-                  fill="#78350f"
+                  fill="#b45309"
                 />
               </g>
 
               {/* Center Cap */}
-              <circle cx={cx} cy={cy} r="11" fill="#1e293b" stroke="#fbbf24" strokeWidth="2.5" />
-              <circle cx={cx} cy={cy} r="4" fill="#fbbf24" />
+              <circle cx={cx} cy={cy} r="11" fill="#0f172a" stroke="#fde047" strokeWidth="2.5" />
+              <circle cx={cx} cy={cy} r="4" fill="#fde047" />
 
               {/* Center Sub-label */}
               <text
                 x={cx}
                 y={cy + 30}
                 textAnchor="middle"
-                className="fill-amber-400 font-mono text-[10px] font-bold tracking-wider"
+                className="fill-amber-300 font-mono text-[10px] font-extrabold tracking-wider"
               >
                 100% KUOTA RESMI
               </text>
             </svg>
 
             {/* Digital Odometer Box */}
-            <div className="w-full bg-slate-950/90 border border-slate-800/90 rounded-lg px-3.5 py-2.5 text-center -mt-2">
+            <div className="w-full bg-slate-950/95 border border-amber-500/40 rounded-lg px-3.5 py-2.5 text-center -mt-2 shadow-[inset_0_0_15px_rgba(245,158,11,0.12)]">
               <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 Akumulasi Target Sales
               </div>
-              <div className="text-lg sm:text-xl font-black font-mono tabular-nums text-amber-300 mt-0.5 tracking-tight">
+              <div className="text-lg sm:text-xl font-black font-mono tabular-nums text-amber-300 mt-0.5 tracking-tight drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">
                 {formatRupiah(totalTarget)}
               </div>
             </div>
@@ -339,16 +342,17 @@ export function TargetSpeedometerCluster({
         {/* ================================================================= */}
         {/* SPEEDOMETER 2: TOTAL REALISASI                                    */}
         {/* ================================================================= */}
-        <div className="bg-slate-900 border border-cyan-500/30 hover:border-cyan-400/60 rounded-xl p-5 shadow-lg flex flex-col justify-between relative overflow-hidden transition-colors">
+        <div className="bg-slate-900/95 border border-cyan-400/50 hover:border-cyan-300 rounded-xl p-5 shadow-[0_0_28px_rgba(34,211,238,0.2)] flex flex-col justify-between relative overflow-hidden transition-all">
+          <div className="absolute -top-16 -right-16 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" />
           {/* Top Bar */}
           <div className="flex items-start justify-between gap-2 z-10">
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400 block">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-cyan-400 font-bold block">
                 02 · Aktual Penjualan {needleMode === 'projected' ? '(Simulasi)' : ''}
               </span>
               <h4 className="text-base font-bold text-slate-100 mt-0.5">Total Realisasi</h4>
             </div>
-            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+            <div className="p-2 rounded-lg bg-cyan-500/15 border border-cyan-400/40 text-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.4)]">
               <Award className="w-4 h-4" />
             </div>
           </div>
@@ -362,8 +366,8 @@ export function TargetSpeedometerCluster({
                   <stop offset="65%" stopColor="#22d3ee" />
                   <stop offset="100%" stopColor="#10b981" />
                 </linearGradient>
-                <filter id="glowCyan" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3.5" result="blur" />
+                <filter id="glowCyan" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="4.5" result="blur" />
                   <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
               </defs>
@@ -372,7 +376,8 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, outerR, -120, 120)}
                 fill="none"
-                stroke="#1e293b"
+                stroke="#22d3ee"
+                strokeOpacity="0.35"
                 strokeWidth="2"
                 strokeDasharray="3 3"
               />
@@ -381,7 +386,7 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, trackR, -120, 120)}
                 fill="none"
-                stroke="#0f172a"
+                stroke="#020617"
                 strokeWidth="14"
                 strokeLinecap="round"
               />
@@ -391,7 +396,7 @@ export function TargetSpeedometerCluster({
                 d={describeArc(cx, cy, trackR, gauge2Target100Angle, 120)}
                 fill="none"
                 stroke="#10b981"
-                strokeOpacity="0.18"
+                strokeOpacity="0.22"
                 strokeWidth="14"
               />
 
@@ -411,7 +416,7 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, innerR, -120, 120)}
                 fill="none"
-                stroke="#334155"
+                stroke="#475569"
                 strokeWidth="1"
               />
 
@@ -430,7 +435,7 @@ export function TargetSpeedometerCluster({
                       y1={p1.y}
                       x2={p2.x}
                       y2={p2.y}
-                      stroke={isTarget100 ? '#fbbf24' : isMajor ? '#22d3ee' : '#475569'}
+                      stroke={isTarget100 ? '#fde047' : isMajor ? '#22d3ee' : '#475569'}
                       strokeWidth={isTarget100 ? '2.5' : isMajor ? '1.8' : '1'}
                     />
                     {isMajor && (
@@ -438,8 +443,8 @@ export function TargetSpeedometerCluster({
                         x={labelPos.x}
                         y={labelPos.y + 3}
                         textAnchor="middle"
-                        className={`font-mono text-[9px] font-semibold ${
-                          isTarget100 ? 'fill-amber-400 font-bold' : 'fill-slate-400'
+                        className={`font-mono text-[9px] font-bold ${
+                          isTarget100 ? 'fill-amber-300' : 'fill-cyan-300/90'
                         }`}
                       >
                         {val}%
@@ -459,7 +464,7 @@ export function TargetSpeedometerCluster({
                     y1={tIn.y}
                     x2={tOut.x}
                     y2={tOut.y}
-                    stroke="#fbbf24"
+                    stroke="#fde047"
                     strokeWidth="2.5"
                   />
                 );
@@ -473,7 +478,7 @@ export function TargetSpeedometerCluster({
                     cx={mPos.x}
                     cy={mPos.y}
                     r="4"
-                    fill="#fbbf24"
+                    fill="#fde047"
                     stroke="#020617"
                     strokeWidth="1.5"
                   />
@@ -487,38 +492,39 @@ export function TargetSpeedometerCluster({
                   transformOrigin: `${cx}px ${cy}px`,
                   transition: 'transform 700ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
+                filter="url(#glowCyan)"
               >
                 <polygon
                   points={`${cx - 3.5},${cy} ${cx},${cy - (trackR - 4)} ${cx + 3.5},${cy}`}
-                  fill="#22d3ee"
+                  fill="#67e8f9"
                 />
                 <polygon
                   points={`${cx - 2},${cy} ${cx},${cy + 14} ${cx + 2},${cy}`}
-                  fill="#164e63"
+                  fill="#0891b2"
                 />
               </g>
 
               {/* Center Cap */}
-              <circle cx={cx} cy={cy} r="11" fill="#1e293b" stroke="#22d3ee" strokeWidth="2.5" />
-              <circle cx={cx} cy={cy} r="4" fill="#22d3ee" />
+              <circle cx={cx} cy={cy} r="11" fill="#0f172a" stroke="#22d3ee" strokeWidth="2.5" />
+              <circle cx={cx} cy={cy} r="4" fill="#67e8f9" />
 
               {/* Center Ratio Sub-label */}
               <text
                 x={cx}
                 y={cy + 30}
                 textAnchor="middle"
-                className="fill-cyan-300 font-mono text-[10px] font-bold tracking-wider"
+                className="fill-cyan-300 font-mono text-[10px] font-extrabold tracking-wider"
               >
                 {activeRealisasiPct.toFixed(1)}% DARI TARGET
               </text>
             </svg>
 
             {/* Digital Odometer Box */}
-            <div className="w-full bg-slate-950/90 border border-cyan-500/30 rounded-lg px-3.5 py-2.5 text-center -mt-2">
+            <div className="w-full bg-slate-950/95 border border-cyan-400/40 rounded-lg px-3.5 py-2.5 text-center -mt-2 shadow-[inset_0_0_15px_rgba(34,211,238,0.15)]">
               <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 Realisasi ({salesValueField}) {needleMode === 'projected' ? '· Proyeksi' : ''}
               </div>
-              <div className="text-lg sm:text-xl font-black font-mono tabular-nums text-cyan-300 mt-0.5 tracking-tight">
+              <div className="text-lg sm:text-xl font-black font-mono tabular-nums text-cyan-300 mt-0.5 tracking-tight drop-shadow-[0_0_10px_rgba(34,211,238,0.6)]">
                 {formatRupiah(activeRealisasiValue)}
               </div>
             </div>
@@ -542,16 +548,17 @@ export function TargetSpeedometerCluster({
         {/* ================================================================= */}
         {/* SPEEDOMETER 3: RATA-RATA ACHIEVEMENT                              */}
         {/* ================================================================= */}
-        <div className="bg-slate-900 border border-slate-800 hover:border-emerald-500/40 rounded-xl p-5 shadow-lg flex flex-col justify-between relative overflow-hidden transition-colors">
+        <div className="bg-slate-900/95 border border-emerald-500/40 hover:border-emerald-400 rounded-xl p-5 shadow-[0_0_28px_rgba(16,185,129,0.16)] flex flex-col justify-between relative overflow-hidden transition-all">
+          <div className="absolute -top-16 -right-16 w-40 h-40 bg-emerald-500/15 rounded-full blur-3xl pointer-events-none" />
           {/* Top Bar */}
           <div className="flex items-start justify-between gap-2 z-10">
             <div>
-              <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 block">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-emerald-400 font-bold block">
                 03 · Indeks Performa {needleMode === 'projected' ? '(Simulasi)' : ''}
               </span>
               <h4 className="text-base font-bold text-slate-100 mt-0.5">Rata-rata Achievement</h4>
             </div>
-            <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+            <div className="p-2 rounded-lg bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 shadow-[0_0_12px_rgba(16,185,129,0.4)]">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
@@ -560,8 +567,8 @@ export function TargetSpeedometerCluster({
           <div className="my-2 flex flex-col items-center justify-center relative">
             <svg viewBox="0 0 260 165" className="w-full max-w-[270px] overflow-visible">
               <defs>
-                <filter id="glowAch" x="-20%" y="-20%" width="140%" height="140%">
-                  <feGaussianBlur stdDeviation="3" result="blur" />
+                <filter id="glowAch" x="-30%" y="-30%" width="160%" height="160%">
+                  <feGaussianBlur stdDeviation="4.5" result="blur" />
                   <feComposite in="SourceGraphic" in2="blur" operator="over" />
                 </filter>
               </defs>
@@ -570,7 +577,8 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, outerR, -120, 120)}
                 fill="none"
-                stroke="#1e293b"
+                stroke={achStatus.hex}
+                strokeOpacity="0.35"
                 strokeWidth="2"
                 strokeDasharray="3 3"
               />
@@ -625,7 +633,7 @@ export function TargetSpeedometerCluster({
               <path
                 d={describeArc(cx, cy, innerR, -120, 120)}
                 fill="none"
-                stroke="#334155"
+                stroke="#475569"
                 strokeWidth="1"
               />
 
@@ -652,8 +660,8 @@ export function TargetSpeedometerCluster({
                         x={labelPos.x}
                         y={labelPos.y + 3}
                         textAnchor="middle"
-                        className={`font-mono text-[9px] font-semibold ${
-                          isTarget100 ? 'fill-emerald-400 font-bold' : 'fill-slate-400'
+                        className={`font-mono text-[9px] font-bold ${
+                          isTarget100 ? 'fill-emerald-400' : 'fill-slate-400'
                         }`}
                       >
                         {val}%
@@ -692,6 +700,7 @@ export function TargetSpeedometerCluster({
                   transformOrigin: `${cx}px ${cy}px`,
                   transition: 'transform 700ms cubic-bezier(0.16, 1, 0.3, 1)',
                 }}
+                filter="url(#glowAch)"
               >
                 <polygon
                   points={`${cx - 3.5},${cy} ${cx},${cy - (trackR - 4)} ${cx + 3.5},${cy}`}
@@ -704,7 +713,7 @@ export function TargetSpeedometerCluster({
               </g>
 
               {/* Center Cap */}
-              <circle cx={cx} cy={cy} r="11" fill="#1e293b" stroke={achStatus.hex} strokeWidth="2.5" />
+              <circle cx={cx} cy={cy} r="11" fill="#0f172a" stroke={achStatus.hex} strokeWidth="2.5" />
               <circle cx={cx} cy={cy} r="4" fill={achStatus.hex} />
 
               {/* Status Label below center */}
@@ -713,18 +722,21 @@ export function TargetSpeedometerCluster({
                 y={cy + 30}
                 textAnchor="middle"
                 fill={achStatus.hex}
-                className="font-mono text-[10px] font-bold tracking-wider"
+                className="font-mono text-[10px] font-extrabold tracking-wider"
               >
                 {achStatus.label}
               </text>
             </svg>
 
             {/* Digital Odometer Box */}
-            <div className="w-full bg-slate-950/90 border border-slate-800/90 rounded-lg px-3.5 py-2.5 text-center -mt-2">
+            <div className="w-full bg-slate-950/95 border border-slate-800/90 rounded-lg px-3.5 py-2.5 text-center -mt-2 shadow-[inset_0_0_15px_rgba(16,185,129,0.12)]">
               <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider">
                 Realisasi / Target × 100 {needleMode === 'projected' ? '(Est. Akhir Bulan)' : ''}
               </div>
-              <div className={`text-lg sm:text-xl font-black font-mono tabular-nums mt-0.5 tracking-tight ${achStatus.color}`}>
+              <div
+                className={`text-lg sm:text-xl font-black font-mono tabular-nums mt-0.5 tracking-tight ${achStatus.color}`}
+                style={{ textShadow: `0 0 10px ${achStatus.hex}80` }}
+              >
                 {achievementRate !== null ? `${activeAchPct.toFixed(1)}%` : 'N/A'}
               </div>
             </div>
