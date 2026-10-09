@@ -336,17 +336,17 @@ function MultiSelectFilterMenu({
                       isChecked ? 'bg-slate-800/80 text-white' : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-200'
                     }`}
                   >
-                    <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0" onClick={e => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
                       <input
                         type="checkbox"
                         checked={isChecked}
-                        onChange={() => toggleOption(opt.id)}
-                        className={`w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 focus:ring-0 cursor-pointer ${checkboxAccent}`}
+                        readOnly
+                        className={`w-3.5 h-3.5 rounded border-slate-700 bg-slate-950 focus:ring-0 cursor-pointer pointer-events-none ${checkboxAccent}`}
                       />
                       <span className={`truncate ${isChecked ? 'font-medium' : ''}`}>
                         {opt.label}
                       </span>
-                    </label>
+                    </div>
                     <button
                       type="button"
                       onClick={(e) => {
@@ -567,6 +567,9 @@ export function MonthComparisonView({
     return [];
   });
 
+  const [selectedGrowthOmsetList, setSelectedGrowthOmsetList] = useState<string[]>([]);
+  const [selectedGrowthEcList, setSelectedGrowthEcList] = useState<string[]>([]);
+
   const [searchFilter, setSearchFilter] = useState<string>(() => filters?.searchQuery || '');
 
   // Tab 2 (Outlet) Specific Status Filter
@@ -642,6 +645,8 @@ export function MonthComparisonView({
     setSelectedMarkNewList([]);
     setSelectedAreas([]);
     setSelectedRayons([]);
+    setSelectedGrowthOmsetList([]);
+    setSelectedGrowthEcList([]);
     setSearchFilter('');
     setOutletStatusFilter('ALL');
     setPrevSelectedDays(Array.from({ length: 31 }, (_, i) => i + 1));
@@ -649,6 +654,59 @@ export function MonthComparisonView({
     if (onFilterChange) {
       onFilterChange({});
     }
+  };
+
+  // Options for Growth Omset & Growth EC Multi-Select Filters (Bisa dipilih lebih dari 1)
+  const growthOmsetOptions: MultiSelectOption[] = useMemo(() => [
+    { id: 'GROWTH_HIGH', label: 'Tumbuh Tinggi (> +20%)' },
+    { id: 'GROWTH_MOD', label: 'Tumbuh Positif (0% s/d +20%)' },
+    { id: 'DECLINE_MOD', label: 'Turun Ringan (-1% s/d -20%)' },
+    { id: 'DECLINE_HIGH', label: 'Turun Tajam (< -20%)' },
+    { id: 'NEW_SALES', label: 'New Active / Baru Transaksi' },
+    { id: 'DROP_SALES', label: 'Drop (-100% / Tidak Beli)' },
+  ], []);
+
+  const growthEcOptions: MultiSelectOption[] = useMemo(() => [
+    { id: 'EC_UP_HIGH', label: 'EC Naik Tinggi (> +15%)' },
+    { id: 'EC_UP_MOD', label: 'EC Naik (0.1% s/d +15%)' },
+    { id: 'EC_STABLE', label: 'EC Stabil (0% / Tetap)' },
+    { id: 'EC_DOWN_MOD', label: 'EC Turun (-0.1% s/d -15%)' },
+    { id: 'EC_DOWN_HIGH', label: 'EC Turun Tajam (< -15%)' },
+    { id: 'EC_NEW', label: 'EC Baru (Bulan Lalu 0)' },
+    { id: 'EC_DROP', label: 'EC Drop (Bulan Ini 0)' },
+  ], []);
+
+  const getGrowthOmsetBucket = (prevVal: number, currVal: number, growthPercent: number | null): string => {
+    if (prevVal === 0 && currVal > 0) return 'NEW_SALES';
+    if (prevVal > 0 && currVal === 0) return 'DROP_SALES';
+    if (growthPercent === null) return currVal > 0 ? 'NEW_SALES' : 'DROP_SALES';
+    if (growthPercent > 20) return 'GROWTH_HIGH';
+    if (growthPercent >= 0) return 'GROWTH_MOD';
+    if (growthPercent >= -20) return 'DECLINE_MOD';
+    return 'DECLINE_HIGH';
+  };
+
+  const getGrowthEcBucket = (ecPrev: number, ecCurr: number, growthEcPercent: number | null): string => {
+    if (ecPrev === 0 && ecCurr > 0) return 'EC_NEW';
+    if (ecPrev > 0 && ecCurr === 0) return 'EC_DROP';
+    if (ecPrev === ecCurr) return 'EC_STABLE';
+    const pct = growthEcPercent !== null ? growthEcPercent : (ecPrev > 0 ? ((ecCurr - ecPrev) / ecPrev) * 100 : 0);
+    if (pct > 15) return 'EC_UP_HIGH';
+    if (pct > 0) return 'EC_UP_MOD';
+    if (pct >= -15) return 'EC_DOWN_MOD';
+    return 'EC_DOWN_HIGH';
+  };
+
+  const matchesGrowthOmsetFilter = (prevVal: number, currVal: number, growthPercent: number | null): boolean => {
+    if (selectedGrowthOmsetList.length === 0 || selectedGrowthOmsetList.length === growthOmsetOptions.length) return true;
+    const bucket = getGrowthOmsetBucket(prevVal, currVal, growthPercent);
+    return selectedGrowthOmsetList.includes(bucket);
+  };
+
+  const matchesGrowthEcFilter = (ecPrev: number, ecCurr: number, growthEcPercent: number | null): boolean => {
+    if (selectedGrowthEcList.length === 0 || selectedGrowthEcList.length === growthEcOptions.length) return true;
+    const bucket = getGrowthEcBucket(ecPrev, ecCurr, growthEcPercent);
+    return selectedGrowthEcList.includes(bucket);
   };
 
   // Salesmen list
@@ -936,10 +994,12 @@ export function MonthComparisonView({
     if (selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length) count++;
     if (selectedAreas.length > 0 && selectedAreas.length < allAreas.length) count++;
     if (selectedRayons.length > 0 && selectedRayons.length < allRayons.length) count++;
+    if (selectedGrowthOmsetList.length > 0 && selectedGrowthOmsetList.length < growthOmsetOptions.length) count++;
+    if (selectedGrowthEcList.length > 0 && selectedGrowthEcList.length < growthEcOptions.length) count++;
     if (searchFilter.trim()) count++;
     if (prevSelectedDays.length < 31 || currSelectedDays.length < maxCurrDay) count++;
     return count;
-  }, [selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, searchFilter, prevSelectedDays, currSelectedDays, maxCurrDay]);
+  }, [selectedSalesmen, salesmenList.length, selectedOutletType, selectedChannels, allChannels.length, selectedMarkNewList, allMarkNewCategories.length, selectedAreas, allAreas.length, selectedRayons, allRayons.length, selectedGrowthOmsetList, growthOmsetOptions.length, selectedGrowthEcList, growthEcOptions.length, searchFilter, prevSelectedDays, currSelectedDays, maxCurrDay]);
 
   // ==========================================
   // 1. HARIAN (DAY-BY-DAY) COMPARISON DATASET
@@ -1021,8 +1081,12 @@ export function MonthComparisonView({
         diffEC,
         growthEC,
       };
+    }).filter(d => {
+      if (!matchesGrowthOmsetFilter(d.prevSales, d.currSales, d.growthSales)) return false;
+      if (!matchesGrowthEcFilter(d.prevEC, d.currEC, d.growthEC)) return false;
+      return true;
     });
-  }, [dailyPrevTxs, dailyCurrTxs]);
+  }, [dailyPrevTxs, dailyCurrTxs, selectedGrowthOmsetList, selectedGrowthEcList]);
 
   // ==========================================
   // 2. MONITORING BY ECERAN (BERDASARKAN KOLOM MARK NEW)
@@ -1155,15 +1219,19 @@ export function MonthComparisonView({
       .sort((a, b) => b.omsetCurr - a.omsetCurr);
   }, [eceranPrevTxs, eceranCurrTxs, eceranOmsetCurr]);
 
-  // Filtered Eceran data if specific MARK NEW is selected
+  // Filtered Eceran data if specific MARK NEW, Growth Omset, or Growth EC is selected
   const displayedEceranData = useMemo(() => {
-    if (selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length) {
-      return eceranMarkNewData.filter(d => 
-        selectedMarkNewList.some(s => s.trim().toUpperCase() === d.markNew.trim().toUpperCase())
-      );
-    }
-    return eceranMarkNewData;
-  }, [eceranMarkNewData, selectedMarkNewList, allMarkNewCategories.length]);
+    return eceranMarkNewData.filter(d => {
+      if (selectedMarkNewList.length > 0 && selectedMarkNewList.length < allMarkNewCategories.length) {
+        if (!selectedMarkNewList.some(s => s.trim().toUpperCase() === d.markNew.trim().toUpperCase())) {
+          return false;
+        }
+      }
+      if (!matchesGrowthOmsetFilter(d.omsetPrev, d.omsetCurr, d.growthOmset)) return false;
+      if (!matchesGrowthEcFilter(d.ecPrev, d.ecCurr, d.growthEC)) return false;
+      return true;
+    });
+  }, [eceranMarkNewData, selectedMarkNewList, allMarkNewCategories.length, selectedGrowthOmsetList, selectedGrowthEcList]);
 
   // ==========================================
   // 3. MONITORING BY OUTLET
@@ -1323,13 +1391,18 @@ export function MonthComparisonView({
     });
   }, [masterOutlets, activePrevTxs, activeCurrTxs, selectedSalesmen, selectedOutletType, selectedChannels, selectedMarkNewList, selectedAreas, selectedRayons, searchFilter, filters]);
 
-  // Filtered Outlets for DataTable (termasuk status button)
+  // Filtered Outlets for DataTable (termasuk status button, Growth Omset & Growth EC)
   const filteredOutlets = useMemo(() => {
     return outletComparisonData.filter(o => {
       if (outletStatusFilter !== 'ALL' && o.status !== outletStatusFilter) return false;
+      if (!matchesGrowthOmsetFilter(o.omsetPrev, o.omsetCurr, o.growthOmset)) return false;
+      const ecPrevVal = o.ecPrev ? 1 : 0;
+      const ecCurrVal = o.ecCurr ? 1 : 0;
+      const ecGrowthVal = ecPrevVal > 0 ? ((ecCurrVal - ecPrevVal) / ecPrevVal) * 100 : (ecCurrVal > 0 ? 100 : 0);
+      if (!matchesGrowthEcFilter(ecPrevVal, ecCurrVal, ecGrowthVal)) return false;
       return true;
     });
-  }, [outletComparisonData, outletStatusFilter]);
+  }, [outletComparisonData, outletStatusFilter, selectedGrowthOmsetList, selectedGrowthEcList]);
 
   // Outlet KPIs
   const outletKpis = useMemo(() => {
@@ -1369,6 +1442,8 @@ export function MonthComparisonView({
       actualPrevious: number;
       actualCurrent: number;
       target: number;
+      ecPrevSet: Set<string>;
+      ecCurrSet: Set<string>;
     }>();
 
     // Seed from calculation.salesmanPerformances to keep targets
@@ -1387,6 +1462,8 @@ export function MonthComparisonView({
           actualPrevious: 0,
           actualCurrent: 0,
           target: s.target || 0,
+          ecPrevSet: new Set(),
+          ecCurrSet: new Set(),
         });
       }
     });
@@ -1401,10 +1478,13 @@ export function MonthComparisonView({
           actualPrevious: 0,
           actualCurrent: 0,
           target: 0,
+          ecPrevSet: new Set(),
+          ecCurrSet: new Set(),
         });
       }
       const item = map.get(slsId)!;
       item.actualPrevious += (t.salesValue || 0);
+      if (t.salesValue > 0 && t.outletId) item.ecPrevSet.add(t.outletId);
       if (t.area && !item.area) item.area = t.area;
     });
 
@@ -1418,10 +1498,13 @@ export function MonthComparisonView({
           actualPrevious: 0,
           actualCurrent: 0,
           target: 0,
+          ecPrevSet: new Set(),
+          ecCurrSet: new Set(),
         });
       }
       const item = map.get(slsId)!;
       item.actualCurrent += (t.salesValue || 0);
+      if (t.salesValue > 0 && t.outletId) item.ecCurrSet.add(t.outletId);
       if (t.area && !item.area) item.area = t.area;
     });
 
@@ -1430,6 +1513,10 @@ export function MonthComparisonView({
         ? ((s.actualCurrent - s.actualPrevious) / s.actualPrevious) * 100 
         : (s.actualCurrent > 0 ? null : 0);
       
+      const ecPrev = s.ecPrevSet.size;
+      const ecCurr = s.ecCurrSet.size;
+      const growthEC = ecPrev > 0 ? ((ecCurr - ecPrev) / ecPrev) * 100 : (ecCurr > 0 ? null : 0);
+
       const achievementRate = s.target > 0 
         ? (s.actualCurrent / s.target) * 100 
         : null;
@@ -1443,6 +1530,9 @@ export function MonthComparisonView({
 
       return {
         ...s,
+        ecPrev,
+        ecCurr,
+        growthEC,
         growthRate,
         growthStatus,
         achievementRate,
@@ -1451,11 +1541,15 @@ export function MonthComparisonView({
   }, [calculation, activePrevTxs, activeCurrTxs, selectedSalesmen, selectedOutletType, selectedChannels, selectedMarkNewList, selectedAreas, selectedRayons, searchFilter, filters]);
 
   const filteredSalesmanPerformances = useMemo(() => {
-    if (selectedSalesmen.length > 0 && selectedSalesmen.length < salesmenList.length) {
-      return dateAwareSalesmanPerformances.filter(s => selectedSalesmen.includes(s.salesmanId));
-    }
-    return dateAwareSalesmanPerformances;
-  }, [dateAwareSalesmanPerformances, selectedSalesmen, salesmenList.length]);
+    return dateAwareSalesmanPerformances.filter(s => {
+      if (selectedSalesmen.length > 0 && selectedSalesmen.length < salesmenList.length) {
+        if (!selectedSalesmen.includes(s.salesmanId)) return false;
+      }
+      if (!matchesGrowthOmsetFilter(s.actualPrevious, s.actualCurrent, s.growthRate)) return false;
+      if (!matchesGrowthEcFilter(s.ecPrev, s.ecCurr, s.growthEC)) return false;
+      return true;
+    });
+  }, [dateAwareSalesmanPerformances, selectedSalesmen, salesmenList.length, selectedGrowthOmsetList, selectedGrowthEcList]);
 
   // ==========================================
   // TABLE COLUMNS
@@ -2593,8 +2687,8 @@ export function MonthComparisonView({
           />
         </div>
 
-        {/* Row 2: Area, Rayon, Search */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+        {/* Row 2: Area, Rayon, Filter Growth OMSET, Filter Growth EC, Search */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-1">
           {/* Area - Multi-Select */}
           <MultiSelectFilterMenu
             label="Area"
@@ -2613,6 +2707,26 @@ export function MonthComparisonView({
             onChange={handleRayonsChange}
             accentColor="cyan"
             placeholder="Semua Rayon"
+          />
+
+          {/* Filter Growth OMSET - Multi-Select (Bisa dipilih lebih dari 1) */}
+          <MultiSelectFilterMenu
+            label="Filter Growth OMSET"
+            options={growthOmsetOptions}
+            selectedValues={selectedGrowthOmsetList}
+            onChange={setSelectedGrowthOmsetList}
+            accentColor="emerald"
+            placeholder="Semua Growth Omset"
+          />
+
+          {/* Filter Growth EC - Multi-Select (Bisa dipilih lebih dari 1) */}
+          <MultiSelectFilterMenu
+            label="Filter Growth EC"
+            options={growthEcOptions}
+            selectedValues={selectedGrowthEcList}
+            onChange={setSelectedGrowthEcList}
+            accentColor="amber"
+            placeholder="Semua Growth EC"
           />
 
           {/* Search Query */}
@@ -2688,6 +2802,20 @@ export function MonthComparisonView({
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-800 text-slate-300 border border-slate-700 text-[11px]">
               <span>Rayon: {selectedRayons.length === 1 ? selectedRayons[0] : `${selectedRayons.length} Rayon`}</span>
               <button type="button" onClick={() => handleRayonsChange([])} className="hover:text-white"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+
+          {selectedGrowthOmsetList.length > 0 && selectedGrowthOmsetList.length < growthOmsetOptions.length && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-emerald-950 text-emerald-300 border border-emerald-800/60 text-[11px]">
+              <span>Growth Omset: {selectedGrowthOmsetList.length === 1 ? (growthOmsetOptions.find(o => o.id === selectedGrowthOmsetList[0])?.label || selectedGrowthOmsetList[0]) : `${selectedGrowthOmsetList.length} Kategori`}</span>
+              <button type="button" onClick={() => setSelectedGrowthOmsetList([])} className="hover:text-white" title="Reset filter Growth Omset"><X className="w-3 h-3" /></button>
+            </span>
+          )}
+
+          {selectedGrowthEcList.length > 0 && selectedGrowthEcList.length < growthEcOptions.length && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-amber-950 text-amber-300 border border-amber-800/60 text-[11px]">
+              <span>Growth EC: {selectedGrowthEcList.length === 1 ? (growthEcOptions.find(o => o.id === selectedGrowthEcList[0])?.label || selectedGrowthEcList[0]) : `${selectedGrowthEcList.length} Kategori`}</span>
+              <button type="button" onClick={() => setSelectedGrowthEcList([])} className="hover:text-white" title="Reset filter Growth EC"><X className="w-3 h-3" /></button>
             </span>
           )}
 
