@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Clock,
   Store,
@@ -15,6 +15,9 @@ import {
   Search,
   Sparkles,
   FileSpreadsheet,
+  ChevronDown,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import { CalculationResult, GlobalFilterState } from '../../types/analytics';
 import { AppSettings, MasterOutletRecord, TransactionRecord, UserProfile } from '../../types/database';
@@ -132,12 +135,28 @@ export function LastTransactionOver7DaysView({
   onLoadSampleData,
 }: LastTxOver7DaysViewProps) {
   const [minDaysThreshold, setMinDaysThreshold] = useState<number>(7);
-  const [selectedDepo, setSelectedDepo] = useState<string>('ALL');
-  const [selectedChannel, setSelectedChannel] = useState<string>('ALL');
-  const [selectedSalesman, setSelectedSalesman] = useState<string>('ALL');
+  const [selectedChannels, setSelectedChannels] = useState<string[]>([]);
+  const [isChannelDropdownOpen, setIsChannelDropdownOpen] = useState<boolean>(false);
+  const channelDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedSalesmen, setSelectedSalesmen] = useState<string[]>([]);
+  const [isSalesmanDropdownOpen, setIsSalesmanDropdownOpen] = useState<boolean>(false);
+  const salesmanDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedSourceMonth, setSelectedSourceMonth] = useState<'ALL' | 'BULAN_INI' | 'BULAN_LALU'>('ALL');
   const [selectedSeverity, setSelectedSeverity] = useState<'ALL' | '8_14' | '15_21' | 'OVER_21'>('ALL');
   const [manualCutOffDate, setManualCutOffDate] = useState<string>(''); // Empty = Auto
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (channelDropdownRef.current && !channelDropdownRef.current.contains(event.target as Node)) {
+        setIsChannelDropdownOpen(false);
+      }
+      if (salesmanDropdownRef.current && !salesmanDropdownRef.current.contains(event.target as Node)) {
+        setIsSalesmanDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const hasTransactions = prevTransactions.length > 0 || currTransactions.length > 0;
 
@@ -403,30 +422,36 @@ export function LastTransactionOver7DaysView({
     return allOutletsLastTx.filter(item => item.daysSinceLastTx > minDaysThreshold);
   }, [allOutletsLastTx, minDaysThreshold]);
 
-  // Unique Depos, Channels, and Salesmen from baseOver7DaysOutlets for quick local filters
-  const uniqueDepos = useMemo(() => {
-    const set = new Set<string>();
-    baseOver7DaysOutlets.forEach(item => {
-      if (item.depo) set.add(item.depo);
-    });
-    return Array.from(set).sort();
-  }, [baseOver7DaysOutlets]);
-
+  // Unique Channels and Salesmen from baseOver7DaysOutlets for quick local filters
   const uniqueChannels = useMemo(() => {
     const set = new Set<string>();
     baseOver7DaysOutlets.forEach(item => {
-      if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) return;
       const ch = (item.channel || 'GENERAL TRADE').trim();
       if (ch) set.add(ch);
     });
     return Array.from(set).sort();
-  }, [baseOver7DaysOutlets, selectedDepo]);
+  }, [baseOver7DaysOutlets]);
+
+  const toggleChannel = (ch: string) => {
+    setSelectedChannels(prev => {
+      const next = prev.includes(ch) ? prev.filter(c => c !== ch) : [...prev, ch];
+      return next;
+    });
+    setSelectedSalesmen([]);
+  };
+
+  const toggleSalesman = (id: string) => {
+    setSelectedSalesmen(prev => {
+      const next = prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id];
+      return next;
+    });
+  };
 
   const uniqueSalesmen = useMemo(() => {
     const map = new Map<string, string>();
     baseOver7DaysOutlets.forEach(item => {
-      if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) return;
-      if (selectedChannel !== 'ALL' && (item.channel || 'GENERAL TRADE').trim() !== selectedChannel) return;
+      const itemChannel = (item.channel || 'GENERAL TRADE').trim();
+      if (selectedChannels.length > 0 && !selectedChannels.includes(itemChannel)) return;
       if (item.salesmanId) {
         map.set(item.salesmanId, item.salesmanName || item.salesmanId);
       }
@@ -434,14 +459,14 @@ export function LastTransactionOver7DaysView({
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [baseOver7DaysOutlets, selectedDepo, selectedChannel]);
+  }, [baseOver7DaysOutlets, selectedChannels]);
 
   // Apply local dropdown filters
   const filteredOutlets = useMemo(() => {
     return baseOver7DaysOutlets.filter(item => {
-      if (selectedDepo !== 'ALL' && item.depo !== selectedDepo) return false;
-      if (selectedChannel !== 'ALL' && (item.channel || 'GENERAL TRADE').trim() !== selectedChannel) return false;
-      if (selectedSalesman !== 'ALL' && item.salesmanId !== selectedSalesman) return false;
+      const itemChannel = (item.channel || 'GENERAL TRADE').trim();
+      if (selectedChannels.length > 0 && !selectedChannels.includes(itemChannel)) return false;
+      if (selectedSalesmen.length > 0 && !selectedSalesmen.includes(item.salesmanId)) return false;
       if (selectedSourceMonth === 'BULAN_INI' && item.lastTxMonthSource !== 'BULAN INI') return false;
       if (selectedSourceMonth === 'BULAN_LALU' && item.lastTxMonthSource !== 'BULAN LALU') return false;
       if (selectedSeverity === '8_14' && (item.daysSinceLastTx < 8 || item.daysSinceLastTx > 14)) return false;
@@ -449,7 +474,7 @@ export function LastTransactionOver7DaysView({
       if (selectedSeverity === 'OVER_21' && item.daysSinceLastTx <= 21) return false;
       return true;
     });
-  }, [baseOver7DaysOutlets, selectedDepo, selectedChannel, selectedSalesman, selectedSourceMonth, selectedSeverity]);
+  }, [baseOver7DaysOutlets, selectedChannels, selectedSalesmen, selectedSourceMonth, selectedSeverity]);
 
   // Summary statistics
   const summaryStats = useMemo(() => {
@@ -671,9 +696,10 @@ export function LastTransactionOver7DaysView({
 
   const handleResetLocalFilters = () => {
     setMinDaysThreshold(7);
-    setSelectedDepo('ALL');
-    setSelectedChannel('ALL');
-    setSelectedSalesman('ALL');
+    setSelectedChannels([]);
+    setIsChannelDropdownOpen(false);
+    setSelectedSalesmen([]);
+    setIsSalesmanDropdownOpen(false);
     setSelectedSourceMonth('ALL');
     setSelectedSeverity('ALL');
     setManualCutOffDate('');
@@ -803,67 +829,191 @@ export function LastTransactionOver7DaysView({
           </button>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-          {/* 1. Filter Depo */}
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">1. Filter Depo</label>
-            <select
-              value={selectedDepo}
-              onChange={e => {
-                setSelectedDepo(e.target.value);
-                setSelectedSalesman('ALL');
-              }}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+          {/* 1. Filter Chanel (Multi-select Checkbox Dropdown) */}
+          <div className="relative" ref={channelDropdownRef}>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">1. Filter Chanel</label>
+            <button
+              type="button"
+              onClick={() => setIsChannelDropdownOpen(prev => !prev)}
+              className="w-full bg-slate-950 border border-slate-700 hover:border-cyan-500/70 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 flex items-center justify-between gap-2 focus:outline-none focus:border-cyan-500 transition-colors"
             >
-              <option value="ALL">Semua Depo ({uniqueDepos.length})</option>
-              {uniqueDepos.map(d => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
+              <span className="truncate text-left">
+                {selectedChannels.length === 0
+                  ? `Semua Chanel (${uniqueChannels.length})`
+                  : selectedChannels.length === 1
+                  ? selectedChannels[0]
+                  : `${selectedChannels.length} Chanel Dipilih`}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+                  isChannelDropdownOpen ? 'rotate-180 text-cyan-400' : ''
+                }`}
+              />
+            </button>
+
+            {isChannelDropdownOpen && (
+              <div className="absolute left-0 right-0 mt-1.5 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="p-2 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedChannels.length === uniqueChannels.length) {
+                        setSelectedChannels([]);
+                      } else {
+                        setSelectedChannels([...uniqueChannels]);
+                      }
+                      setSelectedSalesmen([]);
+                    }}
+                    className="text-[10px] font-mono font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                  >
+                    {selectedChannels.length === uniqueChannels.length ? 'Hapus Semua' : 'Pilih Semua'}
+                  </button>
+                  {selectedChannels.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedChannels([]);
+                        setSelectedSalesmen([]);
+                      }}
+                      className="text-[10px] font-mono text-amber-400 hover:text-amber-300"
+                    >
+                      Reset ({selectedChannels.length})
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
+                  {uniqueChannels.map(ch => {
+                    const isChecked = selectedChannels.includes(ch);
+                    return (
+                      <label
+                        key={ch}
+                        onClick={() => toggleChannel(ch)}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs select-none transition-colors ${
+                          isChecked
+                            ? 'bg-cyan-500/15 text-cyan-200 font-semibold'
+                            : 'text-slate-300 hover:bg-slate-800/70'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="sr-only"
+                        />
+                        {isChecked ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        )}
+                        <span className="truncate">{ch}</span>
+                      </label>
+                    );
+                  })}
+                  {uniqueChannels.length === 0 && (
+                    <div className="px-2 py-3 text-center text-[11px] text-slate-500 font-mono">
+                      Tidak ada chanel tersedia
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 2. Filter Chanel */}
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">2. Filter Chanel</label>
-            <select
-              value={selectedChannel}
-              onChange={e => {
-                setSelectedChannel(e.target.value);
-                setSelectedSalesman('ALL');
-              }}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+          {/* 2. Filter Nama Sales (Multi-select Checkbox Dropdown) */}
+          <div className="relative" ref={salesmanDropdownRef}>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">2. Filter Nama Sales</label>
+            <button
+              type="button"
+              onClick={() => setIsSalesmanDropdownOpen(prev => !prev)}
+              className="w-full bg-slate-950 border border-slate-700 hover:border-cyan-500/70 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 flex items-center justify-between gap-2 focus:outline-none focus:border-cyan-500 transition-colors"
             >
-              <option value="ALL">Semua Chanel ({uniqueChannels.length})</option>
-              {uniqueChannels.map(ch => (
-                <option key={ch} value={ch}>
-                  {ch}
-                </option>
-              ))}
-            </select>
+              <span className="truncate text-left">
+                {selectedSalesmen.length === 0
+                  ? `Semua Salesman (${uniqueSalesmen.length})`
+                  : selectedSalesmen.length === 1
+                  ? (() => {
+                      const found = uniqueSalesmen.find(s => s.id === selectedSalesmen[0]);
+                      return found ? `${found.name} (${found.id})` : selectedSalesmen[0];
+                    })()
+                  : `${selectedSalesmen.length} Salesman Dipilih`}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 shrink-0 transition-transform ${
+                  isSalesmanDropdownOpen ? 'rotate-180 text-cyan-400' : ''
+                }`}
+              />
+            </button>
+
+            {isSalesmanDropdownOpen && (
+              <div className="absolute left-0 right-0 mt-1.5 bg-slate-950 border border-slate-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="p-2 border-b border-slate-800 flex items-center justify-between bg-slate-900/80">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedSalesmen.length === uniqueSalesmen.length) {
+                        setSelectedSalesmen([]);
+                      } else {
+                        setSelectedSalesmen(uniqueSalesmen.map(s => s.id));
+                      }
+                    }}
+                    className="text-[10px] font-mono font-bold text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                  >
+                    {selectedSalesmen.length === uniqueSalesmen.length ? 'Hapus Semua' : 'Pilih Semua'}
+                  </button>
+                  {selectedSalesmen.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSalesmen([])}
+                      className="text-[10px] font-mono text-amber-400 hover:text-amber-300"
+                    >
+                      Reset ({selectedSalesmen.length})
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
+                  {uniqueSalesmen.map(s => {
+                    const isChecked = selectedSalesmen.includes(s.id);
+                    return (
+                      <label
+                        key={s.id}
+                        onClick={() => toggleSalesman(s.id)}
+                        className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-xs select-none transition-colors ${
+                          isChecked
+                            ? 'bg-cyan-500/15 text-cyan-200 font-semibold'
+                            : 'text-slate-300 hover:bg-slate-800/70'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="sr-only"
+                        />
+                        {isChecked ? (
+                          <CheckSquare className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        )}
+                        <span className="truncate">
+                          {s.name} <span className="text-[10px] font-mono text-slate-400">({s.id})</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                  {uniqueSalesmen.length === 0 && (
+                    <div className="px-2 py-3 text-center text-[11px] text-slate-500 font-mono">
+                      Tidak ada salesman tersedia
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 3. Filter Salesman */}
+          {/* 3. Filter Bulan Transaksi Terakhir */}
           <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">3. Filter Nama Sales</label>
-            <select
-              value={selectedSalesman}
-              onChange={e => setSelectedSalesman(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-            >
-              <option value="ALL">Semua Salesman ({uniqueSalesmen.length})</option>
-              {uniqueSalesmen.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.id})
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 4. Filter Bulan Transaksi Terakhir */}
-          <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">4. Sumber Bulan Trx Terakhir</label>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">3. Sumber Bulan Trx Terakhir</label>
             <select
               value={selectedSourceMonth}
               onChange={e => setSelectedSourceMonth(e.target.value as any)}
@@ -875,9 +1025,9 @@ export function LastTransactionOver7DaysView({
             </select>
           </div>
 
-          {/* 5. Filter Kelompok Rentang Hari */}
+          {/* 4. Filter Kelompok Rentang Hari */}
           <div>
-            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">5. Kategori Rentang Hari</label>
+            <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">4. Kategori Rentang Hari</label>
             <select
               value={selectedSeverity}
               onChange={e => setSelectedSeverity(e.target.value as any)}
@@ -890,10 +1040,10 @@ export function LastTransactionOver7DaysView({
             </select>
           </div>
 
-          {/* 6. Batas Minimum Hari (Default > 7 Hari) */}
+          {/* 5. Batas Minimum Hari (Default > 7 Hari) */}
           <div>
             <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
-              6. Batas Rentang (&gt; X Hari)
+              5. Batas Rentang (&gt; X Hari)
             </label>
             <div className="flex items-center gap-1.5">
               <input
@@ -908,10 +1058,10 @@ export function LastTransactionOver7DaysView({
             </div>
           </div>
 
-          {/* 7. Tanggal Update Harian (Auto / Custom Override) */}
+          {/* 6. Tanggal Update Harian (Auto / Custom Override) */}
           <div>
             <label className="block text-[10px] font-mono uppercase text-slate-400 mb-1">
-              7. Tgl Update Harian (Auto)
+              6. Tgl Update Harian (Auto)
             </label>
             <div className="flex items-center gap-1">
               <input
@@ -979,7 +1129,7 @@ export function LastTransactionOver7DaysView({
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {salesmanSummary.map(s => {
-                  const isSelected = selectedSalesman === s.salesmanId;
+                  const isSelected = selectedSalesmen.includes(s.salesmanId);
                   return (
                     <tr
                       key={`${s.depo}-${s.salesmanId}`}
@@ -1012,16 +1162,14 @@ export function LastTransactionOver7DaysView({
                       </td>
                       <td className="py-2.5 px-4 text-center" data-capture-ignore="true">
                         <button
-                          onClick={() =>
-                            setSelectedSalesman(isSelected ? 'ALL' : s.salesmanId)
-                          }
+                          onClick={() => toggleSalesman(s.salesmanId)}
                           className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border transition-colors ${
                             isSelected
                               ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
                               : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
                           }`}
                         >
-                          {isSelected ? 'Tampilkan Semua' : 'Lihat Toko'}
+                          {isSelected ? 'Hapus Filter' : 'Pilih Sales'}
                         </button>
                       </td>
                     </tr>
