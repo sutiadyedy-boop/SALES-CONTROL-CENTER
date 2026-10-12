@@ -1460,6 +1460,9 @@ export function MonthComparisonView({
           salesmanId: s.salesmanId,
           salesmanName: s.salesmanName,
           area: s.area || '',
+          depo: s.depo || '',
+          pma: s.pma || '',
+          cabang: s.cabang || '',
           actualPrevious: 0,
           actualCurrent: 0,
           target: s.target || 0,
@@ -1476,6 +1479,9 @@ export function MonthComparisonView({
           salesmanId: slsId,
           salesmanName: t.salesmanName || slsId,
           area: t.area || '',
+          depo: t.depo || '',
+          pma: t.pma || '',
+          cabang: t.cabang || '',
           actualPrevious: 0,
           actualCurrent: 0,
           target: 0,
@@ -1487,6 +1493,9 @@ export function MonthComparisonView({
       item.actualPrevious += (t.salesValue || 0);
       if (t.salesValue > 0 && t.outletId) item.ecPrevSet.add(t.outletId);
       if (t.area && !item.area) item.area = t.area;
+      if (t.depo && !item.depo) item.depo = t.depo;
+      if (t.pma && !item.pma) item.pma = t.pma;
+      if (t.cabang && !item.cabang) item.cabang = t.cabang;
     });
 
     activeCurrTxs.forEach(t => {
@@ -1496,6 +1505,9 @@ export function MonthComparisonView({
           salesmanId: slsId,
           salesmanName: t.salesmanName || slsId,
           area: t.area || '',
+          depo: t.depo || '',
+          pma: t.pma || '',
+          cabang: t.cabang || '',
           actualPrevious: 0,
           actualCurrent: 0,
           target: 0,
@@ -1507,6 +1519,9 @@ export function MonthComparisonView({
       item.actualCurrent += (t.salesValue || 0);
       if (t.salesValue > 0 && t.outletId) item.ecCurrSet.add(t.outletId);
       if (t.area && !item.area) item.area = t.area;
+      if (t.depo && !item.depo) item.depo = t.depo;
+      if (t.pma && !item.pma) item.pma = t.pma;
+      if (t.cabang && !item.cabang) item.cabang = t.cabang;
     });
 
     return Array.from(map.values()).map(s => {
@@ -1552,9 +1567,256 @@ export function MonthComparisonView({
     });
   }, [dateAwareSalesmanPerformances, selectedSalesmen, salesmenList.length, selectedGrowthOmsetList, selectedGrowthEcList]);
 
+  const filteredDepoPmaPerformances = useMemo(() => {
+    const isGenericTierPma = (val?: string) => {
+      if (!val) return true;
+      const u = String(val).trim().toUpperCase();
+      return ['GOLD', 'SILVER', 'BRONZE', 'PLATINUM', 'REGULER', 'REGULAR', 'OK', 'AKTIF', 'ACTIVE', '-'].includes(u);
+    };
+    const isGenericDefaultDepo = (val?: string) => {
+      if (!val) return true;
+      const u = String(val).trim().toUpperCase();
+      return u === 'DEPO BONE PUSAT' || u === 'DEPO UTAMA' || u === '-';
+    };
+    const resolveDepoPmaLabel = (s: any): string => {
+      const expDepo = !isGenericDefaultDepo(s.depo) ? String(s.depo).trim() : '';
+      const expPma = !isGenericTierPma(s.pma) ? String(s.pma).trim() : '';
+      const area = s.area ? String(s.area).trim() : '';
+      const cabang = s.cabang ? String(s.cabang).trim() : '';
+      const rawDepo = s.depo ? String(s.depo).trim() : '';
+      const rawPma = s.pma ? String(s.pma).trim() : '';
+
+      if (expDepo && area && !expDepo.toUpperCase().includes(area.toUpperCase()) && !area.toUpperCase().includes(expDepo.toUpperCase())) {
+        return `${expDepo} - ${area}`;
+      }
+      if (expPma && area && !expPma.toUpperCase().includes(area.toUpperCase()) && !area.toUpperCase().includes(expPma.toUpperCase())) {
+        return `${expPma} - ${area}`;
+      }
+      if (expDepo) return expDepo;
+      if (expPma) return expPma;
+      if (area) return area;
+      if (cabang) return cabang;
+      if (rawDepo) return rawDepo;
+      if (rawPma) return rawPma;
+      return 'DEPO / PMA UMUM';
+    };
+
+    const grpMap = new Map<string, {
+      depoPmaName: string;
+      salesmenCount: number;
+      actualPrevious: number;
+      actualCurrent: number;
+      target: number;
+      ecPrevSet: Set<string>;
+      ecCurrSet: Set<string>;
+    }>();
+
+    filteredSalesmanPerformances.forEach((s: any) => {
+      const label = resolveDepoPmaLabel(s);
+      const key = label.toUpperCase();
+      let grp = grpMap.get(key);
+      if (!grp) {
+        grp = {
+          depoPmaName: label,
+          salesmenCount: 0,
+          actualPrevious: 0,
+          actualCurrent: 0,
+          target: 0,
+          ecPrevSet: new Set(),
+          ecCurrSet: new Set(),
+        };
+        grpMap.set(key, grp);
+      }
+      grp.salesmenCount += 1;
+      grp.actualPrevious += (s.actualPrevious || 0);
+      grp.actualCurrent += (s.actualCurrent || 0);
+      grp.target += (s.target || 0);
+      if (s.ecPrevSet) s.ecPrevSet.forEach((o: string) => grp!.ecPrevSet.add(o));
+      if (s.ecCurrSet) s.ecCurrSet.forEach((o: string) => grp!.ecCurrSet.add(o));
+    });
+
+    return Array.from(grpMap.values()).map(g => {
+      const growthRate = g.actualPrevious > 0
+        ? ((g.actualCurrent - g.actualPrevious) / g.actualPrevious) * 100
+        : (g.actualCurrent > 0 ? null : 0);
+      const ecPrev = g.ecPrevSet.size;
+      const ecCurr = g.ecCurrSet.size;
+      const growthEC = ecPrev > 0 ? ((ecCurr - ecPrev) / ecPrev) * 100 : (ecCurr > 0 ? null : 0);
+      const achievementRate = g.target > 0 ? (g.actualCurrent / g.target) * 100 : null;
+      let growthStatus: 'POSITIVE' | 'NEGATIVE' | 'NEW_SALES' | 'NO_DATA' = 'NO_DATA';
+      if (g.actualPrevious === 0 && g.actualCurrent > 0) {
+        growthStatus = 'NEW_SALES';
+      } else if (growthRate !== null) {
+        growthStatus = growthRate >= 0 ? 'POSITIVE' : 'NEGATIVE';
+      }
+      return {
+        ...g,
+        ecPrev,
+        ecCurr,
+        growthEC,
+        growthRate,
+        growthStatus,
+        achievementRate,
+      };
+    }).sort((a, b) => b.actualCurrent - a.actualCurrent);
+  }, [filteredSalesmanPerformances]);
+
   // ==========================================
   // TABLE COLUMNS
   // ==========================================
+
+  // A0. Depo / PMA Comparison Table Columns
+  const depoPmaComparisonColumns: ColumnDef<any>[] = [
+    {
+      key: 'depoPmaName',
+      header: 'Depo / PMA',
+      accessor: (row) => row.depoPmaName,
+      render: (row) => (
+        <div>
+          <div className="font-bold text-amber-300 font-mono">{row.depoPmaName}</div>
+          <div className="text-[10px] text-slate-500 font-mono">{row.salesmenCount} Salesman</div>
+        </div>
+      ),
+    },
+    {
+      key: 'actualPrevious',
+      header: `Sales ${prevLabel}`,
+      align: 'right',
+      accessor: (row) => row.actualPrevious,
+      render: (row) => (
+        <span className="font-mono text-slate-300">
+          {formatRupiah(row.actualPrevious)}
+        </span>
+      ),
+    },
+    {
+      key: 'actualCurrent',
+      header: `Sales ${currLabel}`,
+      align: 'right',
+      accessor: (row) => row.actualCurrent,
+      render: (row) => (
+        <span className="font-mono font-bold text-cyan-300">
+          {formatRupiah(row.actualCurrent)}
+        </span>
+      ),
+    },
+    {
+      key: 'growthRate',
+      header: 'Growth Omset %',
+      align: 'right',
+      accessor: (row) => row.growthRate ?? -999,
+      render: (row) => {
+        if (row.growthStatus === 'NEW_SALES') {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW SALES</span>
+            </span>
+          );
+        }
+        if (row.growthRate === null) {
+          return <span className="text-slate-500 font-mono text-xs">N/A</span>;
+        }
+        const isUp = row.growthRate > 0.05;
+        const isDown = row.growthRate < -0.05;
+        return (
+          <span className={`font-mono font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border text-xs ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap / Stabil'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthRate)}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'ecPrevious',
+      header: `EC ${prevLabel}`,
+      align: 'right',
+      accessor: (row) => row.ecPrev ?? 0,
+      render: (row) => <span className="font-mono text-slate-400 text-xs">{row.ecPrev ?? 0} Toko</span>,
+    },
+    {
+      key: 'ecCurrent',
+      header: `EC ${currLabel}`,
+      align: 'right',
+      accessor: (row) => row.ecCurr ?? 0,
+      render: (row) => <span className="font-mono font-bold text-amber-300 text-xs">{row.ecCurr ?? 0} Toko</span>,
+    },
+    {
+      key: 'growthEC',
+      header: 'Growth EC %',
+      align: 'right',
+      accessor: (row) => row.growthEC ?? -999,
+      render: (row) => {
+        if (row.ecPrev === 0 && row.ecCurr > 0) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW EC</span>
+            </span>
+          );
+        }
+        if (row.growthEC === null || row.growthEC === undefined) {
+          return <span className="text-slate-500 font-mono text-xs">-</span>;
+        }
+        const isUp = row.growthEC > 0.05;
+        const isDown = row.growthEC < -0.05;
+        return (
+          <span className={`font-mono font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border text-xs ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren EC Naik' : isDown ? 'Tren EC Turun' : 'Tren EC Tetap / Stabil'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthEC)}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'target',
+      header: `Target ${currLabel}`,
+      align: 'right',
+      accessor: (row) => row.target,
+      render: (row) => (
+        <span className="font-mono text-slate-400">
+          {row.target > 0 ? formatRupiah(row.target) : 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'achievementRate',
+      header: 'Achievement %',
+      align: 'right',
+      accessor: (row) => row.achievementRate ?? -1,
+      render: (row) => (
+        <span className={`font-mono font-bold ${
+          row.achievementRate !== null && row.achievementRate >= 100 ? 'text-emerald-400' : 'text-slate-200'
+        }`}>
+          {row.achievementRate !== null ? `${row.achievementRate.toFixed(1)}%` : 'N/A'}
+        </span>
+      ),
+    },
+  ];
 
   // A. Salesman Table Columns
   const salesmanColumns: ColumnDef<any>[] = [
@@ -3265,9 +3527,18 @@ export function MonthComparisonView({
             </div>
           </div>
 
+          {/* Depo / PMA Comparison DataTable (Above Salesman Matrix) */}
+          <DataTable
+            title={`Matriks Kinerja Depo / PMA (${prevLabel} vs ${currLabel})`}
+            columns={depoPmaComparisonColumns}
+            data={filteredDepoPmaPerformances}
+            searchPlaceholder="Cari Depo / PMA / Area..."
+            exportFileName={`Matriks_Depo_PMA_${prevLabel}_vs_${currLabel}.xlsx`}
+          />
+
           {/* Salesman Comparison DataTable */}
           <DataTable
-            title={`Matriks Perbandingan Pertumbuhan Salesman (${prevLabel} vs ${currLabel})`}
+            title={`Matriks Kinerja Salesman (${prevLabel} vs ${currLabel})`}
             columns={salesmanColumns}
             data={filteredSalesmanPerformances}
             searchPlaceholder="Cari salesman..."

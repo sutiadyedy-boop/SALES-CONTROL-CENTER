@@ -33,7 +33,7 @@ export function ReportsView({
     );
   }
 
-  const { kpis, salesmanPerformances } = calculation;
+  const { kpis, salesmanPerformances, depoPmaPerformances = [] } = calculation;
   const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
     ? settings.previousMonthLabel 
     : 'September 2026';
@@ -174,10 +174,49 @@ export function ReportsView({
           </div>
         </div>
 
-        {/* Section 3: Salesman Leaderboard Snapshot */}
+        {/* Section 3: Depo / PMA Performance Snapshot */}
         <div>
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-            III. Ringkasan Peringkat Salesman
+            III. Matriks Kinerja Depo / PMA
+          </h3>
+          <div className="overflow-x-auto border border-slate-800 rounded-xl mb-6">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-semibold">
+                <tr>
+                  <th className="py-2 px-3 text-center">Rank</th>
+                  <th className="py-2 px-3">Depo / PMA</th>
+                  <th className="py-2 px-3 text-center">Jml Sales</th>
+                  <th className="py-2 px-3 text-right">Target</th>
+                  <th className="py-2 px-3 text-right">Realisasi</th>
+                  <th className="py-2 px-3 text-right">Ach %</th>
+                  <th className="py-2 px-3 text-right">Growth</th>
+                  <th className="py-2 px-3 text-center">RO %</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 font-mono">
+                {depoPmaPerformances.map(d => (
+                  <tr key={d.depoPmaKey}>
+                    <td className="py-2 px-3 text-center font-bold text-slate-300">{d.rank}</td>
+                    <td className="py-2 px-3 font-sans font-semibold text-amber-300">
+                      {d.depoPmaName}
+                    </td>
+                    <td className="py-2 px-3 text-center text-slate-400">{d.salesmenCount}</td>
+                    <td className="py-2 px-3 text-right text-slate-300">{formatRupiah(d.target)}</td>
+                    <td className="py-2 px-3 text-right text-cyan-300 font-semibold">{formatRupiah(d.actualCurrent)}</td>
+                    <td className="py-2 px-3 text-right font-bold">{d.achievementRate !== null ? `${d.achievementRate.toFixed(1)}%` : 'N/A'}</td>
+                    <td className="py-2 px-3 text-right">{formatPercent(d.growthRate)}</td>
+                    <td className="py-2 px-3 text-center">{d.roRate !== null ? `${d.roRate.toFixed(0)}%` : 'N/A'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Section 4: Salesman Leaderboard Snapshot */}
+        <div>
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+            IV. Matriks Kinerja Salesman (Ringkasan Peringkat Salesman)
           </h3>
           <div className="overflow-x-auto border border-slate-800 rounded-xl">
             <table className="w-full text-left text-xs">

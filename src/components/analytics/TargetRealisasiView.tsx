@@ -19,9 +19,10 @@ import {
   ArrowRight,
   Plus,
   Minus,
-  Send
+  Send,
+  Building2
 } from 'lucide-react';
-import { CalculationResult, SalesmanPerformanceItem } from '../../types/analytics';
+import { CalculationResult, DepoPmaPerformanceItem, SalesmanPerformanceItem } from '../../types/analytics';
 import { AppSettings, TargetRecord, TransactionRecord } from '../../types/database';
 import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
@@ -179,7 +180,7 @@ export function TargetRealisasiView({
     );
   }
 
-  const { salesmanPerformances, kpis } = calculation;
+  const { salesmanPerformances, depoPmaPerformances = [], kpis } = calculation;
 
   // Shortfall & Run Rate Measurements at Team Level
   const totalKekurangan = Math.max(0, kpis.totalTarget - kpis.totalActualCurrent);
@@ -416,6 +417,213 @@ export function TargetRealisasiView({
     }
     return allColumns;
   }, [tableViewMode, allColumns]);
+
+  // Enriched Depo / PMA Matrix with dynamic working days calculation
+  interface EnrichedDepoPmaPerformance extends DepoPmaPerformanceItem {
+    kekurangan: number;
+    targetPerHariSisa: number;
+    runRateHarian: number;
+    proyeksiSales: number;
+    proyeksiAch: number | null;
+  }
+
+  const enrichedDepoPmas: EnrichedDepoPmaPerformance[] = depoPmaPerformances.map(d => {
+    const kekurangan = Math.max(0, d.target - d.actualCurrent);
+    const targetPerHariSisa = sisaHariKerja > 0 && kekurangan > 0 ? Math.round(kekurangan / sisaHariKerja) : 0;
+    const runRateHarian = hariKerjaBerjalan > 0 ? Math.round(d.actualCurrent / hariKerjaBerjalan) : 0;
+    const proyeksiSales = hariKerjaBerjalan > 0 ? Math.round((d.actualCurrent / hariKerjaBerjalan) * hariKerjaBlnIni) : d.actualCurrent;
+    const proyeksiAch = d.target > 0 ? (proyeksiSales / d.target) * 100 : null;
+    return {
+      ...d,
+      kekurangan,
+      targetPerHariSisa,
+      runRateHarian,
+      proyeksiSales,
+      proyeksiAch,
+    };
+  });
+
+  const allDepoPmaColumns: ColumnDef<EnrichedDepoPmaPerformance>[] = [
+    {
+      key: 'rank',
+      header: 'Rank',
+      width: '56px',
+      align: 'center',
+      render: (row) => (
+        <span className={`inline-block w-5 h-5 rounded-full text-xs font-bold leading-5 ${
+          row.rank === 1 ? 'bg-amber-400 text-slate-950' : row.rank === 2 ? 'bg-slate-300 text-slate-950' : row.rank === 3 ? 'bg-amber-700 text-white' : 'text-slate-400'
+        }`}>
+          {row.rank}
+        </span>
+      ),
+    },
+    {
+      key: 'depoPmaName',
+      header: 'Depo / PMA',
+      accessor: (row) => row.depoPmaName,
+      render: (row) => (
+        <div>
+          <div className="font-bold text-amber-300 font-mono">{row.depoPmaName}</div>
+          <div className="text-[10px] text-slate-500 font-mono">{row.salesmenCount} Salesman</div>
+        </div>
+      ),
+    },
+    {
+      key: 'target',
+      header: 'Target (IDR)',
+      align: 'right',
+      accessor: (row) => row.target,
+      render: (row) => (
+        <span className="font-mono text-slate-300">
+          {row.target > 0 ? formatRupiah(row.target) : <span className="text-slate-500">TARGET NOT FOUND</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'actualCurrent',
+      header: 'Realisasi (IDR)',
+      align: 'right',
+      accessor: (row) => row.actualCurrent,
+      render: (row) => <span className="font-mono font-bold text-cyan-300">{formatRupiah(row.actualCurrent)}</span>,
+    },
+    {
+      key: 'achievementRate',
+      header: 'Achievement %',
+      align: 'right',
+      accessor: (row) => row.achievementRate ?? -1,
+      render: (row) => {
+        if (row.achievementRate === null) {
+          return <span className="text-[11px] text-slate-500">N/A</span>;
+        }
+        const isAch = row.achievementRate >= 100;
+        return (
+          <span className={`font-mono font-bold px-2 py-0.5 rounded text-xs ${
+            isAch ? 'bg-emerald-500/20 text-emerald-300' : row.achievementRate >= 80 ? 'bg-amber-500/20 text-amber-300' : 'bg-rose-500/20 text-rose-300'
+          }`}>
+            {row.achievementRate.toFixed(1)}%
+          </span>
+        );
+      },
+    },
+    {
+      key: 'kekurangan',
+      header: 'Sisa Target (Kekurangan)',
+      align: 'right',
+      accessor: (row) => row.kekurangan,
+      render: (row) => {
+        if (row.targetStatus === 'TARGET_NOT_FOUND') {
+          return <span className="text-[10px] text-slate-500 font-mono">-</span>;
+        }
+        if (row.actualCurrent >= row.target) {
+          const surplus = row.actualCurrent - row.target;
+          return (
+            <div className="text-right">
+              <span className="font-mono font-semibold text-emerald-400 text-xs">
+                +{formatRupiah(surplus)}
+              </span>
+              <div className="text-[10px] text-emerald-500">Surplus Tercapai</div>
+            </div>
+          );
+        }
+        return (
+          <div className="text-right">
+            <span className="font-mono font-bold text-rose-400 text-xs">
+              {formatRupiah(row.kekurangan)}
+            </span>
+            <div className="text-[10px] text-rose-500">Kekurangan</div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'targetPerHariSisa',
+      header: 'Target / Hari (Sisa Kerja)',
+      align: 'right',
+      accessor: (row) => row.targetPerHariSisa,
+      render: (row) => {
+        if (row.targetStatus === 'TARGET_NOT_FOUND') {
+          return <span className="text-[10px] text-slate-500 font-mono">-</span>;
+        }
+        if (row.actualCurrent >= row.target) {
+          return (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300">
+              TERCAPAI (0/hr)
+            </span>
+          );
+        }
+        if (sisaHariKerja === 0) {
+          return <span className="text-xs text-slate-500 font-mono">Hari Habis</span>;
+        }
+        return (
+          <div className="text-right">
+            <span className="font-mono font-bold text-amber-300 text-xs">
+              {formatRupiah(row.targetPerHariSisa)}
+            </span>
+            <div className="text-[10px] text-slate-400">/ hari ({sisaHariKerja} hr sisa)</div>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'runRateHarian',
+      header: 'Run Rate Saat Ini',
+      align: 'right',
+      accessor: (row) => row.runRateHarian,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-cyan-300 text-xs">
+            {formatRupiah(row.runRateHarian)}
+          </span>
+          <div className="text-[10px] text-slate-400">/ hari ({hariKerjaBerjalan} hr)</div>
+        </div>
+      ),
+    },
+    {
+      key: 'proyeksiSales',
+      header: 'Proyeksi Akhir Bulan',
+      align: 'right',
+      accessor: (row) => row.proyeksiSales,
+      render: (row) => {
+        if (row.targetStatus === 'TARGET_NOT_FOUND') {
+          return <span className="font-mono text-slate-300 text-xs">{formatRupiah(row.proyeksiSales)}</span>;
+        }
+        const ach = row.proyeksiAch;
+        return (
+          <div className="text-right">
+            <div className="font-mono text-slate-200 text-xs font-semibold">
+              {formatRupiah(row.proyeksiSales)}
+            </div>
+            {ach !== null && (
+              <div className={`text-[10px] font-mono font-bold ${ach >= 100 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {ach.toFixed(1)}% est
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'targetStatus',
+      header: 'Status',
+      align: 'center',
+      render: (row) => {
+        if (row.targetStatus === 'ACHIEVED') {
+          return <span className="text-[11px] text-emerald-400 font-semibold">Tercapai</span>;
+        }
+        if (row.targetStatus === 'UNDER') {
+          return <span className="text-[11px] text-amber-400 font-semibold">Di Bawah Target</span>;
+        }
+        return <span className="text-[10px] text-slate-500 font-mono">TARGET NOT FOUND</span>;
+      },
+    },
+  ];
+
+  const depoPmaColumns = useMemo(() => {
+    if (tableViewMode === 'standard') {
+      return allDepoPmaColumns.filter(c => !['kekurangan', 'targetPerHariSisa', 'runRateHarian', 'proyeksiSales'].includes(c.key));
+    }
+    return allDepoPmaColumns;
+  }, [tableViewMode, allDepoPmaColumns]);
 
   return (
     <div className="space-y-6">
@@ -802,9 +1010,18 @@ export function TargetRealisasiView({
         </div>
       </div>
 
+      {/* Matriks Kinerja Depo / PMA (Above Salesman Matrix) */}
+      <DataTable
+        title={`Matriks Kinerja Depo / PMA (${currLabel}) - Sisa ${sisaHariKerja} Hari Kerja`}
+        columns={depoPmaColumns}
+        data={enrichedDepoPmas}
+        searchPlaceholder="Cari Depo / PMA / Area..."
+        exportFileName={`Matriks_Depo_PMA_Target_vs_Realisasi_${currLabel}.xlsx`}
+      />
+
       {/* Main Table */}
       <DataTable
-        title={`Tabel Peringkat Performance Salesman (${currLabel}) - Sisa ${sisaHariKerja} Hari Kerja`}
+        title={`Matriks Kinerja Salesman (${currLabel}) - Sisa ${sisaHariKerja} Hari Kerja`}
         columns={columns}
         data={enrichedSalesmen}
         searchPlaceholder="Cari salesman atau kode..."

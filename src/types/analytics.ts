@@ -39,6 +39,9 @@ export interface SalesmanPerformanceItem {
   salesmanName: string;
   area?: string;
   rayon?: string;
+  depo?: string;
+  pma?: string;
+  cabang?: string;
   target: number;
   actualCurrent: number;
   actualPrevious: number;
@@ -49,6 +52,32 @@ export interface SalesmanPerformanceItem {
   targetStatus: 'ACHIEVED' | 'UNDER' | 'TARGET_NOT_FOUND';
   
   // RO metrics per salesman
+  totalMasterOutlets: number;
+  activeOutlets: number;
+  transactingOutlets: number;
+  nonTransactingOutlets: number;
+  roRate: number | null;
+  dropOutletsCount: number;
+  newOutletsCount: number;
+}
+
+export interface DepoPmaPerformanceItem {
+  rank: number;
+  depoPmaKey: string;
+  depoPmaName: string;
+  depo?: string;
+  pma?: string;
+  area?: string;
+  cabang?: string;
+  salesmenCount: number;
+  target: number;
+  actualCurrent: number;
+  actualPrevious: number;
+  achievementRate: number | null;
+  gap: number;
+  growthRate: number | null;
+  growthStatus: 'POSITIVE' | 'NEGATIVE' | 'NEW_SALES' | 'NO_DATA';
+  targetStatus: 'ACHIEVED' | 'UNDER' | 'TARGET_NOT_FOUND';
   totalMasterOutlets: number;
   activeOutlets: number;
   transactingOutlets: number;
@@ -189,6 +218,7 @@ export interface FilterOptions {
 export interface CalculationResult {
   kpis: ControlTowerKPIs;
   salesmanPerformances: SalesmanPerformanceItem[];
+  depoPmaPerformances: DepoPmaPerformanceItem[];
   dropOutlets: DropOutletItem[];
   newOutlets: NewOutletItem[];
   outletsNotTransacted: NonTransactingOutletItem[];

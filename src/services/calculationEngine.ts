@@ -1,6 +1,7 @@
 import { 
   CalculationResult,
   ControlTowerKPIs, 
+  DepoPmaPerformanceItem,
   DropOutletItem, 
   GlobalFilterState, 
   NewOutletItem,
@@ -534,6 +535,8 @@ export function computeAnalytics(
     const slsArea = trg?.area || (salesmanAreas.get(slsId) ? Array.from(salesmanAreas.get(slsId)!)[0] : undefined);
     const slsPma = trg?.pma || (salesmanPmas.get(slsId) ? Array.from(salesmanPmas.get(slsId)!)[0] : undefined);
     const slsCabang = trg?.cb || (salesmanCabangs.get(slsId) ? Array.from(salesmanCabangs.get(slsId)!)[0] : undefined);
+    const slsDepo = salesmanDepos.get(slsId) ? Array.from(salesmanDepos.get(slsId)!)[0] : undefined;
+    const slsRayon = salesmanRayons.get(slsId) ? Array.from(salesmanRayons.get(slsId)!)[0] : undefined;
 
     // Apply role/filter to salesman
     if (!filterPredicate({
@@ -541,6 +544,7 @@ export function computeAnalytics(
       area: slsArea,
       pma: slsPma,
       cabang: slsCabang,
+      depo: slsDepo,
     })) {
       continue;
     }
@@ -575,6 +579,10 @@ export function computeAnalytics(
       salesmanId: slsId,
       salesmanName,
       area: slsArea,
+      rayon: slsRayon,
+      depo: slsDepo,
+      pma: slsPma,
+      cabang: slsCabang,
       target: targetVal,
       actualCurrent,
       actualPrevious,
@@ -604,6 +612,151 @@ export function computeAnalytics(
   // Assign ranks
   salesmanPerformances.forEach((s, idx) => {
     s.rank = idx + 1;
+  });
+
+  // 8B. Compute Depo / PMA Performance Matrix directly from actual data (Salesman & Database records)
+  const isGenericTierPma = (val?: string) => {
+    if (!val) return true;
+    const u = String(val).trim().toUpperCase();
+    return ['GOLD', 'SILVER', 'BRONZE', 'PLATINUM', 'REGULER', 'REGULAR', 'OK', 'AKTIF', 'ACTIVE', '-'].includes(u);
+  };
+
+  const isGenericDefaultDepo = (val?: string) => {
+    if (!val) return true;
+    const u = String(val).trim().toUpperCase();
+    return u === 'DEPO BONE PUSAT' || u === 'DEPO UTAMA' || u === '-';
+  };
+
+  const resolveSalesmanDepoPmaName = (s: SalesmanPerformanceItem): string => {
+    const expDepo = !isGenericDefaultDepo(s.depo) ? String(s.depo).trim() : '';
+    const expPma = !isGenericTierPma(s.pma) ? String(s.pma).trim() : '';
+    const area = s.area ? String(s.area).trim() : '';
+    const cabang = s.cabang ? String(s.cabang).trim() : '';
+    const rawDepo = s.depo ? String(s.depo).trim() : '';
+    const rawPma = s.pma ? String(s.pma).trim() : '';
+
+    if (expDepo && area && !expDepo.toUpperCase().includes(area.toUpperCase()) && !area.toUpperCase().includes(expDepo.toUpperCase())) {
+      return `${expDepo} - ${area}`;
+    }
+    if (expPma && area && !expPma.toUpperCase().includes(area.toUpperCase()) && !area.toUpperCase().includes(expPma.toUpperCase())) {
+      return `${expPma} - ${area}`;
+    }
+    if (expDepo) return expDepo;
+    if (expPma) return expPma;
+    if (area) return area;
+    if (cabang) return cabang;
+    if (rawDepo) return rawDepo;
+    if (rawPma) return rawPma;
+    return 'DEPO / PMA UMUM';
+  };
+
+  const depoPmaGroupMap = new Map<string, {
+    depoPmaName: string;
+    depo?: string;
+    pma?: string;
+    area?: string;
+    cabang?: string;
+    salesmenCount: number;
+    target: number;
+    actualCurrent: number;
+    actualPrevious: number;
+    totalMasterOutlets: number;
+    activeOutlets: number;
+    transactingOutlets: number;
+    nonTransactingOutlets: number;
+    dropOutletsCount: number;
+    newOutletsCount: number;
+  }>();
+
+  for (const s of salesmanPerformances) {
+    const label = resolveSalesmanDepoPmaName(s);
+    const key = label.toUpperCase();
+    let grp = depoPmaGroupMap.get(key);
+    if (!grp) {
+      grp = {
+        depoPmaName: label,
+        depo: s.depo,
+        pma: s.pma,
+        area: s.area,
+        cabang: s.cabang,
+        salesmenCount: 0,
+        target: 0,
+        actualCurrent: 0,
+        actualPrevious: 0,
+        totalMasterOutlets: 0,
+        activeOutlets: 0,
+        transactingOutlets: 0,
+        nonTransactingOutlets: 0,
+        dropOutletsCount: 0,
+        newOutletsCount: 0,
+      };
+      depoPmaGroupMap.set(key, grp);
+    }
+    grp.salesmenCount += 1;
+    grp.target += s.target;
+    grp.actualCurrent += s.actualCurrent;
+    grp.actualPrevious += s.actualPrevious;
+    grp.totalMasterOutlets += s.totalMasterOutlets;
+    grp.activeOutlets += s.activeOutlets;
+    grp.transactingOutlets += s.transactingOutlets;
+    grp.nonTransactingOutlets += s.nonTransactingOutlets;
+    grp.dropOutletsCount += s.dropOutletsCount;
+    grp.newOutletsCount += s.newOutletsCount;
+  }
+
+  const depoPmaPerformances: DepoPmaPerformanceItem[] = [];
+  for (const [key, grp] of depoPmaGroupMap.entries()) {
+    const achievementRate = calculateAchievement(grp.actualCurrent, grp.target);
+    let targetStatus: DepoPmaPerformanceItem['targetStatus'] = 'TARGET_NOT_FOUND';
+    if (grp.target > 0) {
+      targetStatus = grp.actualCurrent >= grp.target ? 'ACHIEVED' : 'UNDER';
+    }
+    const gap = calculateGap(grp.actualCurrent, grp.target);
+    const growthRate = calculateGrowth(grp.actualCurrent, grp.actualPrevious);
+    let growthStatus: DepoPmaPerformanceItem['growthStatus'] = 'NO_DATA';
+    if (grp.actualPrevious > 0 && growthRate !== null) {
+      growthStatus = growthRate >= 0 ? 'POSITIVE' : 'NEGATIVE';
+    } else if (grp.actualPrevious === 0 && grp.actualCurrent > 0) {
+      growthStatus = 'NEW_SALES';
+    }
+    const grpRoRate = calculateRO(grp.transactingOutlets, grp.activeOutlets);
+
+    depoPmaPerformances.push({
+      rank: 0,
+      depoPmaKey: key,
+      depoPmaName: grp.depoPmaName,
+      depo: grp.depo,
+      pma: grp.pma,
+      area: grp.area,
+      cabang: grp.cabang,
+      salesmenCount: grp.salesmenCount,
+      target: grp.target,
+      actualCurrent: grp.actualCurrent,
+      actualPrevious: grp.actualPrevious,
+      achievementRate,
+      gap,
+      growthRate,
+      growthStatus,
+      targetStatus,
+      totalMasterOutlets: grp.totalMasterOutlets,
+      activeOutlets: grp.activeOutlets,
+      transactingOutlets: grp.transactingOutlets,
+      nonTransactingOutlets: grp.nonTransactingOutlets,
+      roRate: grpRoRate,
+      dropOutletsCount: grp.dropOutletsCount,
+      newOutletsCount: grp.newOutletsCount,
+    });
+  }
+
+  depoPmaPerformances.sort((a, b) => {
+    if (a.achievementRate === null && b.achievementRate === null) return b.actualCurrent - a.actualCurrent;
+    if (a.achievementRate === null) return 1;
+    if (b.achievementRate === null) return -1;
+    return b.achievementRate - a.achievementRate;
+  });
+
+  depoPmaPerformances.forEach((d, idx) => {
+    d.rank = idx + 1;
   });
 
   // 8. Overall KPIs
@@ -718,6 +871,7 @@ export function computeAnalytics(
       newActiveOutletRevenue,
     },
     salesmanPerformances,
+    depoPmaPerformances,
     dropOutlets,
     newOutlets,
     outletsNotTransacted,
