@@ -4,6 +4,7 @@ import {
   TrendingDown,
   ArrowUpRight, 
   ArrowDownRight, 
+  Minus,
   Calendar, 
   DollarSign, 
   BarChart3,
@@ -1596,23 +1597,92 @@ export function MonthComparisonView({
     },
     {
       key: 'growthRate',
-      header: 'Growth % (MoM)',
+      header: 'Growth Omset %',
       align: 'right',
       accessor: (row) => row.growthRate ?? -999,
       render: (row) => {
         if (row.growthStatus === 'NEW_SALES') {
-          return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50">NEW SALES</span>;
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW SALES</span>
+            </span>
+          );
         }
         if (row.growthRate === null) {
           return <span className="text-slate-500 font-mono text-xs">N/A</span>;
         }
-        const isPos = row.growthRate >= 0;
+        const isUp = row.growthRate > 0.05;
+        const isDown = row.growthRate < -0.05;
         return (
-          <span className={`font-mono font-bold flex items-center justify-end gap-1 ${
-            isPos ? 'text-emerald-400' : 'text-rose-400'
-          }`}>
-            {isPos ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-            {formatPercent(row.growthRate)}
+          <span className={`font-mono font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border text-xs ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap / Stabil'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthRate)}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'ecPrevious',
+      header: `EC ${prevLabel}`,
+      align: 'right',
+      accessor: (row) => row.ecPrev ?? 0,
+      render: (row) => <span className="font-mono text-slate-400 text-xs">{row.ecPrev ?? 0} Toko</span>,
+    },
+    {
+      key: 'ecCurrent',
+      header: `EC ${currLabel}`,
+      align: 'right',
+      accessor: (row) => row.ecCurr ?? 0,
+      render: (row) => <span className="font-mono font-bold text-amber-300 text-xs">{row.ecCurr ?? 0} Toko</span>,
+    },
+    {
+      key: 'growthEC',
+      header: 'Growth EC %',
+      align: 'right',
+      accessor: (row) => row.growthEC ?? -999,
+      render: (row) => {
+        if (row.ecPrev === 0 && row.ecCurr > 0) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW EC</span>
+            </span>
+          );
+        }
+        if (row.growthEC === null || row.growthEC === undefined) {
+          return <span className="text-slate-500 font-mono text-xs">-</span>;
+        }
+        const isUp = row.growthEC > 0.05;
+        const isDown = row.growthEC < -0.05;
+        return (
+          <span className={`font-mono font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border text-xs ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren EC Naik' : isDown ? 'Tren EC Turun' : 'Tren EC Tetap / Stabil'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthEC)}</span>
           </span>
         );
       },
@@ -1682,12 +1752,32 @@ export function MonthComparisonView({
       align: 'right',
       accessor: (row) => row.growthOmset ?? -999,
       render: (row) => {
-        if (row.growthOmset === null) return <span className="text-cyan-400 font-mono text-xs">NEW SALES</span>;
-        const isPos = row.growthOmset >= 0;
+        if (row.growthOmset === null) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW SALES</span>
+            </span>
+          );
+        }
+        const isUp = row.growthOmset > 0.05;
+        const isDown = row.growthOmset < -0.05;
         return (
-          <span className={`font-mono font-bold flex items-center justify-end gap-1 ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {isPos ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-            {formatPercent(row.growthOmset)}
+          <span className={`font-mono font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border text-xs ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap / Stabil'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthOmset)}</span>
           </span>
         );
       },
@@ -1712,11 +1802,28 @@ export function MonthComparisonView({
       align: 'right',
       accessor: (row) => row.growthQty ?? -999,
       render: (row) => {
-        if (row.growthQty === null) return <span className="text-cyan-400 font-mono text-xs">NEW</span>;
-        const isPos = row.growthQty >= 0;
+        if (row.growthQty === null) {
+          return (
+            <span className="text-cyan-400 font-mono text-xs inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
+        }
+        const isUp = row.growthQty > 0.05;
+        const isDown = row.growthQty < -0.05;
         return (
-          <span className={`font-mono text-xs font-semibold ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {formatPercent(row.growthQty)}
+          <span className={`font-mono text-xs font-semibold inline-flex items-center justify-end gap-1 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
+          }`}>
+            {isUp ? (
+              <ArrowUpRight className="w-3 h-3 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3 h-3 shrink-0" />
+            ) : (
+              <Minus className="w-3 h-3 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthQty)}</span>
           </span>
         );
       },
@@ -1741,11 +1848,32 @@ export function MonthComparisonView({
       align: 'right',
       accessor: (row) => row.growthEC ?? -999,
       render: (row) => {
-        if (row.growthEC === null) return <span className="text-cyan-400 font-mono text-xs">NEW</span>;
-        const isPos = row.growthEC >= 0;
+        if (row.growthEC === null) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW EC</span>
+            </span>
+          );
+        }
+        const isUp = row.growthEC > 0.05;
+        const isDown = row.growthEC < -0.05;
         return (
-          <span className={`font-mono text-xs font-semibold ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {formatPercent(row.growthEC)}
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren EC Naik' : isDown ? 'Tren EC Turun' : 'Tren EC Tetap / Stabil'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthEC)}</span>
           </span>
         );
       },
@@ -1827,21 +1955,48 @@ export function MonthComparisonView({
       accessor: (row) => row.growthOmset ?? -999,
       render: (row) => {
         if (row.status === 'NEW_ACTIVE') {
-          return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50">NEW ACTIVE</span>;
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW ACTIVE</span>
+            </span>
+          );
         }
         if (row.status === 'DROP') {
-          return <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/60 text-rose-300 font-bold border border-rose-800/60">DROP OUTLET</span>;
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/60 text-rose-300 font-bold border border-rose-800/60 inline-flex items-center justify-end gap-1">
+              <ArrowDownRight className="w-3 h-3" />
+              <span>DROP OUTLET</span>
+            </span>
+          );
         }
         if (row.status === 'NOT_BUYING') {
-          return <span className="text-slate-600 font-mono text-xs">-</span>;
+          return (
+            <span className="text-slate-500 font-mono text-xs inline-flex items-center justify-end gap-1">
+              <Minus className="w-3 h-3" />
+              <span>0.0%</span>
+            </span>
+          );
         }
-        const isPos = (row.growthOmset || 0) >= 0;
+        const val = row.growthOmset || 0;
+        const isUp = val > 0.05;
+        const isDown = val < -0.05;
         return (
-          <span className={`font-mono font-bold text-xs flex items-center justify-end gap-1 ${
-            isPos ? 'text-emerald-400' : 'text-rose-400'
-          }`}>
-            {isPos ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-            {formatPercent(row.growthOmset)}
+          <span className={`font-mono font-bold text-xs inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(val)}</span>
           </span>
         );
       },
@@ -1859,6 +2014,46 @@ export function MonthComparisonView({
       align: 'right',
       accessor: (row) => row.qtyCurr,
       render: (row) => <span className="font-mono font-semibold text-slate-200 text-xs">{row.qtyCurr > 0 ? formatNumber(row.qtyCurr) : '-'}</span>,
+    },
+    {
+      key: 'ecGrowthTrend',
+      header: 'Tren EC (Beli)',
+      align: 'center',
+      accessor: (row) => (row.omsetCurr > 0 ? 1 : 0) - (row.omsetPrev > 0 ? 1 : 0),
+      render: (row) => {
+        const prevActive = row.omsetPrev > 0 ? 1 : 0;
+        const currActive = row.omsetCurr > 0 ? 1 : 0;
+        if (prevActive === 0 && currActive === 1) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-950/50 text-emerald-300 border border-emerald-800/50 inline-flex items-center justify-center gap-1">
+              <ArrowUpRight className="w-3 h-3 text-emerald-400" />
+              <span>EC Naik (+1)</span>
+            </span>
+          );
+        }
+        if (prevActive === 1 && currActive === 0) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-950/50 text-rose-300 border border-rose-800/50 inline-flex items-center justify-center gap-1">
+              <ArrowDownRight className="w-3 h-3 text-rose-400" />
+              <span>EC Turun (-1)</span>
+            </span>
+          );
+        }
+        if (prevActive === 1 && currActive === 1) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-950/40 text-amber-300 border border-amber-800/40 inline-flex items-center justify-center gap-1">
+              <Minus className="w-3 h-3 text-amber-400" />
+              <span>EC Tetap (1&rarr;1)</span>
+            </span>
+          );
+        }
+        return (
+          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-500 bg-slate-900 border border-slate-800 inline-flex items-center justify-center gap-1">
+            <Minus className="w-3 h-3 text-slate-500" />
+            <span>Tetap (0)</span>
+          </span>
+        );
+      },
     },
     {
       key: 'status',
@@ -1934,16 +2129,36 @@ export function MonthComparisonView({
     },
     {
       key: 'growthSales',
-      header: 'Growth Sales',
+      header: 'Growth Omset',
       align: 'right',
       accessor: (row) => row.growthSales ?? -999,
       render: (row) => {
-        if (row.growthSales === null) return <span className="text-cyan-400 font-mono text-xs">NEW</span>;
-        const isPos = row.growthSales >= 0;
+        if (row.growthSales === null) {
+          return (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-900/40 text-cyan-300 font-bold border border-cyan-700/50 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
+        }
+        const isUp = row.growthSales > 0.05;
+        const isDown = row.growthSales < -0.05;
         return (
-          <span className={`font-mono font-bold flex items-center justify-end gap-1 ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {isPos ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
-            {formatPercent(row.growthSales)}
+          <span className={`font-mono font-bold inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border text-xs ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthSales)}</span>
           </span>
         );
       },
@@ -1978,14 +2193,31 @@ export function MonthComparisonView({
     },
     {
       key: 'diffEC',
-      header: 'Selisih EC',
+      header: 'Growth & Selisih EC',
       align: 'right',
       accessor: (row) => row.diffEC,
       render: (row) => {
-        const isPos = row.diffEC >= 0;
+        const isUp = row.diffEC > 0;
+        const isDown = row.diffEC < 0;
+        const pctText = row.growthEC === null
+          ? 'NEW'
+          : `${row.growthEC >= 0 ? '+' : ''}${row.growthEC.toFixed(1)}%`;
         return (
-          <span className={`font-mono font-bold ${isPos ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {isPos ? `+${row.diffEC}` : row.diffEC} Toko
+          <span className={`font-mono font-bold text-xs inline-flex items-center justify-end gap-1 px-2 py-0.5 rounded border ${
+            isUp
+              ? 'text-emerald-400 bg-emerald-950/40 border-emerald-800/50'
+              : isDown
+              ? 'text-rose-400 bg-rose-950/40 border-rose-800/50'
+              : 'text-amber-300 bg-amber-950/40 border-amber-800/50'
+          }`} title={isUp ? 'Tren EC Naik' : isDown ? 'Tren EC Turun' : 'Tren EC Tetap'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{isUp ? `+${row.diffEC}` : row.diffEC} Toko ({pctText})</span>
           </span>
         );
       },

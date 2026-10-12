@@ -4,7 +4,10 @@ import {
   UserX, 
   UserCheck, 
   Store, 
-  Layers
+  Layers,
+  ArrowUpRight,
+  ArrowDownRight,
+  Minus
 } from 'lucide-react';
 import { 
   CalculationResult, 
@@ -137,40 +140,74 @@ export function ControlTowerTables({
     },
     {
       key: 'growthRate',
-      header: 'Growth MoM',
-      width: '120px',
+      header: 'Growth Omset (MoM)',
+      width: '140px',
       align: 'right',
       accessor: row => row.growthRate ?? -999,
-      render: row => (
-        <span
-          className={`font-semibold ${
-            row.growthRate !== null && row.growthRate >= 0
-              ? 'text-emerald-400'
-              : row.growthRate === null
-              ? 'text-slate-400'
-              : 'text-rose-400'
-          }`}
-        >
-          {formatPercent(row.growthRate)}
-        </span>
-      ),
+      render: row => {
+        if (row.growthRate === null) {
+          return (
+            <span className="text-cyan-400 font-semibold inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+              <span>NEW</span>
+            </span>
+          );
+        }
+        const isUp = row.growthRate > 0.05;
+        const isDown = row.growthRate < -0.05;
+        return (
+          <span
+            className={`font-semibold inline-flex items-center justify-end gap-1 ${
+              isUp
+                ? 'text-emerald-400'
+                : isDown
+                ? 'text-rose-400'
+                : 'text-amber-300'
+            }`}
+            title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap'}
+          >
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthRate)}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'roRate',
-      header: 'RO Aktif %',
-      width: '130px',
+      header: 'EC / RO Aktif %',
+      width: '145px',
       align: 'center',
       accessor: row => row.roRate ?? -1,
-      render: row => (
-        <div>
-          <span className="font-bold text-cyan-400">
-            {row.roRate !== null ? `${row.roRate.toFixed(0)}%` : 'N/A'}
-          </span>
-          <div className="text-[10px] text-slate-500 font-mono">
-            {row.transactingOutlets}/{row.activeOutlets} Toko
+      render: row => {
+        const netEcDiff = (row.newOutletsCount || 0) - (row.dropOutletsCount || 0);
+        const isEcUp = netEcDiff > 0;
+        const isEcDown = netEcDiff < 0;
+        return (
+          <div>
+            <div className="inline-flex items-center justify-center gap-1">
+              {isEcUp ? (
+                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" title={`EC Naik (+${netEcDiff} Toko)`} />
+              ) : isEcDown ? (
+                <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" title={`EC Turun (${netEcDiff} Toko)`} />
+              ) : (
+                <Minus className="w-3.5 h-3.5 text-amber-400 shrink-0" title="EC Tetap / Stabil" />
+              )}
+              <span className="font-bold text-cyan-400">
+                {row.roRate !== null ? `${row.roRate.toFixed(0)}%` : 'N/A'}
+              </span>
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono">
+              {row.transactingOutlets}/{row.activeOutlets} Toko ({netEcDiff >= 0 ? `+${netEcDiff}` : netEcDiff} EC)
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
   ];
 

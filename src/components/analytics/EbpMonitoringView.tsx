@@ -738,23 +738,30 @@ export function EbpMonitoringView({
       render: (row) => {
         if (row.status === 'NEW') {
           return (
-            <span className="font-mono text-[11px] font-bold text-cyan-300 bg-cyan-500/15 px-2 py-0.5 rounded border border-cyan-500/30">
-              NEW (+100%)
+            <span className="font-mono text-[11px] font-bold text-cyan-300 bg-cyan-500/15 px-2 py-0.5 rounded border border-cyan-500/30 inline-flex items-center justify-end gap-1">
+              <ArrowUpRight className="w-3 h-3 shrink-0" />
+              <span>NEW (+100%)</span>
             </span>
           );
         }
         if (row.status === 'STABIL' && row.epbPrev === 0 && row.epbCurr === 0) {
-          return <span className="font-mono text-xs text-slate-500">0.0%</span>;
+          return (
+            <span className="font-mono text-xs text-slate-500 inline-flex items-center justify-end gap-0.5">
+              <Minus className="w-3 h-3 shrink-0" />
+              <span>0.0%</span>
+            </span>
+          );
         }
         const isPos = row.growthPercent > 0;
         const isNeg = row.growthPercent < 0;
         return (
           <span
-            className={`font-mono text-xs font-bold ${
-              isPos ? 'text-emerald-400' : isNeg ? 'text-rose-400' : 'text-slate-400'
+            className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+              isPos ? 'text-emerald-400' : isNeg ? 'text-rose-400' : 'text-amber-300'
             }`}
           >
-            {isPos ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+            {isPos ? <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> : isNeg ? <ArrowDownRight className="w-3.5 h-3.5 shrink-0" /> : <Minus className="w-3.5 h-3.5 shrink-0" />}
+            <span>{isPos ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}</span>
           </span>
         );
       },

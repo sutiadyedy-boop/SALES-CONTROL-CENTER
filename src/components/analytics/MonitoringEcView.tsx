@@ -1031,13 +1031,21 @@ export function MonitoringEcView({
       accessor: (row) => row.growthPercent ?? 0,
       render: (row) => {
         if (row.growthPercent === null) {
-          return <span className="font-mono text-xs text-cyan-300 font-semibold">NEW</span>;
+          return (
+            <span className="font-mono text-xs text-cyan-300 font-semibold inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
         }
+        const isUp = row.growthPercent > 0.05;
+        const isDown = row.growthPercent < -0.05;
         return (
-          <span className={`font-mono text-xs font-bold ${
-            row.growthPercent > 0 ? 'text-emerald-400' : row.growthPercent < 0 ? 'text-rose-400' : 'text-slate-400'
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
           }`}>
-            {row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+            {isUp ? <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> : isDown ? <ArrowDownRight className="w-3.5 h-3.5 shrink-0" /> : <Minus className="w-3.5 h-3.5 shrink-0" />}
+            <span>{row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}</span>
           </span>
         );
       },
@@ -1147,13 +1155,21 @@ export function MonitoringEcView({
       accessor: (row) => row.growthPercent ?? 0,
       render: (row) => {
         if (row.growthPercent === null) {
-          return <span className="font-mono text-xs text-cyan-300 font-semibold">NEW</span>;
+          return (
+            <span className="font-mono text-xs text-cyan-300 font-semibold inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
         }
+        const isUp = row.growthPercent > 0.05;
+        const isDown = row.growthPercent < -0.05;
         return (
-          <span className={`font-mono text-xs font-bold ${
-            row.growthPercent > 0 ? 'text-emerald-400' : row.growthPercent < 0 ? 'text-rose-400' : 'text-slate-400'
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
           }`}>
-            {row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+            {isUp ? <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> : isDown ? <ArrowDownRight className="w-3.5 h-3.5 shrink-0" /> : <Minus className="w-3.5 h-3.5 shrink-0" />}
+            <span>{row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}</span>
           </span>
         );
       },
@@ -1238,10 +1254,11 @@ export function MonitoringEcView({
       align: 'right',
       accessor: (row) => row.diff,
       render: (row) => (
-        <span className={`font-mono text-xs font-bold ${
-          row.diff > 0 ? 'text-emerald-400' : row.diff < 0 ? 'text-rose-400' : 'text-slate-400'
+        <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+          row.diff > 0 ? 'text-emerald-400' : row.diff < 0 ? 'text-rose-400' : 'text-amber-300'
         }`}>
-          {row.diff > 0 ? `+${row.diff}` : row.diff}
+          {row.diff > 0 ? <ArrowUpRight className="w-3 h-3 shrink-0" /> : row.diff < 0 ? <ArrowDownRight className="w-3 h-3 shrink-0" /> : <Minus className="w-3 h-3 shrink-0" />}
+          <span>{row.diff > 0 ? `+${row.diff}` : row.diff}</span>
         </span>
       ),
     },
@@ -1252,13 +1269,21 @@ export function MonitoringEcView({
       accessor: (row) => row.growthPercent ?? 0,
       render: (row) => {
         if (row.growthPercent === null) {
-          return <span className="font-mono text-xs text-cyan-300">NEW</span>;
+          return (
+            <span className="font-mono text-xs text-cyan-300 inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
         }
+        const isUp = row.growthPercent > 0.05;
+        const isDown = row.growthPercent < -0.05;
         return (
-          <span className={`font-mono text-xs font-bold ${
-            row.growthPercent > 0 ? 'text-emerald-400' : row.growthPercent < 0 ? 'text-rose-400' : 'text-slate-400'
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
           }`}>
-            {row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+            {isUp ? <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> : isDown ? <ArrowDownRight className="w-3.5 h-3.5 shrink-0" /> : <Minus className="w-3.5 h-3.5 shrink-0" />}
+            <span>{row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}</span>
           </span>
         );
       },
@@ -1334,13 +1359,21 @@ export function MonitoringEcView({
       accessor: (row) => row.growthPercent ?? 0,
       render: (row) => {
         if (row.growthPercent === null) {
-          return <span className="font-mono text-xs text-cyan-300 font-semibold">NEW</span>;
+          return (
+            <span className="font-mono text-xs text-cyan-300 font-semibold inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
         }
+        const isUp = row.growthPercent > 0.05;
+        const isDown = row.growthPercent < -0.05;
         return (
-          <span className={`font-mono text-xs font-bold ${
-            row.growthPercent > 0 ? 'text-emerald-400' : row.growthPercent < 0 ? 'text-rose-400' : 'text-slate-400'
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
           }`}>
-            {row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+            {isUp ? <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> : isDown ? <ArrowDownRight className="w-3.5 h-3.5 shrink-0" /> : <Minus className="w-3.5 h-3.5 shrink-0" />}
+            <span>{row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}</span>
           </span>
         );
       },
@@ -1435,10 +1468,11 @@ export function MonitoringEcView({
       align: 'right',
       accessor: (row) => row.diff,
       render: (row) => (
-        <span className={`font-mono text-xs font-bold ${
-          row.diff > 0 ? 'text-emerald-400' : row.diff < 0 ? 'text-rose-400' : 'text-slate-400'
+        <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+          row.diff > 0 ? 'text-emerald-400' : row.diff < 0 ? 'text-rose-400' : 'text-amber-300'
         }`}>
-          {row.diff > 0 ? `+${row.diff}` : row.diff}
+          {row.diff > 0 ? <ArrowUpRight className="w-3 h-3 shrink-0" /> : row.diff < 0 ? <ArrowDownRight className="w-3 h-3 shrink-0" /> : <Minus className="w-3 h-3 shrink-0" />}
+          <span>{row.diff > 0 ? `+${row.diff}` : row.diff}</span>
         </span>
       ),
     },
@@ -1449,13 +1483,21 @@ export function MonitoringEcView({
       accessor: (row) => row.growthPercent ?? 0,
       render: (row) => {
         if (row.growthPercent === null) {
-          return <span className="font-mono text-xs text-cyan-300">NEW</span>;
+          return (
+            <span className="font-mono text-xs text-cyan-300 inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3 h-3" />
+              <span>NEW</span>
+            </span>
+          );
         }
+        const isUp = row.growthPercent > 0.05;
+        const isDown = row.growthPercent < -0.05;
         return (
-          <span className={`font-mono text-xs font-bold ${
-            row.growthPercent > 0 ? 'text-emerald-400' : row.growthPercent < 0 ? 'text-rose-400' : 'text-slate-400'
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-0.5 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
           }`}>
-            {row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+            {isUp ? <ArrowUpRight className="w-3.5 h-3.5 shrink-0" /> : isDown ? <ArrowDownRight className="w-3.5 h-3.5 shrink-0" /> : <Minus className="w-3.5 h-3.5 shrink-0" />}
+            <span>{row.growthPercent >= 0 ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}</span>
           </span>
         );
       },

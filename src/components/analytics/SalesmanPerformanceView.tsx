@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Award, TrendingUp, AlertTriangle, Zap, Store, Send, MessageSquare } from 'lucide-react';
+import { Users, Award, TrendingUp, AlertTriangle, Zap, Store, Send, MessageSquare, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
 import { CalculationResult, SalesmanPerformanceItem } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
 import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
@@ -134,14 +134,35 @@ export function SalesmanPerformanceView({
     },
     {
       key: 'growthRate',
-      header: 'Growth %',
+      header: 'Growth Omset %',
       align: 'right',
       accessor: (row) => row.growthRate ?? -999,
-      render: (row) => (
-        <span className={`font-mono text-xs ${row.growthRate && row.growthRate >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-          {formatPercent(row.growthRate)}
-        </span>
-      ),
+      render: (row) => {
+        if (row.growthRate === null) {
+          return (
+            <span className="font-mono text-xs text-cyan-400 font-bold inline-flex items-center justify-end gap-0.5">
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+              <span>NEW</span>
+            </span>
+          );
+        }
+        const isUp = row.growthRate > 0.05;
+        const isDown = row.growthRate < -0.05;
+        return (
+          <span className={`font-mono text-xs font-bold inline-flex items-center justify-end gap-1 ${
+            isUp ? 'text-emerald-400' : isDown ? 'text-rose-400' : 'text-amber-300'
+          }`} title={isUp ? 'Tren Omset Naik' : isDown ? 'Tren Omset Turun' : 'Tren Omset Tetap'}>
+            {isUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+            ) : isDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 shrink-0" />
+            )}
+            <span>{formatPercent(row.growthRate)}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'activeOutlets',
@@ -151,14 +172,26 @@ export function SalesmanPerformanceView({
     },
     {
       key: 'roRate',
-      header: 'RO %',
+      header: 'EC / RO %',
       align: 'center',
       accessor: (row) => row.roRate ?? -1,
-      render: (row) => (
-        <span className="font-mono font-bold text-cyan-400 text-xs">
-          {row.roRate !== null ? `${row.roRate.toFixed(0)}%` : 'N/A'}
-        </span>
-      ),
+      render: (row) => {
+        const netEcDiff = (row.newOutletsCount || 0) - (row.dropOutletsCount || 0);
+        const isEcUp = netEcDiff > 0;
+        const isEcDown = netEcDiff < 0;
+        return (
+          <span className="font-mono font-bold text-cyan-400 text-xs inline-flex items-center justify-center gap-1" title={isEcUp ? `Tren EC Naik (+${netEcDiff} Toko)` : isEcDown ? `Tren EC Turun (${netEcDiff} Toko)` : 'Tren EC Tetap'}>
+            {isEcUp ? (
+              <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+            ) : isEcDown ? (
+              <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+            ) : (
+              <Minus className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            )}
+            <span>{row.roRate !== null ? `${row.roRate.toFixed(0)}%` : 'N/A'}</span>
+          </span>
+        );
+      },
     },
     {
       key: 'dropOutletsCount',
