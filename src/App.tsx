@@ -799,6 +799,17 @@ export default function App() {
     const fcs = new Set<string>();
     const pmas = new Set<string>();
     const slsMap = new Map<string, string>();
+    const prefixes = new Set<string>(['AEPDA', 'GDKDA', 'GLKDA']);
+
+    const checkPrefix = (name?: string, id?: string) => {
+      const uName = (name || '').trim().toUpperCase();
+      const uId = (id || '').trim().toUpperCase();
+      ['AEPDA', 'GDKDA', 'GLKDA'].forEach(p => {
+        if (uName.startsWith(p) || uId.startsWith(p)) prefixes.add(p);
+      });
+      const m = uName.match(/^([A-Z0-9]{3,8})[\s\-_\/.:]/);
+      if (m && m[1]) prefixes.add(m[1]);
+    };
 
     masterOutlets.forEach(m => {
       if (m.cabang) cabangs.add(m.cabang);
@@ -808,26 +819,43 @@ export default function App() {
       if (m.channel) channels.add(m.channel);
       if (m.fc) fcs.add(m.fc);
       if (m.pma) pmas.add(m.pma);
-      if (m.salesmanId) slsMap.set(m.salesmanId, m.salesmanName || m.salesmanId);
+      if (m.salesmanId) {
+        slsMap.set(m.salesmanId, m.salesmanName || m.salesmanId);
+        checkPrefix(m.salesmanName, m.salesmanId);
+      }
     });
 
     targets.forEach(t => {
       if (t.area) areas.add(t.area);
       if (t.pma) pmas.add(t.pma);
-      if (t.salesmanId) slsMap.set(t.salesmanId, t.salesmanName);
+      if (t.salesmanId) {
+        slsMap.set(t.salesmanId, t.salesmanName);
+        checkPrefix(t.salesmanName, t.salesmanId);
+      }
     });
 
     currTransactions.forEach(t => {
       if (t.area) areas.add(t.area);
       if (t.pma) pmas.add(t.pma);
-      if (t.salesmanId) slsMap.set(t.salesmanId, t.salesmanName);
+      if (t.salesmanId) {
+        slsMap.set(t.salesmanId, t.salesmanName);
+        checkPrefix(t.salesmanName, t.salesmanId);
+      }
     });
 
     prevTransactions.forEach(t => {
       if (t.area) areas.add(t.area);
       if (t.pma) pmas.add(t.pma);
-      if (t.salesmanId) slsMap.set(t.salesmanId, t.salesmanName);
+      if (t.salesmanId) {
+        slsMap.set(t.salesmanId, t.salesmanName);
+        checkPrefix(t.salesmanName, t.salesmanId);
+      }
     });
+
+    const prefixList = Array.from(prefixes);
+    const standardPrefixes = ['AEPDA', 'GDKDA', 'GLKDA'].filter(p => prefixList.includes(p));
+    const extraPrefixes = prefixList.filter(p => !standardPrefixes.includes(p)).sort();
+    const sortedPrefixes = [...standardPrefixes, ...extraPrefixes];
 
     return {
       cabangs: Array.from(cabangs).filter(Boolean).sort(),
@@ -838,6 +866,7 @@ export default function App() {
       fcs: Array.from(fcs).filter(Boolean).sort(),
       pmas: Array.from(pmas).filter(Boolean).sort(),
       salesmen: Array.from(slsMap.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name)),
+      salesmanPrefixes: sortedPrefixes,
     };
   }, [masterOutlets, targets, currTransactions, prevTransactions]);
 
@@ -1189,6 +1218,9 @@ export default function App() {
                 calculation={analytics}
                 opportunities={opportunities}
                 settings={settings}
+                filters={filters}
+                onFilterChange={setFilters}
+                filterOptions={filterOptions}
                 onNavigate={(tab) => handleSelectTab(tab)}
                 onLoadSampleData={handleUserLoadSampleData}
               />

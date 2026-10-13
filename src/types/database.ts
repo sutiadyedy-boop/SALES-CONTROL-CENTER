@@ -145,6 +145,7 @@ export interface AppSettings {
   };
   previousMonthLabel: string; // e.g. "AGUSTUS 2026"
   currentMonthLabel: string; // e.g. "SEPTEMBER 2026"
+  cabang?: string; // e.g. "Cabang Bone"
   thresholds?: InsightThresholds;
 }
 

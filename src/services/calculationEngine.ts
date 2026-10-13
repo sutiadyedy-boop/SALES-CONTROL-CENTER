@@ -109,9 +109,11 @@ export function matchesMulti(itemVal: string | undefined, filterVal: string | st
 
 export function applyRoleAndGlobalFilter(
   filters: GlobalFilterState = {},
-  userProfile?: UserProfile
+  userProfile?: UserProfile,
+  salesmanNameLookup?: Map<string, string>
 ): (record: {
   salesmanId?: string;
+  salesmanName?: string;
   area?: string;
   rayon?: string;
   channel?: string;
@@ -138,6 +140,26 @@ export function applyRoleAndGlobalFilter(
     if (!matchesMulti(item.salesmanId, filters.salesmanId)) {
       return false;
     }
+
+    // Salesman Prefix filter (e.g. AEPDA, GDKDA, GLKDA) - Multi-Select (Bisa dipilih lebih dari 1)
+    const selectedPrefixes = toArray(filters.salesmanPrefix).map(p => p.trim().toUpperCase()).filter(Boolean);
+    if (selectedPrefixes.length > 0) {
+      const slsName = (
+        item.salesmanName || 
+        (item.salesmanId && salesmanNameLookup ? salesmanNameLookup.get(item.salesmanId) : '') || 
+        ''
+      ).trim().toUpperCase();
+      const slsId = (item.salesmanId || '').trim().toUpperCase();
+
+      const matchesAnyPrefix = selectedPrefixes.some(prefix => 
+        slsName.startsWith(prefix) || slsId.startsWith(prefix)
+      );
+
+      if (!matchesAnyPrefix) {
+        return false;
+      }
+    }
+
     if (!matchesMulti(item.area, filters.area)) {
       return false;
     }
@@ -180,7 +202,22 @@ export function computeAnalytics(
   filters: GlobalFilterState = {},
   userProfile?: UserProfile
 ): CalculationResult {
-  const filterPredicate = applyRoleAndGlobalFilter(filters, userProfile);
+  // Build unified salesman name lookup
+  const salesmanNameLookup = new Map<string, string>();
+  for (const m of masterOutlets) {
+    if (m.salesmanId && m.salesmanName) salesmanNameLookup.set(m.salesmanId, m.salesmanName);
+  }
+  for (const t of targets) {
+    if (t.salesmanId && t.salesmanName) salesmanNameLookup.set(t.salesmanId, t.salesmanName);
+  }
+  for (const t of currTransactions) {
+    if (t.salesmanId && t.salesmanName) salesmanNameLookup.set(t.salesmanId, t.salesmanName);
+  }
+  for (const t of prevTransactions) {
+    if (t.salesmanId && t.salesmanName) salesmanNameLookup.set(t.salesmanId, t.salesmanName);
+  }
+
+  const filterPredicate = applyRoleAndGlobalFilter(filters, userProfile, salesmanNameLookup);
 
   // 1. Full Master Outlet Map (unfiltered for full cross-database enrichment)
   const fullMasterMap = new Map<string, MasterOutletRecord>();
@@ -262,6 +299,7 @@ export function computeAnalytics(
 
     return {
       ...t,
+      salesmanName: t.salesmanName || (t.salesmanId ? salesmanNameLookup.get(t.salesmanId) : '') || m?.salesmanName || '',
       area: t.area || m?.area || (slsAreas ? Array.from(slsAreas)[0] : '') || '',
       pma: t.pma || m?.pma || (slsPmas ? Array.from(slsPmas)[0] : '') || '',
       rayon: t.rayon || m?.rayon || (slsRayons ? Array.from(slsRayons)[0] : '') || '',
@@ -433,6 +471,7 @@ export function computeAnalytics(
 
     return filterPredicate({
       salesmanId: t.salesmanId,
+      salesmanName: t.salesmanName || (t.salesmanId ? salesmanNameLookup.get(t.salesmanId) : ''),
       area: targetArea,
       pma: targetPma,
       cabang: targetCabang,
@@ -447,7 +486,7 @@ export function computeAnalytics(
     if (m.salesmanId) allSalesmenIds.add(m.salesmanId);
   }
 
-  // If specific channel/rayon/fc/pma/area/cabang/depo filter is active, refine salesmen to those active in that segment
+  // If specific channel/rayon/fc/pma/area/cabang/depo/salesmanPrefix filter is active, refine salesmen to those active in that segment
   const hasActiveSegmentFilter = 
     toArray(filters?.channel).length > 0 ||
     toArray(filters?.rayon).length > 0 ||
@@ -455,7 +494,8 @@ export function computeAnalytics(
     toArray(filters?.pma).length > 0 ||
     toArray(filters?.area).length > 0 ||
     toArray(filters?.cabang).length > 0 ||
-    toArray(filters?.depo).length > 0;
+    toArray(filters?.depo).length > 0 ||
+    toArray(filters?.salesmanPrefix).length > 0;
 
   if (hasActiveSegmentFilter) {
     const activeSlsInFilter = new Set<string>();

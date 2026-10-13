@@ -865,6 +865,17 @@ export function MonthComparisonView({
     if (filters?.depo && !matchesFilter(t.depo, filters.depo)) return false;
     if (filters?.fc && !matchesFilter(t.fc, filters.fc)) return false;
     if (filters?.pma && !matchesFilter(t.pma, filters.pma)) return false;
+    if (filters?.salesmanPrefix) {
+      const prefixes = (Array.isArray(filters.salesmanPrefix) ? filters.salesmanPrefix : [filters.salesmanPrefix])
+        .filter(Boolean)
+        .map(p => p.trim().toUpperCase());
+      if (prefixes.length > 0) {
+        const slsName = (t.salesmanName || '').trim().toUpperCase();
+        const slsId = (t.salesmanId || '').trim().toUpperCase();
+        const matches = prefixes.some(p => slsName.startsWith(p) || slsId.startsWith(p));
+        if (!matches) return false;
+      }
+    }
 
     // 8. Search query filter
     if (searchFilter.trim()) {
@@ -1440,6 +1451,9 @@ export function MonthComparisonView({
       salesmanId: string;
       salesmanName: string;
       area: string;
+      depo?: string;
+      pma?: string;
+      cabang?: string;
       actualPrevious: number;
       actualCurrent: number;
       target: number;

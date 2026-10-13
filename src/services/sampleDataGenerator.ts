@@ -7,14 +7,14 @@ import {
 
 export function createAuthenticOfficeData() {
   const salesmen = [
-    { id: 'SLS-001', name: 'AHMAD HIDAYAT', nik: 'NIK-10291', area: 'BONE KOTA', cb: 'BONE', target: 275000000 },
-    { id: 'SLS-002', name: 'BUDI SANTOSO', nik: 'NIK-10292', area: 'BONE UTARA', cb: 'BONE', target: 240000000 },
-    { id: 'SLS-003', name: 'CITRA DEWI', nik: 'NIK-10293', area: 'BONE SELATAN', cb: 'BONE', target: 210000000 },
-    { id: 'SLS-004', name: 'DANI PRASETYO', nik: 'NIK-10294', area: 'BONE BARAT', cb: 'BONE', target: 260000000 },
-    { id: 'SLS-005', name: 'EKO WAHYUDI', nik: 'NIK-10295', area: 'BONE TIMUR', cb: 'BONE', target: 195000000 },
-    { id: 'SLS-006', name: 'FAJAR NUGRAHA', nik: 'NIK-10296', area: 'WATAMPONE', cb: 'BONE', target: 290000000 },
-    { id: 'SLS-007', name: 'GITA PRATIWI', nik: 'NIK-10297', area: 'TANETE', cb: 'BONE', target: 180000000 },
-    { id: 'SLS-008', name: 'HENDRA KURNIA', nik: 'NIK-10298', area: 'SOPPENG PERB', cb: 'BONE', target: 220000000 },
+    { id: 'SLS-001', name: 'AEPDA - AHMAD HIDAYAT', nik: 'NIK-10291', area: 'BONE KOTA', cb: 'BONE', target: 275000000 },
+    { id: 'SLS-002', name: 'AEPDA - BUDI SANTOSO', nik: 'NIK-10292', area: 'BONE UTARA', cb: 'BONE', target: 240000000 },
+    { id: 'SLS-003', name: 'GDKDA - CITRA DEWI', nik: 'NIK-10293', area: 'BONE SELATAN', cb: 'BONE', target: 210000000 },
+    { id: 'SLS-004', name: 'GDKDA - DANI PRASETYO', nik: 'NIK-10294', area: 'BONE BARAT', cb: 'BONE', target: 260000000 },
+    { id: 'SLS-005', name: 'GLKDA - EKO WAHYUDI', nik: 'NIK-10295', area: 'BONE TIMUR', cb: 'BONE', target: 195000000 },
+    { id: 'SLS-006', name: 'GLKDA - FAJAR NUGRAHA', nik: 'NIK-10296', area: 'WATAMPONE', cb: 'BONE', target: 290000000 },
+    { id: 'SLS-007', name: 'AEPDA - GITA PRATIWI', nik: 'NIK-10297', area: 'TANETE', cb: 'BONE', target: 180000000 },
+    { id: 'SLS-008', name: 'GDKDA - HENDRA KURNIA', nik: 'NIK-10298', area: 'SOPPENG PERB', cb: 'BONE', target: 220000000 },
   ];
 
   const channels = ['GENERAL TRADE', 'SEMI GROSIR', 'GROSIR BESAR', 'MINIMARKET', 'KIOS'];

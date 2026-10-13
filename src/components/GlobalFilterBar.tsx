@@ -308,10 +308,18 @@ export function GlobalFilterBar({
     getSelected(filters.pma).length > 0,
     getSelected(filters.rayon).length > 0,
     getSelected(filters.salesmanId).length > 0,
+    getSelected(filters.salesmanPrefix).length > 0,
     getSelected(filters.channel).length > 0,
     getSelected(filters.fc).length > 0,
     Boolean(filters.searchQuery),
   ].filter(Boolean).length;
+
+  const prefixOptions = useMemo(() => {
+    const list = options.salesmanPrefixes && options.salesmanPrefixes.length > 0
+      ? options.salesmanPrefixes
+      : ['AEPDA', 'GDKDA', 'GLKDA'];
+    return list.map(p => ({ value: p, label: p }));
+  }, [options.salesmanPrefixes]);
 
   // Options formatted for MultiSelectDropdown
   const cabangOptions = useMemo(
@@ -435,6 +443,21 @@ export function GlobalFilterBar({
             onToggle={() => toggleDropdown('salesman')}
             onClose={closeDropdown}
             onChange={vals => handleMultiChange('salesmanId', vals)}
+          />
+        )}
+
+        {/* 5B. Filter Prefix Salesman (AEPDA, GDKDA, GLKDA - Multi-Select) */}
+        {prefixOptions.length > 0 && (
+          <MultiSelectDropdown
+            id="salesmanPrefix"
+            label="Prefix Tim"
+            allLabel="Semua Prefix (AEPDA/GDKDA/GLKDA)"
+            options={prefixOptions}
+            selectedValues={getSelected(filters.salesmanPrefix)}
+            isOpen={openDropdown === 'salesmanPrefix'}
+            onToggle={() => toggleDropdown('salesmanPrefix')}
+            onClose={closeDropdown}
+            onChange={vals => handleMultiChange('salesmanPrefix', vals)}
           />
         )}
 

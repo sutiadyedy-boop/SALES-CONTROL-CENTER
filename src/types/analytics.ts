@@ -5,6 +5,7 @@ export interface GlobalFilterState {
   area?: string | string[];
   rayon?: string | string[];
   salesmanId?: string | string[];
+  salesmanPrefix?: string | string[]; // Multi-select filter for prefix codes e.g. AEPDA, GDKDA, GLKDA
   channel?: string | string[];
   fc?: string | string[];
   pma?: string | string[];
@@ -213,6 +214,7 @@ export interface FilterOptions {
   channels: string[];
   fcs: string[];
   pmas: string[];
+  salesmanPrefixes?: string[];
 }
 
 export interface CalculationResult {

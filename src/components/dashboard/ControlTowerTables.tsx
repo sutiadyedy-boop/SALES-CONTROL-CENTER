@@ -194,11 +194,11 @@ export function ControlTowerTables({
           <div>
             <div className="inline-flex items-center justify-center gap-1">
               {isEcUp ? (
-                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" title={`EC Naik (+${netEcDiff} Toko)`} />
+                <span title={`EC Naik (+${netEcDiff} Toko)`}><ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" /></span>
               ) : isEcDown ? (
-                <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" title={`EC Turun (${netEcDiff} Toko)`} />
+                <span title={`EC Turun (${netEcDiff} Toko)`}><ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" /></span>
               ) : (
-                <Minus className="w-3.5 h-3.5 text-amber-400 shrink-0" title="EC Tetap / Stabil" />
+                <span title="EC Tetap / Stabil"><Minus className="w-3.5 h-3.5 text-amber-400 shrink-0" /></span>
               )}
               <span className="font-bold text-cyan-400">
                 {row.roRate !== null ? `${row.roRate.toFixed(0)}%` : 'N/A'}
@@ -369,11 +369,11 @@ export function ControlTowerTables({
           <div>
             <div className="inline-flex items-center justify-center gap-1">
               {isEcUp ? (
-                <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" title={`EC Naik (+${netEcDiff} Toko)`} />
+                <span title={`EC Naik (+${netEcDiff} Toko)`}><ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 shrink-0" /></span>
               ) : isEcDown ? (
-                <ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" title={`EC Turun (${netEcDiff} Toko)`} />
+                <span title={`EC Turun (${netEcDiff} Toko)`}><ArrowDownRight className="w-3.5 h-3.5 text-rose-400 shrink-0" /></span>
               ) : (
-                <Minus className="w-3.5 h-3.5 text-amber-400 shrink-0" title="EC Tetap / Stabil" />
+                <span title="EC Tetap / Stabil"><Minus className="w-3.5 h-3.5 text-amber-400 shrink-0" /></span>
               )}
               <span className="font-bold text-cyan-400">
                 {row.roRate !== null ? `${row.roRate.toFixed(0)}%` : 'N/A'}
