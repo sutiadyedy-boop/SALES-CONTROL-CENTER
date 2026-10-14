@@ -12,10 +12,7 @@ import {
   Zap,
   Radio,
   FileSpreadsheet,
-  ArrowRight,
-  Filter,
-  Check,
-  RotateCcw
+  ArrowRight
 } from 'lucide-react';
 import { CalculationResult, OpportunityItem, GlobalFilterState, FilterOptions } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
@@ -95,72 +92,6 @@ export function DashboardView({
 
   const isAchieved = kpis.achievementRate !== null && kpis.achievementRate >= 100;
 
-  // Active selected prefixes from filters
-  const activePrefixes = useMemo(() => {
-    const raw = filters?.salesmanPrefix;
-    if (!raw) return [];
-    if (Array.isArray(raw)) return raw.filter(Boolean);
-    return [raw].filter(Boolean);
-  }, [filters?.salesmanPrefix]);
-
-  // Display prefixes ensuring AEPDA, GDKDA, GLKDA are in primary slots
-  const displayPrefixes = useMemo(() => {
-    const list = filterOptions?.salesmanPrefixes && filterOptions.salesmanPrefixes.length > 0
-      ? filterOptions.salesmanPrefixes
-      : ['AEPDA', 'GDKDA', 'GLKDA'];
-    const set = new Set(['AEPDA', 'GDKDA', 'GLKDA', ...list]);
-    const standard = ['AEPDA', 'GDKDA', 'GLKDA'].filter(p => set.has(p));
-    const rest = Array.from(set).filter(p => !['AEPDA', 'GDKDA', 'GLKDA'].includes(p)).sort();
-    return [...standard, ...rest];
-  }, [filterOptions?.salesmanPrefixes]);
-
-  // Salesmen count per prefix based on unfiltered dataset
-  const prefixCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    const slsList = (filterOptions?.salesmen && filterOptions.salesmen.length > 0)
-      ? filterOptions.salesmen
-      : (calculation?.salesmanPerformances || []).map(s => ({ id: s.salesmanId, name: s.salesmanName }));
-
-    slsList.forEach(s => {
-      const uName = (s.name || '').trim().toUpperCase();
-      const uId = (s.id || '').trim().toUpperCase();
-      displayPrefixes.forEach(p => {
-        if (uName.startsWith(p) || uId.startsWith(p)) {
-          counts[p] = (counts[p] || 0) + 1;
-        }
-      });
-    });
-    return counts;
-  }, [filterOptions?.salesmen, calculation?.salesmanPerformances, displayPrefixes]);
-
-  const handleTogglePrefix = (prefix: string) => {
-    if (!onFilterChange) return;
-    const isSelected = activePrefixes.includes(prefix);
-    const updated = isSelected
-      ? activePrefixes.filter(p => p !== prefix)
-      : [...activePrefixes, prefix];
-    onFilterChange({
-      ...filters,
-      salesmanPrefix: updated.length > 0 ? updated : undefined,
-    });
-  };
-
-  const handleSelectAllPrefixes = () => {
-    if (!onFilterChange) return;
-    onFilterChange({
-      ...filters,
-      salesmanPrefix: displayPrefixes,
-    });
-  };
-
-  const handleResetPrefixes = () => {
-    if (!onFilterChange) return;
-    onFilterChange({
-      ...filters,
-      salesmanPrefix: undefined,
-    });
-  };
-
   return (
     <div className="space-y-6">
       {/* CONTROL TOWER BANNER */}
@@ -191,98 +122,6 @@ export function DashboardView({
             <span className="text-slate-500 mr-1.5">STATUS DATA:</span>
             <span className="text-emerald-400 font-semibold">TERVALIDASI</span>
           </div>
-        </div>
-      </div>
-
-      {/* FILTER DASHBOARD: PREFIX SALESMAN (AEPDA, GDKDA, GLKDA - BISA PILIH LEBIH DARI 1) */}
-      <div className="bg-slate-900/90 border border-cyan-500/30 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3 relative overflow-hidden backdrop-blur-sm">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.15)]">
-              <Filter className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-xs sm:text-sm font-bold font-mono tracking-wider text-slate-100 uppercase">
-                  FILTER DASHBOARD — PREFIX SALESMAN
-                </h3>
-                {activePrefixes.length > 0 ? (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
-                    {activePrefixes.length} Dipilih: {activePrefixes.join(', ')}
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-mono text-slate-400 bg-slate-800 border border-slate-700">
-                    Semua Salesman Aktif (Tanpa Filter)
-                  </span>
-                )}
-              </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Pilih satu atau lebih prefix untuk menampilkan hanya data salesman yang nama depannya tertulis <strong>AEPDA</strong>, <strong>GDKDA</strong>, atau <strong>GLKDA</strong> (seluruh metrik, speedometer, grafik, dan tabel performa otomatis menyesuaikan).
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSelectAllPrefixes}
-              className="text-xs font-mono font-semibold px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 transition-colors"
-            >
-              Pilih Semua ({displayPrefixes.length})
-            </button>
-            {activePrefixes.length > 0 && (
-              <button
-                type="button"
-                onClick={handleResetPrefixes}
-                className="flex items-center gap-1.5 text-xs font-mono font-semibold px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 transition-colors"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Checkbox Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5 pt-1">
-          {displayPrefixes.map(prefix => {
-            const isChecked = activePrefixes.includes(prefix);
-            const count = prefixCounts[prefix] || 0;
-            return (
-              <button
-                key={prefix}
-                type="button"
-                onClick={() => handleTogglePrefix(prefix)}
-                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl text-xs font-mono font-semibold transition-all border cursor-pointer select-none ${
-                  isChecked
-                    ? 'bg-cyan-950/70 text-cyan-200 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.25)]'
-                    : 'bg-slate-950/80 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white'
-                }`}
-                title={`Filter salesman yang nama depannya tertulis ${prefix} (Klik untuk centang)`}
-              >
-                <div
-                  className={`w-4 h-4 rounded flex items-center justify-center border transition-all ${
-                    isChecked
-                      ? 'bg-cyan-500 border-cyan-500 text-slate-950'
-                      : 'border-slate-700 bg-slate-900'
-                  }`}
-                >
-                  {isChecked && <Check className="w-3 h-3 stroke-[3]" />}
-                </div>
-
-                <span className="font-bold tracking-wide">{prefix}</span>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                    isChecked
-                      ? 'bg-cyan-900/60 text-cyan-200'
-                      : 'bg-slate-800 text-slate-400'
-                  }`}
-                >
-                  {count} Salesman
-                </span>
-              </button>
-            );
-          })}
         </div>
       </div>
 
