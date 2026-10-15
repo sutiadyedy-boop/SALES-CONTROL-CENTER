@@ -22,6 +22,7 @@ import { ControlTowerTables } from './ControlTowerTables';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { ExecutiveBriefingBar } from './ExecutiveBriefingBar';
 import { TopLeakageOutletsCard } from './TopLeakageOutletsCard';
+import { DashboardSkeleton } from './DashboardSkeleton';
 
 interface DashboardViewProps {
   calculation: CalculationResult | null;
@@ -30,6 +31,9 @@ interface DashboardViewProps {
   filters?: GlobalFilterState;
   onFilterChange?: (newFilters: GlobalFilterState) => void;
   filterOptions?: FilterOptions;
+  isLoading?: boolean;
+  hasUploadedFiles?: boolean;
+  loadingMessage?: string;
   onNavigate: (tab: string) => void;
   onLoadSampleData: () => void;
 }
@@ -41,15 +45,47 @@ export function DashboardView({
   filters,
   onFilterChange,
   filterOptions,
+  isLoading = false,
+  hasUploadedFiles = false,
+  loadingMessage,
   onNavigate,
   onLoadSampleData,
 }: DashboardViewProps) {
+  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
+    ? settings.previousMonthLabel 
+    : 'September 2026';
+  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
+    ? settings.currentMonthLabel 
+    : 'Oktober 2026';
+
   // Check if database is empty - strictly display DATA BELUM TERSEDIA without dummy data
   const isEmptyDatabase = 
     !calculation || 
     (calculation.kpis.totalActualCurrent === 0 && 
      calculation.kpis.totalTarget === 0 && 
      calculation.kpis.totalActiveOutlets === 0);
+
+  // 1. If actively loading large datasets, display tactical DashboardSkeleton
+  if (isLoading) {
+    return (
+      <DashboardSkeleton
+        message={loadingMessage || 'MENGANALISIS & MENGKALKULASI DATA BESAR...'}
+        submessage="Memproses agregasi jutaan record transaksi, target resmi, dan master outlet toko..."
+        periodLabel={currLabel.toUpperCase()}
+      />
+    );
+  }
+
+  // 2. If files are uploaded but calculation state is pending / resolving, show skeleton to prevent black blank screen
+  if (hasUploadedFiles && isEmptyDatabase) {
+    return (
+      <DashboardSkeleton
+        message="MENGHUBUNGKAN DATA KANTOR & SINKRONISASI TELEMETRY..."
+        submessage="Sedang merekonsiliasi record transaksi bulan lalu, bulan ini, target, dan master outlet..."
+        periodLabel={currLabel.toUpperCase()}
+      />
+    );
+  }
 
   if (isEmptyDatabase) {
     return (
@@ -83,13 +119,6 @@ export function DashboardView({
   }
 
   const { kpis } = calculation;
-  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
-    ? settings.previousMonthLabel 
-    : 'September 2026';
-  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
-    ? settings.currentMonthLabel 
-    : 'Oktober 2026';
-
   const isAchieved = kpis.achievementRate !== null && kpis.achievementRate >= 100;
 
   return (

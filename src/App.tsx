@@ -201,6 +201,9 @@ export default function App() {
   const [dupPrev, setDupPrev] = useState(0);
   const [dupCurr, setDupCurr] = useState(0);
 
+  // Global loading state during large file parsing & calculations
+  const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
+
   // Helper to load sample office files into memory
   const populateSampleFiles = useCallback(() => {
     const { prevRows, currRows, targetRows, masterRows, data } = getSampleOfficeRawData();
@@ -378,10 +381,16 @@ export default function App() {
     // Files start empty. User can upload their own real files or click "Muat Data Contoh Kantor"
   }, []);
 
-  // User-triggered load demo data with success sound
+  // User-triggered load demo data with success sound and telemetry skeleton
   const handleUserLoadSampleData = useCallback(() => {
-    populateSampleFiles();
-    soundManager.playSuccess();
+    setIsLoadingData(true);
+    setTimeout(() => {
+      populateSampleFiles();
+      soundManager.playSuccess();
+      setTimeout(() => {
+        setIsLoadingData(false);
+      }, 400);
+    }, 60);
   }, [populateSampleFiles]);
 
   // Helper to re-normalize records for a category from its uploaded files
@@ -468,94 +477,102 @@ export default function App() {
 
   // File Upload Handler with multiple file support for 1, 2, and 4
   const handleFileUpload = useCallback(async (category: DatabaseCategory, fileList: FileList) => {
-    const filesArray = Array.from(fileList);
-    let updatedFilesForCat = [...(uploadedFiles[category] || [])];
+    setIsLoadingData(true);
+    try {
+      const filesArray = Array.from(fileList);
+      let updatedFilesForCat = [...(uploadedFiles[category] || [])];
 
-    // If existing files in this category are default sample files, clear them when user uploads real files
-    const isSampleData = updatedFilesForCat.some(f => 
-      f.id === 'prev-file-bone' || 
-      f.id === 'curr-file-ksni' || 
-      f.id === 'target-file-sc' || 
-      f.id === 'master-file-blk'
-    );
-    if (isSampleData) {
-      updatedFilesForCat = [];
-    }
-
-    let resolvedMap = { ...(categoryMappings[category] || {}) };
-    let currentActiveSettings = settings;
-
-    for (const file of filesArray) {
-      try {
-        rawFileObjectsRef.current.set(file.name, file);
-        const parsed = await parseExcelFile(file, category);
-
-        // Auto detect column mappings
-        const autoMappings = autoDetectMappings(category, parsed.headers, resolvedMap);
-        for (const [k, v] of Object.entries(autoMappings)) {
-          if (v.selectedHeader) resolvedMap[k] = v.selectedHeader;
-        }
-
-        const allRows = parsed.allRows || parsed.sampleRows;
-        const detected = detectPeriod(file.name, parsed.sheetNames, allRows, category, resolvedMap['transaction_date']);
-
-        // Update settings dynamically if period detected
-        if (category === 'previous_month' && detected.label) {
-          currentActiveSettings = { ...currentActiveSettings, previousMonthLabel: detected.label };
-          setSettings(currentActiveSettings);
-          saveSettings(currentActiveSettings);
-        } else if ((category === 'current_month' || category === 'target_salesman') && detected.label) {
-          currentActiveSettings = { ...currentActiveSettings, currentMonthLabel: detected.label };
-          setSettings(currentActiveSettings);
-          saveSettings(currentActiveSettings);
-        }
-
-        // Validate file
-        const validation = validateUploadedFile(category, parsed.headers, resolvedMap, parsed.sampleRows);
-
-        const newUploadedFile: RawUploadedFile = {
-          ...parsed,
-          fileName: file.name,
-          sheet: parsed.selectedSheet,
-          rows: allRows.length,
-          columns: parsed.headers.length,
-          period: detected.label || parsed.period || (category === 'previous_month' ? 'SEPTEMBER 2026' : 'OKTOBER 2026'),
-          status: validation.isValid ? 'ready' : 'needs_mapping',
-          validation,
-          mappingConfirmed: false,
-          allRows,
-        };
-
-        if (category === 'target_salesman') {
-          updatedFilesForCat = [newUploadedFile];
-        } else {
-          updatedFilesForCat = [newUploadedFile, ...updatedFilesForCat];
-        }
-      } catch (err: any) {
-        console.error('Error processing file:', err);
-        soundManager.playError();
+      // If existing files in this category are default sample files, clear them when user uploads real files
+      const isSampleData = updatedFilesForCat.some(f => 
+        f.id === 'prev-file-bone' || 
+        f.id === 'curr-file-ksni' || 
+        f.id === 'target-file-sc' || 
+        f.id === 'master-file-blk'
+      );
+      if (isSampleData) {
+        updatedFilesForCat = [];
       }
+
+      let resolvedMap = { ...(categoryMappings[category] || {}) };
+      let currentActiveSettings = settings;
+
+      for (const file of filesArray) {
+        try {
+          rawFileObjectsRef.current.set(file.name, file);
+          const parsed = await parseExcelFile(file, category);
+
+          // Auto detect column mappings
+          const autoMappings = autoDetectMappings(category, parsed.headers, resolvedMap);
+          for (const [k, v] of Object.entries(autoMappings)) {
+            if (v.selectedHeader) resolvedMap[k] = v.selectedHeader;
+          }
+
+          const allRows = parsed.allRows || parsed.sampleRows;
+          const detected = detectPeriod(file.name, parsed.sheetNames, allRows, category, resolvedMap['transaction_date']);
+
+          // Update settings dynamically if period detected
+          if (category === 'previous_month' && detected.label) {
+            currentActiveSettings = { ...currentActiveSettings, previousMonthLabel: detected.label };
+            setSettings(currentActiveSettings);
+            saveSettings(currentActiveSettings);
+          } else if ((category === 'current_month' || category === 'target_salesman') && detected.label) {
+            currentActiveSettings = { ...currentActiveSettings, currentMonthLabel: detected.label };
+            setSettings(currentActiveSettings);
+            saveSettings(currentActiveSettings);
+          }
+
+          // Validate file
+          const validation = validateUploadedFile(category, parsed.headers, resolvedMap, parsed.sampleRows);
+
+          const newUploadedFile: RawUploadedFile = {
+            ...parsed,
+            fileName: file.name,
+            sheet: parsed.selectedSheet,
+            rows: allRows.length,
+            columns: parsed.headers.length,
+            period: detected.label || parsed.period || (category === 'previous_month' ? 'SEPTEMBER 2026' : 'OKTOBER 2026'),
+            status: validation.isValid ? 'ready' : 'needs_mapping',
+            validation,
+            mappingConfirmed: false,
+            allRows,
+          };
+
+          if (category === 'target_salesman') {
+            updatedFilesForCat = [newUploadedFile];
+          } else {
+            updatedFilesForCat = [newUploadedFile, ...updatedFilesForCat];
+          }
+        } catch (err: any) {
+          console.error('Error processing file:', err);
+          soundManager.playError();
+        }
+      }
+
+      if (updatedFilesForCat.length > 0) {
+        soundManager.playSuccess();
+      }
+
+      // Save updated uploaded files state
+      setUploadedFiles(prev => ({
+        ...prev,
+        [category]: updatedFilesForCat,
+      }));
+
+      // Save mapping
+      setCategoryMappings(prev => {
+        const updated = { ...prev, [category]: resolvedMap };
+        saveCategoryMapping(category, resolvedMap);
+        return updated;
+      });
+
+      // Re-normalize all records for this category with all rows
+      renormalizeCategory(category, updatedFilesForCat, resolvedMap, currentActiveSettings);
+    } finally {
+      // Allow slight tick for react to finish render pass
+      setTimeout(() => {
+        setIsLoadingData(false);
+      }, 250);
     }
-
-    if (updatedFilesForCat.length > 0) {
-      soundManager.playSuccess();
-    }
-
-    // Save updated uploaded files state
-    setUploadedFiles(prev => ({
-      ...prev,
-      [category]: updatedFilesForCat,
-    }));
-
-    // Save mapping
-    setCategoryMappings(prev => {
-      const updated = { ...prev, [category]: resolvedMap };
-      saveCategoryMapping(category, resolvedMap);
-      return updated;
-    });
-
-    // Re-normalize all records for this category with all rows
-    renormalizeCategory(category, updatedFilesForCat, resolvedMap, currentActiveSettings);
   }, [uploadedFiles, categoryMappings, settings, renormalizeCategory]);
 
   // Remove file
@@ -1221,6 +1238,8 @@ export default function App() {
                 filters={filters}
                 onFilterChange={setFilters}
                 filterOptions={filterOptions}
+                isLoading={isLoadingData}
+                hasUploadedFiles={totalFilesCount > 0}
                 onNavigate={(tab) => handleSelectTab(tab)}
                 onLoadSampleData={handleUserLoadSampleData}
               />
