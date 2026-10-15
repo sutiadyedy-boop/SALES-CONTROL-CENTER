@@ -12,7 +12,8 @@ import {
   Zap,
   Radio,
   FileSpreadsheet,
-  ArrowRight
+  ArrowRight,
+  Filter
 } from 'lucide-react';
 import { CalculationResult, OpportunityItem, GlobalFilterState, FilterOptions } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
@@ -20,7 +21,6 @@ import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
 import { ControlTowerCharts } from './ControlTowerCharts';
 import { ControlTowerTables } from './ControlTowerTables';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
-import { ExecutiveBriefingBar } from './ExecutiveBriefingBar';
 import { TopLeakageOutletsCard } from './TopLeakageOutletsCard';
 import { DashboardSkeleton } from './DashboardSkeleton';
 
@@ -154,11 +154,75 @@ export function DashboardView({
         </div>
       </div>
 
-      {/* EXECUTIVE 60-SECOND BRIEFING & RUN-RATE CLOSING ESTIMATION */}
-      <ExecutiveBriefingBar
-        calculation={calculation}
-        settings={settings}
-      />
+      {/* QUICK MULTI-SELECT PREFIX FILTER (AEPDA, GDKDA, GLKDA) */}
+      {onFilterChange && (
+        <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-cyan-400 shrink-0" />
+            <span className="text-xs font-bold text-slate-200 uppercase tracking-wide font-mono">
+              Filter Prefix Salesman:
+            </span>
+            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+              (Multi-select: pilih satu atau lebih prefix data salesman)
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Semua / Reset Button */}
+            <button
+              onClick={() => {
+                const nextFilters = { ...filters };
+                delete nextFilters.salesmanPrefix;
+                onFilterChange(nextFilters);
+              }}
+              className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
+                !filters?.salesmanPrefix || (Array.isArray(filters.salesmanPrefix) && filters.salesmanPrefix.length === 0)
+                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              Semua Prefix
+            </button>
+
+            {/* Individual Multi-Select Prefix Pills: AEPDA, GDKDA, GLKDA + Data-driven */}
+            {Array.from(new Set(['AEPDA', 'GDKDA', 'GLKDA', ...(filterOptions?.salesmanPrefixes || [])])).map(prefix => {
+              const currentList = Array.isArray(filters?.salesmanPrefix)
+                ? filters.salesmanPrefix
+                : filters?.salesmanPrefix
+                ? [filters.salesmanPrefix]
+                : [];
+              const isSelected = currentList.includes(prefix);
+
+              return (
+                <button
+                  key={prefix}
+                  onClick={() => {
+                    let updated: string[];
+                    if (isSelected) {
+                      updated = currentList.filter(p => p !== prefix);
+                    } else {
+                      updated = [...currentList, prefix];
+                    }
+                    onFilterChange({
+                      ...filters,
+                      salesmanPrefix: updated.length > 0 ? updated : undefined,
+                    });
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                    isSelected
+                      ? 'bg-cyan-500 text-slate-950 border border-cyan-400 shadow-md shadow-cyan-500/20 font-extrabold'
+                      : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                  }`}
+                  title={`Klik untuk ${isSelected ? 'menghapus' : 'memilih'} filter ${prefix}`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-cyan-400'}`} />
+                  <span>{prefix}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* TOP 9 PRIMARY KPI CARDS -> GLOWING SPEEDOMETER TELEMETRY CLUSTER (KHUSUSNYA TARGET VS REALISASI) */}
       <div className="bg-slate-950/90 border border-cyan-500/30 rounded-2xl p-4 sm:p-5 shadow-[0_0_30px_rgba(6,182,212,0.12)] relative overflow-hidden space-y-4">
