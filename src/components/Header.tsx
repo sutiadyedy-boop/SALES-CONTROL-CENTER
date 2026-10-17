@@ -15,7 +15,8 @@ import {
   Building2,
   Sun,
   Moon,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Palette
 } from 'lucide-react';
 import { UserProfile } from '../types/database';
 import { CaptureJpgButton } from './common/CaptureJpgButton';
@@ -23,6 +24,7 @@ import { ThemeToggle } from './common/ThemeToggle';
 import { SoundToggle } from './common/SoundToggle';
 import { useTheme } from '../context/ThemeContext';
 import { LogoDashboard } from './common/LogoDashboard';
+import { ThemePresetModal } from './common/ThemePresetModal';
 
 interface HeaderProps {
   sessionId: string;
@@ -89,6 +91,7 @@ export function Header({
   const activeMenuLabel = tabLabels[currentTab] || currentTab;
   const { isDark, toggleTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicked outside
@@ -190,6 +193,18 @@ export function Header({
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span className="hidden sm:inline">Muat Demo Data</span>
+        </button>
+
+        {/* Theme Palette Samples & Customizer Button */}
+        <button
+          type="button"
+          onClick={() => setIsThemeModalOpen(true)}
+          className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/60 hover:bg-emerald-900/80 text-emerald-300 hover:text-emerald-200 text-xs font-bold transition-all shadow-sm shadow-emerald-950/50 cursor-pointer"
+          title="Buka Sampel Palet Warna Hitam + Hijau Gelap (Koleksi & Pratinjau Langsung)"
+        >
+          <Palette className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="hidden md:inline">Sampel Hitam + Hijau</span>
+          <span className="md:hidden">Palet</span>
         </button>
 
         {/* Reset / Clear Data (Admin Only) */}
@@ -303,6 +318,24 @@ export function Header({
                   </button>
                 )}
 
+                {/* Theme Preset Modal Trigger in Dropdown */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    setIsThemeModalOpen(true);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-2 text-xs text-emerald-300 hover:text-emerald-200 hover:bg-emerald-500/10 transition-colors text-left font-medium cursor-pointer"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Palette className="w-4 h-4 text-emerald-400" />
+                    <span>Pilihan Palet Hitam + Hijau</span>
+                  </div>
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800">
+                    4 Sampel
+                  </span>
+                </button>
+
                 {/* Theme Toggle in Dropdown */}
                 <button
                   onClick={() => {
@@ -343,6 +376,12 @@ export function Header({
           )}
         </div>
       </div>
+
+      {/* Theme Preset & Sample Selection Modal */}
+      <ThemePresetModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+      />
     </header>
   );
 }

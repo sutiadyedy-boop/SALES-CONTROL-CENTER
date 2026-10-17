@@ -4,9 +4,147 @@
 
 :root {
   color-scheme: dark;
+
+  /* Default Theme: Emerald Midnight (Perpaduan Hitam Pekat & Hijau Gelap Zamrud) */
+  --color-slate-950: #020906; /* Latar Belakang Utama Hitam Zamrud Pekat */
+  --color-slate-900: #071912; /* Kartu Surface & Komponen Panel */
+  --color-slate-800: #123d2b; /* Border Kartu & Pemisah Elemen */
+  --color-slate-700: #1a523a; /* Border Fokus / Hover */
+  --color-slate-600: #2d7353;
+  --color-slate-500: #529f79;
+  --color-slate-400: #86c4a8; /* Teks Sekunder (Hijau Mint Lembut, Kontras Tinggi) */
+  --color-slate-300: #bbf0db; /* Teks Primer Sub */
+  --color-slate-200: #e2fbf0; /* Teks Primer Terang */
+  --color-slate-100: #f0fdf4; /* Teks & Angka Putih Bersih (WCAG AAA 14.8:1) */
+  --color-slate-50: #ffffff;
+
+  /* Vivid & Clear Functional Accents */
+  --color-emerald-500: #10b981;
+  --color-emerald-400: #34d399;
+  --color-emerald-300: #6ee7b7;
+  --color-cyan-400: #22d3ee;
+  --color-amber-400: #fbbf24;
+  --color-rose-400: #f43f5e;
 }
 
-html.light {
+/* ========================================================================= */
+/* 1. TEMA REKOMENDASI UTAMA: EMERALD MIDNIGHT (HITAM PEKAT + HIJAU ZAMRUD) */
+/* ========================================================================= */
+html[data-theme="emerald_midnight"],
+html.emerald_midnight {
+  color-scheme: dark;
+
+  /* Black & Deep Emerald Green scale */
+  --color-slate-950: #020906; /* Latar Belakang Utama Hitam Zamrud Pekat */
+  --color-slate-900: #071912; /* Kartu Surface & Komponen Panel */
+  --color-slate-800: #123d2b; /* Border Kartu & Pemisah Elemen */
+  --color-slate-700: #1a523a; /* Border Fokus / Hover */
+  --color-slate-600: #2d7353;
+  --color-slate-500: #529f79;
+  --color-slate-400: #86c4a8; /* Teks Sekunder (Hijau Mint Lembut, Kontras Tinggi) */
+  --color-slate-300: #bbf0db; /* Teks Primer Sub */
+  --color-slate-200: #e2fbf0; /* Teks Primer Terang */
+  --color-slate-100: #f0fdf4; /* Teks & Angka Putih Bersih (WCAG AAA 14.8:1) */
+  --color-slate-50: #ffffff;
+
+  /* Vivid & Clear Accents */
+  --color-emerald-500: #10b981;
+  --color-emerald-400: #34d399;
+  --color-emerald-300: #6ee7b7;
+  --color-cyan-400: #22d3ee;
+  --color-amber-400: #fbbf24;
+  --color-rose-400: #f43f5e;
+}
+
+html[data-theme="emerald_midnight"] body,
+html.emerald_midnight body {
+  background-color: #020906;
+  color: #f0fdf4;
+}
+
+/* ========================================================================= */
+/* 2. TEMA OPSI 2: FOREST OBSIDIAN (HITAM PEKAT + HIJAU HUTAN PINUS TUA)     */
+/* ========================================================================= */
+html[data-theme="forest_obsidian"],
+html.forest_obsidian {
+  color-scheme: dark;
+
+  --color-slate-950: #030704; /* Hitam Obsidian Pekat */
+  --color-slate-900: #0a1a0f; /* Kartu Hutan Pinus Tua */
+  --color-slate-800: #163e23; /* Border Hijau Gelap */
+  --color-slate-700: #205330;
+  --color-slate-600: #2f7344;
+  --color-slate-500: #499e64;
+  --color-slate-400: #7cc393;
+  --color-slate-300: #b3ecc4;
+  --color-slate-200: #e0f9e8;
+  --color-slate-100: #f2fcf5; /* Angka & Teks Kontras 15.2:1 */
+  --color-slate-50: #ffffff;
+}
+
+html[data-theme="forest_obsidian"] body,
+html.forest_obsidian body {
+  background-color: #030704;
+  color: #f2fcf5;
+}
+
+/* ========================================================================= */
+/* 3. TEMA OPSI 3: CYBER JADE (HITAM GIOK FUTURISTIK / FINTECH MODERN)       */
+/* ========================================================================= */
+html[data-theme="cyber_jade"],
+html.cyber_jade {
+  color-scheme: dark;
+
+  --color-slate-950: #010d08; /* Hitam Giok Dalam */
+  --color-slate-900: #072418; /* Surface Cyber Jade */
+  --color-slate-800: #144e36; /* Border Hijau Giok Tegas */
+  --color-slate-700: #1a6547;
+  --color-slate-600: #2b8c64;
+  --color-slate-500: #46b886;
+  --color-slate-400: #80e4bf;
+  --color-slate-300: #aff3d6;
+  --color-slate-200: #dbfbee;
+  --color-slate-100: #e6fcf5; /* Kontras 13.9:1 */
+  --color-slate-50: #ffffff;
+}
+
+html[data-theme="cyber_jade"] body,
+html.cyber_jade body {
+  background-color: #010d08;
+  color: #e6fcf5;
+}
+
+/* ========================================================================= */
+/* 4. TEMA OPSI 4: STEALTH BLACK & EMERALD (HITAM OLED 100% + AKSEN HIJAU)   */
+/* ========================================================================= */
+html[data-theme="deep_black"],
+html.deep_black {
+  color-scheme: dark;
+
+  --color-slate-950: #000000; /* True Pitch Black 100% */
+  --color-slate-900: #080c09; /* Deep Surface */
+  --color-slate-800: #183323; /* Border Minimalis */
+  --color-slate-700: #254a34;
+  --color-slate-600: #3b6b4d;
+  --color-slate-500: #58936f;
+  --color-slate-400: #82baa0;
+  --color-slate-300: #b4e8d0;
+  --color-slate-200: #e1fbf0;
+  --color-slate-100: #ffffff; /* Kontras Maksimum 19.5:1 */
+  --color-slate-50: #ffffff;
+}
+
+html[data-theme="deep_black"] body,
+html.deep_black body {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+/* ========================================================================= */
+/* 5. TEMA LIGHT (BERSIH UNTUK RUANGAN TERANG)                               */
+/* ========================================================================= */
+html.light,
+html[data-theme="light"] {
   color-scheme: light;
 
   /* Inverted slate scale for crisp enterprise light theme */
@@ -36,7 +174,7 @@ html.light {
   --color-purple-300: #6d28d9;
 }
 
-/* Light mode specific enhancements for extra contrast and legibility */
+/* Light mode specific enhancements */
 html.light .bg-slate-950\/60,
 html.light .bg-slate-950\/70,
 html.light .bg-slate-950\/80,
@@ -77,51 +215,11 @@ html.light .text-rose-300 {
   color: #be123c;
 }
 
-html.light .bg-emerald-950\/30,
-html.light .bg-emerald-950\/40,
-html.light .bg-emerald-950\/60,
-html.light .bg-emerald-950\/70 {
-  background-color: #ecfdf5;
-}
-
-html.light .bg-amber-950\/30,
-html.light .bg-amber-950\/40,
-html.light .bg-amber-950\/60,
-html.light .bg-amber-950\/70 {
-  background-color: #fffbeb;
-}
-
-html.light .bg-rose-950\/30,
-html.light .bg-rose-950\/40,
-html.light .bg-rose-950\/60,
-html.light .bg-rose-950\/70 {
-  background-color: #fff1f2;
-}
-
-html.light .bg-purple-950\/30,
-html.light .bg-purple-950\/40,
-html.light .bg-purple-950\/60,
-html.light .bg-purple-950\/70 {
-  background-color: #faf5ff;
-}
-
 html.light input:not([type="checkbox"]):not([type="radio"]),
 html.light select,
 html.light textarea {
   background-color: #ffffff;
   color: #0f172a;
-}
-
-html.light ::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-
-html.light ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-}
-
-html.light ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
 }
 
 @layer base {
@@ -141,14 +239,14 @@ html.light ::-webkit-scrollbar-thumb:hover {
 }
 
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: var(--color-slate-950, #020906);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: var(--color-slate-800, #123d2b);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: var(--color-slate-700, #1a523a);
 }

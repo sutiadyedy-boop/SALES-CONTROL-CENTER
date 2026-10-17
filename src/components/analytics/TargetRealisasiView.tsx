@@ -30,6 +30,8 @@ import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { WhatsAppSalesmanReportModal } from '../dashboard/WhatsAppSalesmanReportModal';
 import { TargetSpeedometerCluster } from './TargetSpeedometerCluster';
+import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
+import { generateTargetRealisasi5W } from '../../services/fiveWOneHEngine';
 
 interface TargetRealisasiViewProps {
   calculation: CalculationResult | null;
@@ -625,6 +627,10 @@ export function TargetRealisasiView({
     return allDepoPmaColumns;
   }, [tableViewMode, allDepoPmaColumns]);
 
+  const fiveWReport = useMemo(() => {
+    return generateTargetRealisasi5W(calculation, rawTargets, currTransactions, settings);
+  }, [calculation, rawTargets, currTransactions, settings]);
+
   return (
     <div className="space-y-6">
       {/* Title & Period */}
@@ -657,6 +663,9 @@ export function TargetRealisasiView({
           />
         </div>
       </div>
+
+      {/* 5W + 1H & ROOT CAUSE ANALYSIS CARD */}
+      <FiveWOneHAnalysisCard report={fiveWReport} defaultExpanded={false} />
 
       {/* ========================================================================= */}
       {/* PENGUKURAN HARI KERJA & KEKURANGAN SISA HARI KERJA (USER REQUESTED FEATURE) */}

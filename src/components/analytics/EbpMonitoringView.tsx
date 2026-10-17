@@ -25,6 +25,8 @@ import { GlobalFilterState } from '../../types/analytics';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
+import { generateEbpMonitoring5W } from '../../services/fiveWOneHEngine';
 
 export interface EbpMonitoringViewProps {
   masterOutlets: MasterOutletRecord[];
@@ -806,6 +808,10 @@ export function EbpMonitoringView({
     },
   ];
 
+  const fiveWReport = useMemo(() => {
+    return generateEbpMonitoring5W(masterOutlets, currTransactions, prevTransactions, settings);
+  }, [masterOutlets, currTransactions, prevTransactions, settings]);
+
   return (
     <div className="space-y-6">
       {/* 1. Header Section */}
@@ -847,6 +853,9 @@ export function EbpMonitoringView({
           )}
         </div>
       </div>
+
+      {/* 5W + 1H & ROOT CAUSE ANALYSIS CARD */}
+      <FiveWOneHAnalysisCard report={fiveWReport} defaultExpanded={false} />
 
       {/* Synchronized Dashboard Filters Banner */}
       {hasActiveDashboardFilters && (

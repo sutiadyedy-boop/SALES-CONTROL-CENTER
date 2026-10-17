@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { Settings, Save, Shield, Database, Key, CheckCircle2, RotateCcw, SlidersHorizontal, AlertTriangle, ShieldAlert, Lock, Sun, Moon, Calendar } from 'lucide-react';
+import { Settings, Save, Shield, Database, Key, CheckCircle2, RotateCcw, SlidersHorizontal, AlertTriangle, ShieldAlert, Lock, Sun, Moon, Calendar, Palette, Sparkles, Check, Flame, Eye } from 'lucide-react';
 import { AppSettings, UserProfile, UserRole, InsightThresholds } from '../../types/database';
 import { DEFAULT_THRESHOLDS } from '../../services/storageService';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
-import { useTheme } from '../../context/ThemeContext';
+import { useTheme, THEME_OPTIONS, Theme } from '../../context/ThemeContext';
+import { ThemePresetModal } from '../common/ThemePresetModal';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -24,6 +25,7 @@ export function SettingsView({
 }: SettingsViewProps) {
   const isAdmin = userProfile.role === 'ADMIN';
   const { theme, setTheme } = useTheme();
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
   const [formSettings, setFormSettings] = useState<AppSettings>({
     ...settings,
     thresholds: settings.thresholds || DEFAULT_THRESHOLDS,
@@ -122,58 +124,141 @@ export function SettingsView({
 
       {/* Theme Preference Card (Accessible to all users) */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-sm">
-        <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
-          {theme === 'dark' ? (
-            <Moon className="w-4 h-4 text-amber-400" />
-          ) : (
-            <Sun className="w-4 h-4 text-indigo-500" />
-          )}
-          <h3 className="text-sm font-bold text-slate-100">
-            Tema Tampilan Antarmuka (Dark / Light Mode)
-          </h3>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+              <Palette className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
+                <span>Tema &amp; Palet Visual Ruang Kontrol</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  Hitam + Hijau Gelap
+                </span>
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Pilihan palet visual beresolusi tinggi dengan kontras WCAG AAA. Data, formula, dan grafik tetap 100% aman dan akurat.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsThemeModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 text-xs font-bold transition-all shadow-sm cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Katalog Sampel Interaktif</span>
+          </button>
         </div>
 
-        <div className="text-xs">
-          <p className="text-slate-400 mb-3">
-            Pilih mode tema yang paling nyaman untuk Anda. Kontras teks dan palet warna diatur presisi agar seluruh tabel metrik, chart BI, dan laporan audit terbaca tajam dan jelas.
-          </p>
+        <div className="space-y-3">
+          <div className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+            <span>Koleksi Palet Hitam + Hijau Gelap (Rekomendasi Utama)</span>
+          </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <button
-              type="button"
-              onClick={() => setTheme('dark')}
-              className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
-                theme === 'dark'
-                  ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500'
-                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
-              }`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-slate-950 border border-slate-800 flex items-center justify-center text-amber-400 shrink-0">
-                <Moon className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="font-bold text-slate-100 block">Tema Gelap (Dark Mode)</span>
-                <span className="text-[11px] text-slate-400 mt-0.5 block">Kontras tinggi ala ruang kontrol data (default).</span>
-              </div>
-            </button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {THEME_OPTIONS.filter(o => o.category === 'green_dark').map(opt => {
+              const isCurrent = theme === opt.id;
 
-            <button
-              type="button"
-              onClick={() => setTheme('light')}
-              className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all ${
-                theme === 'light'
-                  ? 'border-cyan-500 bg-cyan-500/10 ring-1 ring-cyan-500'
-                  : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
-              }`}
-            >
-              <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-indigo-600 shrink-0">
-                <Sun className="w-4 h-4" />
-              </div>
-              <div>
-                <span className="font-bold text-slate-100 block">Tema Terang (Light Mode)</span>
-                <span className="text-[11px] text-slate-400 mt-0.5 block">Latar bersih putih & teks arang pekat beresolusi tinggi.</span>
-              </div>
-            </button>
+              return (
+                <div
+                  key={opt.id}
+                  className={`p-3.5 rounded-xl border transition-all relative flex flex-col justify-between ${
+                    isCurrent
+                      ? 'border-emerald-400 ring-2 ring-emerald-500/30 bg-slate-950'
+                      : 'border-slate-800 hover:border-slate-700 bg-slate-950/60'
+                  }`}
+                  style={{ backgroundColor: opt.colors.bg }}
+                >
+                  {opt.isRecommended && (
+                    <div className="absolute -top-2 right-3 px-2 py-0.5 rounded-full text-[9px] font-mono font-extrabold bg-emerald-500 text-slate-950 uppercase shadow-sm flex items-center gap-1">
+                      <Flame className="w-2.5 h-2.5" />
+                      <span>Rekomendasi</span>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-xs" style={{ color: opt.colors.text }}>
+                        {opt.name}
+                      </span>
+                      {isCurrent && (
+                        <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          Aktif
+                        </span>
+                      )}
+                    </div>
+
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {opt.tagline}
+                    </p>
+
+                    {/* Palet Swatches */}
+                    <div className="flex items-center gap-2 pt-1 text-[10px] font-mono text-slate-400">
+                      <span>Warna:</span>
+                      <div className="flex items-center gap-1">
+                        <span className="w-3.5 h-3.5 rounded border border-slate-700" style={{ backgroundColor: opt.colors.bg }} title="Latar Belakang" />
+                        <span className="w-3.5 h-3.5 rounded border border-slate-700" style={{ backgroundColor: opt.colors.card }} title="Kartu Data" />
+                        <span className="w-3.5 h-3.5 rounded border border-slate-700" style={{ backgroundColor: opt.colors.border }} title="Garis Border" />
+                        <span className="w-3.5 h-3.5 rounded border border-slate-700" style={{ backgroundColor: opt.colors.accent }} title="Aksen Grafis" />
+                        <span className="w-3.5 h-3.5 rounded border border-slate-700" style={{ backgroundColor: opt.colors.text }} title="Warna Teks" />
+                      </div>
+                      <span className="ml-auto text-[10px] text-emerald-400 font-bold">{opt.contrastRatio}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 pt-2.5 border-t border-slate-800/80 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setTheme(opt.id)}
+                      className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        isCurrent
+                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                          : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                      }`}
+                    >
+                      {isCurrent ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Sedang Digunakan</span>
+                        </>
+                      ) : (
+                        <span>Pilih Tema Ini</span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 border-t border-slate-800/80">
+            <span>Perlu mode standar atau terang untuk presentasi proyektor?</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setTheme('dark')}
+                className={`px-3 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                  theme === 'dark'
+                    ? 'border-cyan-400 text-cyan-300 bg-cyan-950/40'
+                    : 'border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Slate Navy Klasik
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme('light')}
+                className={`px-3 py-1 rounded-lg border text-xs font-medium cursor-pointer transition-colors ${
+                  theme === 'light'
+                    ? 'border-cyan-400 text-cyan-300 bg-cyan-950/40'
+                    : 'border-slate-800 text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Light Mode Terang
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -655,6 +740,12 @@ export function SettingsView({
           </button>
         </div>
       )}
+
+      {/* Theme Preset Modal */}
+      <ThemePresetModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+      />
     </form>
   );
 }

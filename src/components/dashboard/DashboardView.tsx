@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Target, 
   TrendingUp, 
@@ -13,7 +13,8 @@ import {
   Radio,
   FileSpreadsheet,
   ArrowRight,
-  Filter
+  Filter,
+  Palette
 } from 'lucide-react';
 import { CalculationResult, OpportunityItem, GlobalFilterState, FilterOptions } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
@@ -23,6 +24,8 @@ import { ControlTowerTables } from './ControlTowerTables';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { TopLeakageOutletsCard } from './TopLeakageOutletsCard';
 import { DashboardSkeleton } from './DashboardSkeleton';
+import { useTheme } from '../../context/ThemeContext';
+import { ThemePresetModal } from '../common/ThemePresetModal';
 
 interface DashboardViewProps {
   calculation: CalculationResult | null;
@@ -51,6 +54,9 @@ export function DashboardView({
   onNavigate,
   onLoadSampleData,
 }: DashboardViewProps) {
+  const { activeOption } = useTheme();
+  const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+
   const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
     ? settings.previousMonthLabel 
     : 'September 2026';
@@ -138,6 +144,16 @@ export function DashboardView({
         </div>
 
         <div className="flex items-center gap-3 text-xs font-mono">
+          <button
+            type="button"
+            onClick={() => setIsThemeModalOpen(true)}
+            className="bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 px-3 py-1.5 rounded-lg text-emerald-300 flex items-center gap-1.5 font-semibold transition-colors cursor-pointer shadow-sm"
+            title="Klik untuk melihat & memilih Sampel Palet Hitam + Hijau Gelap"
+          >
+            <Palette className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Palet:</span>
+            <span className="text-emerald-200">{activeOption.name.split(' (')[0]}</span>
+          </button>
           <CaptureJpgButton
             targetId="main-capture-area"
             fileName={`Control_Tower_Dashboard_${new Date().toISOString().split('T')[0]}.jpg`}
@@ -932,6 +948,12 @@ export function DashboardView({
           </div>
         </div>
       )}
+
+      {/* THEME PRESET & SAMPLE PICKER MODAL */}
+      <ThemePresetModal
+        isOpen={isThemeModalOpen}
+        onClose={() => setIsThemeModalOpen(false)}
+      />
     </div>
   );
 }

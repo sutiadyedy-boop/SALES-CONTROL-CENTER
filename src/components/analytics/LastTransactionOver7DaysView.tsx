@@ -28,6 +28,8 @@ import { formatRupiah } from '../../services/smartInsightEngine';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
+import { generateLastTxOver7Days5W } from '../../services/fiveWOneHEngine';
 
 interface LastTxOver7DaysViewProps {
   calculation: CalculationResult | null;
@@ -876,6 +878,10 @@ export function LastTransactionOver7DaysView({
     setManualCutOffDate('');
   };
 
+  const fiveWReport = useMemo(() => {
+    return generateLastTxOver7Days5W(calculation, masterOutlets, currTransactions, prevTransactions, settings);
+  }, [calculation, masterOutlets, currTransactions, prevTransactions, settings]);
+
   return (
     <div className="space-y-5">
       {/* Header Banner */}
@@ -915,6 +921,9 @@ export function LastTransactionOver7DaysView({
           </div>
         </div>
       </div>
+
+      {/* 5W + 1H & ROOT CAUSE ANALYSIS CARD */}
+      <FiveWOneHAnalysisCard report={fiveWReport} defaultExpanded={false} />
 
       {/* 5 KPI Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">

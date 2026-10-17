@@ -133,6 +133,15 @@ export async function captureElementToJpg(
     skipFonts = true,
   } = options;
 
+  // Dynamically resolve theme background color so black + dark green themes are captured accurately
+  let effectiveBgColor = backgroundColor;
+  if (typeof window !== 'undefined') {
+    const rootSlate950 = window.getComputedStyle(document.documentElement).getPropertyValue('--color-slate-950')?.trim();
+    if (rootSlate950 && (!options.backgroundColor || options.backgroundColor === '#020617')) {
+      effectiveBgColor = rootSlate950;
+    }
+  }
+
   const cleanFileName = fileName.toLowerCase().endsWith('.jpg') || fileName.toLowerCase().endsWith('.jpeg')
     ? fileName
     : `${fileName}.jpg`;
@@ -217,7 +226,7 @@ export async function captureElementToJpg(
     try {
       const dataUrl = await toJpeg(element, {
         quality,
-        backgroundColor,
+        backgroundColor: effectiveBgColor,
         pixelRatio,
         width: scrollWidth,
         height: scrollHeight,
@@ -249,7 +258,7 @@ export async function captureElementToJpg(
       const blob = await toBlob(element, {
         quality,
         type: 'image/jpeg',
-        backgroundColor,
+        backgroundColor: effectiveBgColor,
         pixelRatio,
         width: scrollWidth,
         height: scrollHeight,
@@ -276,7 +285,7 @@ export async function captureElementToJpg(
     // Strategy 3: html-to-image toPng fallback converted to Jpeg canvas
     try {
       const pngDataUrl = await toPng(element, {
-        backgroundColor,
+        backgroundColor: effectiveBgColor,
         pixelRatio: Math.min(pixelRatio, 2.0),
         width: scrollWidth,
         height: scrollHeight,
@@ -301,7 +310,7 @@ export async function captureElementToJpg(
         canvas.height = img.naturalHeight || scrollHeight;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.fillStyle = backgroundColor;
+          ctx.fillStyle = effectiveBgColor;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(img, 0, 0);
 
@@ -324,7 +333,7 @@ export async function captureElementToJpg(
     // Strategy 4: html2canvas fallback with explicit bounds and scroll positioning
     try {
       const canvas = await html2canvas(element, {
-        backgroundColor,
+        backgroundColor: effectiveBgColor,
         scale: Math.min(pixelRatio, 2.0),
         useCORS: true,
         logging: false,

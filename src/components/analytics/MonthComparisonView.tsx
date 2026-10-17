@@ -37,6 +37,8 @@ import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { parseYearMonthFromDate, INDONESIAN_MONTHS } from '../../services/periodDetectionService';
+import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
+import { generateMonthComparison5W } from '../../services/fiveWOneHEngine';
 
 interface MonthComparisonViewProps {
   calculation: CalculationResult | null;
@@ -2500,6 +2502,10 @@ export function MonthComparisonView({
     },
   ];
 
+  const fiveWReport = useMemo(() => {
+    return generateMonthComparison5W(calculation, prevTransactions, currTransactions, settings);
+  }, [calculation, prevTransactions, currTransactions, settings]);
+
   return (
     <div className="space-y-6">
       {/* 1. Header Bar */}
@@ -2672,6 +2678,9 @@ export function MonthComparisonView({
           </div>
         </div>
       )}
+
+      {/* 5W + 1H & ROOT CAUSE ANALYSIS CARD */}
+      <FiveWOneHAnalysisCard report={fiveWReport} defaultExpanded={false} />
 
       {/* 2. Pilihan Tanggal Perbandingan Harian Terpisah untuk Masing-Masing Bulan */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm space-y-2.5">

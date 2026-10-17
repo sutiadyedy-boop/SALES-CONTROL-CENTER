@@ -1147,7 +1147,7 @@ export default function App() {
 
   if (isAuthenticated === null) {
     return (
-      <div className="min-h-screen bg-[#020617] text-slate-100 flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4">
         <div className="w-14 h-14 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-4 animate-pulse shadow-lg shadow-cyan-950/50">
           <Shield className="w-7 h-7" />
         </div>

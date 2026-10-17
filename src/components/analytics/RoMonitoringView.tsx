@@ -29,6 +29,8 @@ import { DataTable, ColumnDef } from '../common/DataTable';
 import { EmptyState } from '../common/EmptyState';
 import { formatRupiah } from '../../services/smartInsightEngine';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
+import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
+import { generateRoMonitoring5W } from '../../services/fiveWOneHEngine';
 
 interface RoMonitoringViewProps {
   calculation: CalculationResult | null;
@@ -468,6 +470,10 @@ export function RoMonitoringView({
     },
   ];
 
+  const fiveWReport = useMemo(() => {
+    return generateRoMonitoring5W(calculation, masterOutlets, currTransactions, prevTransactions, settings);
+  }, [calculation, masterOutlets, currTransactions, prevTransactions, settings]);
+
   return (
     <div className="space-y-6">
       {/* Title */}
@@ -504,6 +510,9 @@ export function RoMonitoringView({
           )}
         </div>
       </div>
+
+      {/* 5W + 1H & ROOT CAUSE ANALYSIS CARD */}
+      <FiveWOneHAnalysisCard report={fiveWReport} defaultExpanded={false} />
 
       {/* 4 RO Core KPI Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

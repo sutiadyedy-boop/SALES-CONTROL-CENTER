@@ -16,8 +16,9 @@
       (function() {
         try {
           var saved = localStorage.getItem('app_theme');
-          var theme = saved === 'light' || saved === 'dark' ? saved : 'dark';
-          document.documentElement.classList.remove('light', 'dark');
+          var validThemes = ['emerald_midnight', 'forest_obsidian', 'cyber_jade', 'deep_black', 'dark', 'light'];
+          var theme = validThemes.indexOf(saved) !== -1 ? saved : 'emerald_midnight';
+          document.documentElement.classList.remove('emerald_midnight', 'forest_obsidian', 'cyber_jade', 'deep_black', 'dark', 'light');
           document.documentElement.classList.add(theme);
           document.documentElement.setAttribute('data-theme', theme);
         } catch (e) {}

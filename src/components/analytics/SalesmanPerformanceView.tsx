@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Users, Award, TrendingUp, AlertTriangle, Zap, Store, Send, MessageSquare, ArrowUpRight, ArrowDownRight, Minus, Building2 } from 'lucide-react';
 import { CalculationResult, DepoPmaPerformanceItem, SalesmanPerformanceItem } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
@@ -8,6 +8,8 @@ import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { WhatsAppSalesmanReportModal } from '../dashboard/WhatsAppSalesmanReportModal';
 import { soundManager } from '../../services/soundManager';
+import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
+import { generateSalesmanPerformance5W } from '../../services/fiveWOneHEngine';
 
 interface SalesmanPerformanceViewProps {
   calculation: CalculationResult | null;
@@ -413,6 +415,10 @@ export function SalesmanPerformanceView({
     },
   ];
 
+  const fiveWReport = useMemo(() => {
+    return generateSalesmanPerformance5W(calculation, settings);
+  }, [calculation, settings]);
+
   return (
     <div className="space-y-6">
       {/* Title */}
@@ -448,6 +454,9 @@ export function SalesmanPerformanceView({
           />
         </div>
       </div>
+
+      {/* 5W + 1H & ROOT CAUSE ANALYSIS CARD */}
+      <FiveWOneHAnalysisCard report={fiveWReport} defaultExpanded={false} />
 
       {/* Depo / PMA Performance Matrix (Above Salesman Matrix) */}
       <div className="space-y-2">
