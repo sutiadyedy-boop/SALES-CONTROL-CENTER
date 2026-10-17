@@ -14,7 +14,11 @@ import {
   FileSpreadsheet,
   ArrowRight,
   Filter,
-  Palette
+  Palette,
+  Eye,
+  EyeOff,
+  SlidersHorizontal,
+  RotateCcw
 } from 'lucide-react';
 import { CalculationResult, OpportunityItem, GlobalFilterState, FilterOptions } from '../../types/analytics';
 import { AppSettings } from '../../types/database';
@@ -26,6 +30,11 @@ import { TopLeakageOutletsCard } from './TopLeakageOutletsCard';
 import { DashboardSkeleton } from './DashboardSkeleton';
 import { useTheme } from '../../context/ThemeContext';
 import { ThemePresetModal } from '../common/ThemePresetModal';
+import { 
+  DashboardCustomizeModal, 
+  DashboardFeatureVisibility, 
+  DEFAULT_FEATURE_VISIBILITY 
+} from './DashboardCustomizeModal';
 
 interface DashboardViewProps {
   calculation: CalculationResult | null;
@@ -56,6 +65,34 @@ export function DashboardView({
 }: DashboardViewProps) {
   const { activeOption } = useTheme();
   const [isThemeModalOpen, setIsThemeModalOpen] = useState(false);
+  const [isCustomizeModalOpen, setIsCustomizeModalOpen] = useState(false);
+
+  const [featureVisibility, setFeatureVisibility] = useState<DashboardFeatureVisibility>(() => {
+    try {
+      const saved = localStorage.getItem('dashboard_feature_visibility');
+      if (saved) {
+        return { ...DEFAULT_FEATURE_VISIBILITY, ...JSON.parse(saved) };
+      }
+    } catch {}
+    return DEFAULT_FEATURE_VISIBILITY;
+  });
+
+  const updateFeatureVisibility = (newVal: DashboardFeatureVisibility) => {
+    setFeatureVisibility(newVal);
+    try {
+      localStorage.setItem('dashboard_feature_visibility', JSON.stringify(newVal));
+    } catch {}
+  };
+
+  const toggleSingleFeature = (key: keyof DashboardFeatureVisibility) => {
+    const updated = {
+      ...featureVisibility,
+      [key]: !featureVisibility[key],
+    };
+    updateFeatureVisibility(updated);
+  };
+
+  const hiddenCount = Object.values(featureVisibility).filter(v => !v).length;
 
   const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
     ? settings.previousMonthLabel 
@@ -129,119 +166,249 @@ export function DashboardView({
 
   return (
     <div className="space-y-6">
-      {/* CONTROL TOWER BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
-        <div>
+      {/* GLOBAL NOTIFICATION BAR WHEN SOME FEATURES ARE HIDDEN FOR JPG CAPTURE */}
+      {hiddenCount > 0 && (
+        <div 
+          data-capture-ignore="true" 
+          className="bg-amber-950/40 border border-amber-500/40 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-200 shadow-md animate-in fade-in duration-150"
+        >
           <div className="flex items-center gap-2.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-            <h1 className="text-lg md:text-xl font-extrabold tracking-wider text-slate-100 font-mono uppercase">
-              DIGITAL SALES CONTROL TOWER
-            </h1>
+            <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
+              <EyeOff className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="font-bold">Mode Kustom Tampilan Aktif:</span> {hiddenCount} dari 8 fitur sedang disembunyikan.
+              <span className="hidden sm:inline text-amber-300/80 ml-1">
+                Saat tombol <strong>Capture JPG</strong> ditekan, hanya fitur yang aktif yang akan masuk ke gambar.
+              </span>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Real-time Sales Execution · Target Tracking · RO Penetration · Outlet Dynamics ({currLabel} vs {prevLabel})
-          </p>
-        </div>
 
-        <div className="flex items-center gap-3 text-xs font-mono">
-          <button
-            type="button"
-            onClick={() => setIsThemeModalOpen(true)}
-            className="bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 px-3 py-1.5 rounded-lg text-emerald-300 flex items-center gap-1.5 font-semibold transition-colors cursor-pointer shadow-sm"
-            title="Klik untuk melihat & memilih Sampel Palet Hitam + Hijau Gelap"
-          >
-            <Palette className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden sm:inline">Palet:</span>
-            <span className="text-emerald-200">{activeOption.name.split(' (')[0]}</span>
-          </button>
-          <CaptureJpgButton
-            targetId="main-capture-area"
-            fileName={`Control_Tower_Dashboard_${new Date().toISOString().split('T')[0]}.jpg`}
-            label="Capture JPG"
-          />
-          <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300">
-            <span className="text-slate-500 mr-1.5">PERIODE:</span>
-            <span className="text-cyan-400 font-semibold">{currLabel.toUpperCase()}</span>
-          </div>
-          <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300">
-            <span className="text-slate-500 mr-1.5">STATUS DATA:</span>
-            <span className="text-emerald-400 font-semibold">TERVALIDASI</span>
-          </div>
-        </div>
-      </div>
-
-      {/* QUICK MULTI-SELECT PREFIX FILTER (AEPDA, GDKDA, GLKDA) */}
-      {onFilterChange && (
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
           <div className="flex items-center gap-2">
-            <Filter className="w-4 h-4 text-cyan-400 shrink-0" />
-            <span className="text-xs font-bold text-slate-200 uppercase tracking-wide font-mono">
-              Filter Prefix Salesman:
-            </span>
-            <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
-              (Multi-select: pilih satu atau lebih prefix data salesman)
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Semua / Reset Button */}
             <button
-              onClick={() => {
-                const nextFilters = { ...filters };
-                delete nextFilters.salesmanPrefix;
-                onFilterChange(nextFilters);
-              }}
-              className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
-                !filters?.salesmanPrefix || (Array.isArray(filters.salesmanPrefix) && filters.salesmanPrefix.length === 0)
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
-              }`}
+              type="button"
+              onClick={() => setIsCustomizeModalOpen(true)}
+              className="px-3 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 font-semibold text-xs cursor-pointer transition-colors"
             >
-              Semua Prefix
+              Atur Fitur
             </button>
-
-            {/* Individual Multi-Select Prefix Pills: AEPDA, GDKDA, GLKDA + Data-driven */}
-            {Array.from(new Set(['AEPDA', 'GDKDA', 'GLKDA', ...(filterOptions?.salesmanPrefixes || [])])).map(prefix => {
-              const currentList = Array.isArray(filters?.salesmanPrefix)
-                ? filters.salesmanPrefix
-                : filters?.salesmanPrefix
-                ? [filters.salesmanPrefix]
-                : [];
-              const isSelected = currentList.includes(prefix);
-
-              return (
-                <button
-                  key={prefix}
-                  onClick={() => {
-                    let updated: string[];
-                    if (isSelected) {
-                      updated = currentList.filter(p => p !== prefix);
-                    } else {
-                      updated = [...currentList, prefix];
-                    }
-                    onFilterChange({
-                      ...filters,
-                      salesmanPrefix: updated.length > 0 ? updated : undefined,
-                    });
-                  }}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
-                    isSelected
-                      ? 'bg-cyan-500 text-slate-950 border border-cyan-400 shadow-md shadow-cyan-500/20 font-extrabold'
-                      : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
-                  }`}
-                  title={`Klik untuk ${isSelected ? 'menghapus' : 'memilih'} filter ${prefix}`}
-                >
-                  <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-cyan-400'}`} />
-                  <span>{prefix}</span>
-                </button>
-              );
-            })}
+            <button
+              type="button"
+              onClick={() => updateFeatureVisibility(DEFAULT_FEATURE_VISIBILITY)}
+              className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs cursor-pointer transition-all shadow-sm"
+            >
+              Tampilkan Semua Kembali
+            </button>
           </div>
         </div>
       )}
 
-      {/* TOP 9 PRIMARY KPI CARDS -> GLOWING SPEEDOMETER TELEMETRY CLUSTER (KHUSUSNYA TARGET VS REALISASI) */}
-      <div className="bg-slate-950/90 border border-cyan-500/30 rounded-2xl p-4 sm:p-5 shadow-[0_0_30px_rgba(6,182,212,0.12)] relative overflow-hidden space-y-4">
+      {/* 1. CONTROL TOWER BANNER */}
+      {featureVisibility.banner ? (
+        <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-slate-950 border border-slate-800 rounded-2xl p-5 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+              <h1 className="text-lg md:text-xl font-extrabold tracking-wider text-slate-100 font-mono uppercase">
+                DIGITAL SALES CONTROL TOWER
+              </h1>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Real-time Sales Execution · Target Tracking · RO Penetration · Outlet Dynamics ({currLabel} vs {prevLabel})
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5 sm:gap-3 text-xs font-mono flex-wrap">
+            {/* Customizer Button: Hide & Unhide Features */}
+            <button
+              type="button"
+              onClick={() => setIsCustomizeModalOpen(true)}
+              data-capture-ignore="true"
+              className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-semibold transition-all cursor-pointer shadow-sm ${
+                hiddenCount > 0
+                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30'
+                  : 'bg-slate-950/80 hover:bg-slate-800 text-slate-300 border border-slate-800 hover:text-cyan-300'
+              }`}
+              title="Pilih fitur yang ingin ditampilkan / disembunyikan untuk tangkapan JPG"
+            >
+              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline">Kustomisasi Tampilan</span>
+              <span className="sm:hidden">Fitur</span>
+              {hiddenCount > 0 ? (
+                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 font-extrabold">
+                  {hiddenCount} Sembunyi
+                </span>
+              ) : (
+                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-400">
+                  8/8
+                </span>
+              )}
+            </button>
+
+            {/* Palette Switcher Button */}
+            <button
+              type="button"
+              onClick={() => setIsThemeModalOpen(true)}
+              data-capture-ignore="true"
+              className="bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 px-3 py-1.5 rounded-lg text-emerald-300 flex items-center gap-1.5 font-semibold transition-colors cursor-pointer shadow-sm"
+              title="Klik untuk melihat & memilih Sampel Palet Hitam + Hijau Gelap"
+            >
+              <Palette className="w-3.5 h-3.5 text-emerald-400" />
+              <span className="hidden sm:inline">Palet:</span>
+              <span className="text-emerald-200">{activeOption.name.split(' (')[0]}</span>
+            </button>
+
+            {/* Capture JPG Button */}
+            <CaptureJpgButton
+              targetId="main-capture-area"
+              fileName={`Control_Tower_Dashboard_${new Date().toISOString().split('T')[0]}.jpg`}
+              label="Capture JPG"
+            />
+
+            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300">
+              <span className="text-slate-500 mr-1.5">PERIODE:</span>
+              <span className="text-cyan-400 font-semibold">{currLabel.toUpperCase()}</span>
+            </div>
+            <div className="bg-slate-950/80 px-3 py-1.5 rounded-lg border border-slate-800 text-slate-300">
+              <span className="text-slate-500 mr-1.5">STATUS DATA:</span>
+              <span className="text-emerald-400 font-semibold">TERVALIDASI</span>
+            </div>
+
+            {/* Quick Hide Banner Button */}
+            <button
+              type="button"
+              onClick={() => toggleSingleFeature('banner')}
+              data-capture-ignore="true"
+              className="p-1.5 text-slate-500 hover:text-amber-400 hover:bg-slate-950 rounded-lg border border-transparent hover:border-slate-800 transition-colors cursor-pointer"
+              title="Sembunyikan banner ini dari tampilan & tangkapan JPG"
+            >
+              <EyeOff className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div 
+          data-capture-ignore="true" 
+          className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+        >
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Bagian <strong>Banner Judul &amp; Periode</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSingleFeature('banner')}
+            className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+          >
+            Tampilkan Kembali (Unhide)
+          </button>
+        </div>
+      )}
+
+      {/* 2. QUICK MULTI-SELECT PREFIX FILTER (AEPDA, GDKDA, GLKDA) */}
+      {onFilterChange && (
+        featureVisibility.prefixFilter ? (
+          <div className="bg-slate-900/90 border border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-cyan-400 shrink-0" />
+              <span className="text-xs font-bold text-slate-200 uppercase tracking-wide font-mono">
+                Filter Prefix Salesman:
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono hidden sm:inline">
+                (Multi-select: pilih satu atau lebih prefix data salesman)
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Semua / Reset Button */}
+              <button
+                onClick={() => {
+                  const nextFilters = { ...filters };
+                  delete nextFilters.salesmanPrefix;
+                  onFilterChange(nextFilters);
+                }}
+                className={`px-3 py-1 rounded-lg text-xs font-mono font-medium transition-all ${
+                  !filters?.salesmanPrefix || (Array.isArray(filters.salesmanPrefix) && filters.salesmanPrefix.length === 0)
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
+                    : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+                }`}
+              >
+                Semua Prefix
+              </button>
+
+              {/* Individual Multi-Select Prefix Pills: AEPDA, GDKDA, GLKDA + Data-driven */}
+              {Array.from(new Set(['AEPDA', 'GDKDA', 'GLKDA', ...(filterOptions?.salesmanPrefixes || [])])).map(prefix => {
+                const currentList = Array.isArray(filters?.salesmanPrefix)
+                  ? filters.salesmanPrefix
+                  : filters?.salesmanPrefix
+                  ? [filters.salesmanPrefix]
+                  : [];
+                const isSelected = currentList.includes(prefix);
+
+                return (
+                  <button
+                    key={prefix}
+                    onClick={() => {
+                      let updated: string[];
+                      if (isSelected) {
+                        updated = currentList.filter(p => p !== prefix);
+                      } else {
+                        updated = [...currentList, prefix];
+                      }
+                      onFilterChange({
+                        ...filters,
+                        salesmanPrefix: updated.length > 0 ? updated : undefined,
+                      });
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                      isSelected
+                        ? 'bg-cyan-500 text-slate-950 border border-cyan-400 shadow-md shadow-cyan-500/20 font-extrabold'
+                        : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border border-slate-800'
+                    }`}
+                    title={`Klik untuk ${isSelected ? 'menghapus' : 'memilih'} filter ${prefix}`}
+                  >
+                    <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-slate-950' : 'bg-cyan-400'}`} />
+                    <span>{prefix}</span>
+                  </button>
+                );
+              })}
+
+              {/* Quick Hide Filter Button */}
+              <button
+                type="button"
+                onClick={() => toggleSingleFeature('prefixFilter')}
+                data-capture-ignore="true"
+                className="ml-2 flex items-center gap-1 text-[11px] text-slate-400 hover:text-amber-400 px-2 py-1 rounded border border-transparent hover:border-slate-800 hover:bg-slate-950 transition-colors cursor-pointer"
+                title="Sembunyikan bar filter ini dari tampilan & tangkapan JPG"
+              >
+                <EyeOff className="w-3 h-3 text-amber-400" />
+                <span className="hidden sm:inline">Sembunyikan</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            data-capture-ignore="true" 
+            className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+          >
+            <div className="flex items-center gap-2">
+              <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Bagian <strong>Filter Prefix Salesman</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleSingleFeature('prefixFilter')}
+              className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+            >
+              Tampilkan Kembali (Unhide)
+            </button>
+          </div>
+        )
+      )}
+
+      {/* 3. TOP 9 PRIMARY KPI CARDS -> GLOWING SPEEDOMETER TELEMETRY CLUSTER */}
+      {featureVisibility.telemetry ? (
+        <div className="bg-slate-950/90 border border-cyan-500/30 rounded-2xl p-4 sm:p-5 shadow-[0_0_30px_rgba(6,182,212,0.12)] relative overflow-hidden space-y-4">
         {/* Ambient Neon Backlight Glows */}
         <div className="absolute -top-24 left-1/4 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -top-24 left-1/2 w-72 h-72 bg-cyan-500/12 rounded-full blur-3xl pointer-events-none" />
@@ -255,7 +422,7 @@ export function DashboardView({
               SPEEDOMETER TELEMETRY — TARGET VS REALISASI &amp; PENETRASI OUTLET ({currLabel.toUpperCase()})
             </h2>
           </div>
-          <div className="flex items-center gap-3 text-[10px] font-mono text-slate-400">
+          <div className="flex items-center gap-2 sm:gap-3 text-[10px] font-mono text-slate-400 flex-wrap">
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_6px_#f43f5e]" /> &lt;65% Kritis
             </span>
@@ -268,6 +435,18 @@ export function DashboardView({
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#10b981]" /> &ge;100% Achieved
             </span>
+
+            {/* Quick Hide Telemetry Button */}
+            <button
+              type="button"
+              onClick={() => toggleSingleFeature('telemetry')}
+              data-capture-ignore="true"
+              className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-amber-400 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer text-xs font-semibold"
+              title="Sembunyikan speedometer & KPI dari tampilan & tangkapan JPG"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Sembunyikan</span>
+            </button>
           </div>
         </div>
 
@@ -878,76 +1057,198 @@ export function DashboardView({
           </div>
         </div>
       </div>
-
-      {/* 5 BI CHARTS SECTION */}
-      <ControlTowerCharts
-        calculation={calculation}
-        currentPeriodLabel={currLabel}
-        previousPeriodLabel={prevLabel}
-      />
-
-      {/* 4 VIRTUALIZED INTELLIGENCE TABLES SECTION */}
-      <ControlTowerTables
-        calculation={calculation}
-        currentPeriodLabel={currLabel}
-        previousPeriodLabel={prevLabel}
-      />
-
-      {/* TOP 10 LEAKAGE OUTLETS (PARETO 80/20 HIGH-VALUE DROP RECOVERY) */}
-      <TopLeakageOutletsCard
-        dropOutlets={calculation.dropOutlets}
-        totalLostRevenue={kpis.dropOutletLostRevenue}
-        onNavigate={onNavigate}
-      />
-
-      {/* TOP OPPORTUNITY ALERT PREVIEW (OPTIONAL COMPONENT) */}
-      {opportunities.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-bold text-slate-100">
-                Peluang Omset Prioritas (Sales Opportunities)
-              </h3>
-            </div>
-            <button
-              onClick={() => onNavigate('opportunity')}
-              className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-medium transition-colors"
-            >
-              <span>Buka Seluruh Peluang ({opportunities.length})</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
+    ) : (
+        <div 
+          data-capture-ignore="true" 
+          className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+        >
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Bagian <strong>Speedometer Telemetri &amp; 9 KPI Cards</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {opportunities.slice(0, 3).map((opp) => (
-              <div
-                key={opp.id}
-                className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-amber-400 border border-amber-500/20 font-semibold">
-                      PRIORITAS {opp.priority}
-                    </span>
-                    <span className="text-xs font-mono font-bold text-cyan-400">
-                      {formatRupiah(opp.impactValue)}
-                    </span>
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-200 mt-2 line-clamp-1">{opp.title}</h4>
-                  <p className="text-[11px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
-                    {opp.detailText}
-                  </p>
-                </div>
-                <div className="mt-3 pt-2 border-t border-slate-800/80 text-[10px] text-slate-300">
-                  <span className="text-slate-500">Tindakan: </span>
-                  {opp.actionRecommendation}
-                </div>
-              </div>
-            ))}
-          </div>
+          <button
+            type="button"
+            onClick={() => toggleSingleFeature('telemetry')}
+            className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+          >
+            Tampilkan Kembali (Unhide)
+          </button>
         </div>
       )}
+
+      {/* 4. 5 BI CHARTS SECTION */}
+      {featureVisibility.charts ? (
+        <ControlTowerCharts
+          calculation={calculation}
+          currentPeriodLabel={currLabel}
+          previousPeriodLabel={prevLabel}
+          onHide={() => toggleSingleFeature('charts')}
+        />
+      ) : (
+        <div 
+          data-capture-ignore="true" 
+          className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+        >
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Bagian <strong>Visualisasi BI (5 Grafik Analytics)</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSingleFeature('charts')}
+            className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+          >
+            Tampilkan Kembali (Unhide)
+          </button>
+        </div>
+      )}
+
+      {/* 5. VIRTUALIZED INTELLIGENCE TABLES (DEPO & SALESMAN RANKING) */}
+      {featureVisibility.depoTable || featureVisibility.salesmanTable ? (
+        <ControlTowerTables
+          calculation={calculation}
+          currentPeriodLabel={currLabel}
+          previousPeriodLabel={prevLabel}
+          visibleDepoTable={featureVisibility.depoTable}
+          visibleSalesmanTable={featureVisibility.salesmanTable}
+          onToggleDepoTable={() => toggleSingleFeature('depoTable')}
+          onToggleSalesmanTable={() => toggleSingleFeature('salesmanTable')}
+          onHideAllTables={() => updateFeatureVisibility({ ...featureVisibility, depoTable: false, salesmanTable: false })}
+        />
+      ) : (
+        <div 
+          data-capture-ignore="true" 
+          className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+        >
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Bagian <strong>Seluruh Matriks Tabel Kinerja (Depo &amp; Salesman)</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => updateFeatureVisibility({ ...featureVisibility, depoTable: true, salesmanTable: true })}
+            className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+          >
+            Tampilkan Kembali (Unhide)
+          </button>
+        </div>
+      )}
+
+      {/* 6. TOP 10 LEAKAGE OUTLETS (PARETO 80/20 HIGH-VALUE DROP RECOVERY) */}
+      {featureVisibility.leakageCard ? (
+        <TopLeakageOutletsCard
+          dropOutlets={calculation.dropOutlets}
+          totalLostRevenue={kpis.dropOutletLostRevenue}
+          onNavigate={onNavigate}
+          onHide={() => toggleSingleFeature('leakageCard')}
+        />
+      ) : (
+        <div 
+          data-capture-ignore="true" 
+          className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+        >
+          <div className="flex items-center gap-2">
+            <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>Bagian <strong>Top 10 Kebocoran Toko (Drop Outlets)</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => toggleSingleFeature('leakageCard')}
+            className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+          >
+            Tampilkan Kembali (Unhide)
+          </button>
+        </div>
+      )}
+
+      {/* 7. TOP OPPORTUNITY ALERT PREVIEW (OPTIONAL COMPONENT) */}
+      {opportunities.length > 0 && (
+        featureVisibility.opportunities ? (
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-amber-400" />
+                <h3 className="text-sm font-bold text-slate-100">
+                  Peluang Omset Prioritas (Sales Opportunities)
+                </h3>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => toggleSingleFeature('opportunities')}
+                  data-capture-ignore="true"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+                  title="Sembunyikan bagian Peluang Omset dari tampilan & tangkapan JPG"
+                >
+                  <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="hidden sm:inline">Sembunyikan</span>
+                </button>
+                <button
+                  onClick={() => onNavigate('opportunity')}
+                  className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-medium transition-colors cursor-pointer"
+                >
+                  <span>Buka Seluruh Peluang ({opportunities.length})</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {opportunities.slice(0, 3).map((opp) => (
+                <div
+                  key={opp.id}
+                  className="bg-slate-950/70 border border-slate-800 rounded-xl p-3.5 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-900 text-amber-400 border border-amber-500/20 font-semibold">
+                        PRIORITAS {opp.priority}
+                      </span>
+                      <span className="text-xs font-mono font-bold text-cyan-400">
+                        {formatRupiah(opp.impactValue)}
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-200 mt-2 line-clamp-1">{opp.title}</h4>
+                    <p className="text-[11px] text-slate-400 mt-1 leading-relaxed line-clamp-2">
+                      {opp.detailText}
+                    </p>
+                  </div>
+                  <div className="mt-3 pt-2 border-t border-slate-800/80 text-[10px] text-slate-300">
+                    <span className="text-slate-500">Tindakan: </span>
+                    {opp.actionRecommendation}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div 
+            data-capture-ignore="true" 
+            className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+          >
+            <div className="flex items-center gap-2">
+              <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>Bagian <strong>Peluang Omset Prioritas</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleSingleFeature('opportunities')}
+              className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+            >
+              Tampilkan Kembali (Unhide)
+            </button>
+          </div>
+        )
+      )}
+
+      {/* DASHBOARD CUSTOMIZATION (HIDE & UNHIDE FITUR) MODAL */}
+      <DashboardCustomizeModal
+        isOpen={isCustomizeModalOpen}
+        onClose={() => setIsCustomizeModalOpen(false)}
+        visibility={featureVisibility}
+        onChange={updateFeatureVisibility}
+        onReset={() => updateFeatureVisibility(DEFAULT_FEATURE_VISIBILITY)}
+      />
 
       {/* THEME PRESET & SAMPLE PICKER MODAL */}
       <ThemePresetModal

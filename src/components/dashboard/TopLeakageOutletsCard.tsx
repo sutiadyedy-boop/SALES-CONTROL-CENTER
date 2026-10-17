@@ -6,7 +6,8 @@ import {
   User, 
   TrendingDown,
   ShieldAlert,
-  ExternalLink
+  ExternalLink,
+  EyeOff
 } from 'lucide-react';
 import { DropOutletItem } from '../../types/analytics';
 import { formatRupiah } from '../../services/smartInsightEngine';
@@ -15,12 +16,14 @@ interface TopLeakageOutletsCardProps {
   dropOutlets: DropOutletItem[];
   totalLostRevenue: number;
   onNavigate: (tab: string) => void;
+  onHide?: () => void;
 }
 
 export function TopLeakageOutletsCard({
   dropOutlets,
   totalLostRevenue,
   onNavigate,
+  onHide,
 }: TopLeakageOutletsCardProps) {
   // Memoized top 10 drop outlets sorted strictly by lost sales descending (0ms compute)
   const top10Leakage = useMemo(() => {
@@ -62,14 +65,29 @@ export function TopLeakageOutletsCard({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => onNavigate('drop_outlet')}
-          className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold transition-colors"
-        >
-          <span>Lihat Seluruh Drop Outlet ({dropOutlets.length})</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-3">
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              data-capture-ignore="true"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+              title="Sembunyikan bagian Top 10 Kebocoran Toko dari tampilan & tangkapan JPG"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Sembunyikan</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onNavigate('drop_outlet')}
+            className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 font-semibold transition-colors cursor-pointer"
+          >
+            <span>Lihat Seluruh Drop Outlet ({dropOutlets.length})</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
       </div>
 
       {/* Responsive Table of Top Leakage Outlets */}

@@ -8,7 +8,8 @@ import {
   Building2,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  EyeOff
 } from 'lucide-react';
 import { 
   CalculationResult, 
@@ -26,6 +27,11 @@ interface ControlTowerTablesProps {
   calculation: CalculationResult;
   currentPeriodLabel?: string;
   previousPeriodLabel?: string;
+  visibleDepoTable?: boolean;
+  visibleSalesmanTable?: boolean;
+  onToggleDepoTable?: () => void;
+  onToggleSalesmanTable?: () => void;
+  onHideAllTables?: () => void;
 }
 
 type TableTabKey = 'salesman_ranking' | 'drop_outlets' | 'new_active' | 'belum_transaksi';
@@ -34,6 +40,11 @@ export function ControlTowerTables({
   calculation,
   currentPeriodLabel = 'Oktober 2026',
   previousPeriodLabel = 'September 2026',
+  visibleDepoTable = true,
+  visibleSalesmanTable = true,
+  onToggleDepoTable,
+  onToggleSalesmanTable,
+  onHideAllTables,
 }: ControlTowerTablesProps) {
   const [activeTab, setActiveTab] = useState<TableTabKey>('salesman_ranking');
   const { salesmanPerformances, depoPmaPerformances = [], dropOutlets, newOutlets, outletsNotTransacted } = calculation;
@@ -661,6 +672,19 @@ export function ControlTowerTables({
             />
           </div>
 
+          {onHideAllTables && (
+            <button
+              type="button"
+              onClick={onHideAllTables}
+              data-capture-ignore="true"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+              title="Sembunyikan seluruh bagian tabel dari tampilan & tangkapan JPG"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Sembunyikan Tabel</span>
+            </button>
+          )}
+
           {/* Navigation Selector */}
           <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-950 rounded-lg border border-slate-800 text-xs">
           <button
@@ -729,28 +753,99 @@ export function ControlTowerTables({
       {/* Render Active Virtualized Table */}
       {activeTab === 'salesman_ranking' && (
         <div className="space-y-4">
-          <VirtualizedTable
-            columns={depoPmaColumns}
-            data={depoPmaPerformances}
-            title="Matriks Kinerja Depo / PMA"
-            subtitle={`Konsolidasi Target, Realisasi, Achievement %, Growth Omset, dan EC / RO Aktif per Depo / PMA periode ${currentPeriodLabel}.`}
-            searchPlaceholder="Cari Depo / PMA / Area..."
-            exportFileName={`Matriks_Kinerja_Depo_PMA_${currentPeriodLabel.replace(/\s+/g, '_')}`}
-            emptyMessage="DATA BELUM TERSEDIA"
-            viewportHeight={Math.min(360, Math.max(180, depoPmaPerformances.length * 48 + 56))}
-            rowHeight={46}
-          />
-          <VirtualizedTable
-            columns={salesmanColumns}
-            data={salesmanPerformances}
-            title="Matriks Kinerja Salesman (Ranking Performance Salesman)"
-            subtitle={`Urutan salesman berdasarkan persentase Achievement terhadap Target Resmi periode ${currentPeriodLabel}.`}
-            searchPlaceholder="Cari salesman / ID / area..."
-            exportFileName={`Salesman_Ranking_${currentPeriodLabel.replace(/\s+/g, '_')}`}
-            emptyMessage="DATA BELUM TERSEDIA"
-            viewportHeight={460}
-            rowHeight={46}
-          />
+          {visibleDepoTable ? (
+            <VirtualizedTable
+              columns={depoPmaColumns}
+              data={depoPmaPerformances}
+              title="Matriks Kinerja Depo / PMA"
+              subtitle={`Konsolidasi Target, Realisasi, Achievement %, Growth Omset, dan EC / RO Aktif per Depo / PMA periode ${currentPeriodLabel}.`}
+              searchPlaceholder="Cari Depo / PMA / Area..."
+              exportFileName={`Matriks_Kinerja_Depo_PMA_${currentPeriodLabel.replace(/\s+/g, '_')}`}
+              emptyMessage="DATA BELUM TERSEDIA"
+              viewportHeight={Math.min(360, Math.max(180, depoPmaPerformances.length * 48 + 56))}
+              rowHeight={46}
+              actionElement={
+                onToggleDepoTable && (
+                  <button
+                    type="button"
+                    onClick={onToggleDepoTable}
+                    data-capture-ignore="true"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+                    title="Sembunyikan Matriks Depo/PMA dari tampilan & tangkapan JPG"
+                  >
+                    <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">Sembunyikan</span>
+                  </button>
+                )
+              }
+            />
+          ) : (
+            <div 
+              data-capture-ignore="true" 
+              className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+            >
+              <div className="flex items-center gap-2">
+                <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Bagian <strong>Matriks Kinerja Depo / PMA</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+              </div>
+              {onToggleDepoTable && (
+                <button
+                  type="button"
+                  onClick={onToggleDepoTable}
+                  className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+                >
+                  Tampilkan Kembali (Unhide)
+                </button>
+              )}
+            </div>
+          )}
+
+          {visibleSalesmanTable ? (
+            <VirtualizedTable
+              columns={salesmanColumns}
+              data={salesmanPerformances}
+              title="Matriks Kinerja Salesman (Ranking Performance Salesman)"
+              subtitle={`Urutan salesman berdasarkan persentase Achievement terhadap Target Resmi periode ${currentPeriodLabel}.`}
+              searchPlaceholder="Cari salesman / ID / area..."
+              exportFileName={`Salesman_Ranking_${currentPeriodLabel.replace(/\s+/g, '_')}`}
+              emptyMessage="DATA BELUM TERSEDIA"
+              viewportHeight={460}
+              rowHeight={46}
+              actionElement={
+                onToggleSalesmanTable && (
+                  <button
+                    type="button"
+                    onClick={onToggleSalesmanTable}
+                    data-capture-ignore="true"
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+                    title="Sembunyikan Matriks Ranking Salesman dari tampilan & tangkapan JPG"
+                  >
+                    <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">Sembunyikan</span>
+                  </button>
+                )
+              }
+            />
+          ) : (
+            <div 
+              data-capture-ignore="true" 
+              className="bg-slate-900/60 border border-dashed border-slate-800 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-400"
+            >
+              <div className="flex items-center gap-2">
+                <EyeOff className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Bagian <strong>Matriks Ranking Salesman</strong> disembunyikan (tidak akan masuk ke Capture JPG).</span>
+              </div>
+              {onToggleSalesmanTable && (
+                <button
+                  type="button"
+                  onClick={onToggleSalesmanTable}
+                  className="px-3 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 font-semibold text-xs cursor-pointer transition-colors"
+                >
+                  Tampilkan Kembali (Unhide)
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -765,6 +860,20 @@ export function ControlTowerTables({
           emptyMessage="DATA BELUM TERSEDIA"
           viewportHeight={460}
           rowHeight={46}
+          actionElement={
+            onHideAllTables && (
+              <button
+                type="button"
+                onClick={onHideAllTables}
+                data-capture-ignore="true"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+                title="Sembunyikan seluruh bagian tabel dari tampilan & tangkapan JPG"
+              >
+                <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Sembunyikan Tabel</span>
+              </button>
+            )
+          }
         />
       )}
 
@@ -779,6 +888,20 @@ export function ControlTowerTables({
           emptyMessage="DATA BELUM TERSEDIA"
           viewportHeight={460}
           rowHeight={46}
+          actionElement={
+            onHideAllTables && (
+              <button
+                type="button"
+                onClick={onHideAllTables}
+                data-capture-ignore="true"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+                title="Sembunyikan seluruh bagian tabel dari tampilan & tangkapan JPG"
+              >
+                <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Sembunyikan Tabel</span>
+              </button>
+            )
+          }
         />
       )}
 
@@ -793,6 +916,20 @@ export function ControlTowerTables({
           emptyMessage="DATA BELUM TERSEDIA"
           viewportHeight={460}
           rowHeight={46}
+          actionElement={
+            onHideAllTables && (
+              <button
+                type="button"
+                onClick={onHideAllTables}
+                data-capture-ignore="true"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+                title="Sembunyikan seluruh bagian tabel dari tampilan & tangkapan JPG"
+              >
+                <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+                <span className="hidden sm:inline">Sembunyikan Tabel</span>
+              </button>
+            )
+          }
         />
       )}
     </div>

@@ -7,7 +7,8 @@ import {
   Calendar, 
   Target, 
   CheckCircle2, 
-  AlertCircle 
+  AlertCircle,
+  EyeOff
 } from 'lucide-react';
 import { CalculationResult } from '../../types/analytics';
 import { formatPercent, formatRupiah } from '../../services/smartInsightEngine';
@@ -16,12 +17,14 @@ interface ControlTowerChartsProps {
   calculation: CalculationResult;
   currentPeriodLabel?: string;
   previousPeriodLabel?: string;
+  onHide?: () => void;
 }
 
 export function ControlTowerCharts({
   calculation,
   currentPeriodLabel = 'Oktober 2026',
   previousPeriodLabel = 'September 2026',
+  onHide,
 }: ControlTowerChartsProps) {
   const { salesmanPerformances, channelBreakdown, rayonBreakdown, kpis } = calculation;
   const [activeTab, setActiveTab] = useState<'all' | 'target_actual' | 'aug_sept' | 'ach_salesman' | 'growth_salesman' | 'ro_dist'>('all');
@@ -113,6 +116,19 @@ export function ControlTowerCharts({
             RO Distribution
           </button>
         </div>
+
+        {onHide && (
+          <button
+            type="button"
+            onClick={onHide}
+            data-capture-ignore="true"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+            title="Sembunyikan bagian Visualisasi BI dari tampilan & tangkapan JPG"
+          >
+            <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Sembunyikan Grafik</span>
+          </button>
+        )}
       </div>
 
       {/* Floating Hover Tooltip */}
