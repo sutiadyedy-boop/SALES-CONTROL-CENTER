@@ -18,11 +18,15 @@ import {
   Layers, 
   Lightbulb,
   ChevronRight,
-  Info
+  Info,
+  Trophy,
+  Award,
+  LayoutGrid
 } from 'lucide-react';
 import { MasterOutletRecord, TransactionRecord, AppSettings, DatabaseCategory, RawUploadedFile } from '../../types/database';
 import { GlobalFilterState } from '../../types/analytics';
 import { DataTable, ColumnDef } from '../common/DataTable';
+import { VirtualizedTable, VirtualizedColumnDef } from '../common/VirtualizedTable';
 import { EmptyState } from '../common/EmptyState';
 import { CaptureJpgButton } from '../common/CaptureJpgButton';
 import { FiveWOneHAnalysisCard } from './FiveWOneHAnalysisCard';
@@ -44,6 +48,9 @@ export type EbpStatus = 'GROWTH' | 'STABIL' | 'DECLINE' | 'NEW';
 
 export interface EbpOutletItem {
   no: number;
+  rank?: number;
+  depoRank?: number;
+  salesmanRank?: number;
   outletId: string;
   outletName: string;
   salesmanId: string;
@@ -60,6 +67,49 @@ export interface EbpOutletItem {
   diff: number;
   growthPercent: number;
   status: EbpStatus;
+}
+
+export interface DepoPmaEpbRankingItem {
+  rank: number;
+  depoPmaName: string;
+  cabang: string;
+  area: string;
+  salesmenCount: number;
+  totalOutlets: number;
+  outletsWithEpbPrev: number;
+  outletsWithEpbCurr: number;
+  penetrationPrev: number;
+  penetrationCurr: number;
+  epbPrev: number;
+  epbCurr: number;
+  diff: number;
+  growthPercent: number;
+  tokoGrowth: number;
+  tokoNew: number;
+  tokoStabil: number;
+  tokoDecline: number;
+}
+
+export interface SalesmanEpbRankingItem {
+  rank: number;
+  salesmanId: string;
+  salesmanName: string;
+  depo: string;
+  pma: string;
+  cabang: string;
+  totalOutlets: number;
+  outletsWithEpbPrev: number;
+  outletsWithEpbCurr: number;
+  penetrationPrev: number;
+  penetrationCurr: number;
+  epbPrev: number;
+  epbCurr: number;
+  diff: number;
+  growthPercent: number;
+  tokoGrowth: number;
+  tokoNew: number;
+  tokoStabil: number;
+  tokoDecline: number;
 }
 
 /**
@@ -192,6 +242,7 @@ export function EbpMonitoringView({
   const [selectedDepo, setSelectedDepo] = useState<string>('ALL');
   const [selectedEpbCurrFilter, setSelectedEpbCurrFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
   const [selectedEpbPrevFilter, setSelectedEpbPrevFilter] = useState<'ALL' | 'HAS_EPB' | 'ZERO_EPB'>('ALL');
+  const [activeTableTab, setActiveTableTab] = useState<'ranking_depo' | 'ranking_salesman' | 'detail_toko' | 'all_tables'>('ranking_depo');
 
   const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
     ? settings.previousMonthLabel 
@@ -508,13 +559,237 @@ export function EbpMonitoringView({
     });
   }, [allEbpItems, searchQuery, selectedStatus, selectedSalesman, selectedDepo, selectedEpbCurrFilter, selectedEpbPrevFilter, filters]);
 
-  // Re-number filtered rows
-  const numberedFilteredItems = useMemo(() => {
-    return filteredItems.map((item, idx) => ({
+  // 6. Aggregation & Ranking EPB Per PMA / Depo
+  const depoPmaEpbRankings = useMemo<DepoPmaEpbRankingItem[]>(() => {
+    const map = new Map<string, {
+      depoPmaName: string;
+      cabang: string;
+      area: string;
+      salesmen: Set<string>;
+      totalOutlets: number;
+      outletsWithEpbPrev: number;
+      outletsWithEpbCurr: number;
+      epbPrev: number;
+      epbCurr: number;
+      tokoGrowth: number;
+      tokoNew: number;
+      tokoStabil: number;
+      tokoDecline: number;
+    }>();
+
+    filteredItems.forEach(item => {
+      const name = item.pma && item.pma !== '-' ? item.pma : (item.depo && item.depo !== '-' ? item.depo : 'PMA / Depo Lainnya');
+      if (!map.has(name)) {
+        map.set(name, {
+          depoPmaName: name,
+          cabang: item.cabang || '-',
+          area: item.area || '-',
+          salesmen: new Set<string>(),
+          totalOutlets: 0,
+          outletsWithEpbPrev: 0,
+          outletsWithEpbCurr: 0,
+          epbPrev: 0,
+          epbCurr: 0,
+          tokoGrowth: 0,
+          tokoNew: 0,
+          tokoStabil: 0,
+          tokoDecline: 0,
+        });
+      }
+
+      const entry = map.get(name)!;
+      entry.totalOutlets += 1;
+      if (item.salesmanName && item.salesmanName !== 'Unassigned') {
+        entry.salesmen.add(item.salesmanName);
+      }
+      entry.epbPrev += item.epbPrev;
+      entry.epbCurr += item.epbCurr;
+      if (item.epbPrev > 0) entry.outletsWithEpbPrev += 1;
+      if (item.epbCurr > 0) entry.outletsWithEpbCurr += 1;
+
+      if (item.status === 'GROWTH') entry.tokoGrowth += 1;
+      else if (item.status === 'NEW') entry.tokoNew += 1;
+      else if (item.status === 'STABIL') entry.tokoStabil += 1;
+      else if (item.status === 'DECLINE') entry.tokoDecline += 1;
+    });
+
+    const list = Array.from(map.values()).map(entry => {
+      const diff = entry.epbCurr - entry.epbPrev;
+      const growthPercent = entry.epbPrev > 0 
+        ? ((entry.epbCurr - entry.epbPrev) / entry.epbPrev) * 100 
+        : (entry.epbCurr > 0 ? 100 : 0);
+      const penetrationPrev = entry.totalOutlets > 0 ? (entry.outletsWithEpbPrev / entry.totalOutlets) * 100 : 0;
+      const penetrationCurr = entry.totalOutlets > 0 ? (entry.outletsWithEpbCurr / entry.totalOutlets) * 100 : 0;
+
+      return {
+        rank: 0,
+        depoPmaName: entry.depoPmaName,
+        cabang: entry.cabang,
+        area: entry.area,
+        salesmenCount: entry.salesmen.size,
+        totalOutlets: entry.totalOutlets,
+        outletsWithEpbPrev: entry.outletsWithEpbPrev,
+        outletsWithEpbCurr: entry.outletsWithEpbCurr,
+        penetrationPrev,
+        penetrationCurr,
+        epbPrev: entry.epbPrev,
+        epbCurr: entry.epbCurr,
+        diff,
+        growthPercent,
+        tokoGrowth: entry.tokoGrowth,
+        tokoNew: entry.tokoNew,
+        tokoStabil: entry.tokoStabil,
+        tokoDecline: entry.tokoDecline,
+      };
+    });
+
+    // Sort by EPB Bulan Ini descending, then diff descending
+    list.sort((a, b) => {
+      if (b.epbCurr !== a.epbCurr) return b.epbCurr - a.epbCurr;
+      return b.diff - a.diff;
+    });
+
+    return list.map((item, idx) => ({
       ...item,
-      no: idx + 1,
+      rank: idx + 1,
     }));
   }, [filteredItems]);
+
+  // 7. Aggregation & Ranking EPB Per Salesman
+  const salesmanEpbRankings = useMemo<SalesmanEpbRankingItem[]>(() => {
+    const map = new Map<string, {
+      salesmanId: string;
+      salesmanName: string;
+      depo: string;
+      pma: string;
+      cabang: string;
+      totalOutlets: number;
+      outletsWithEpbPrev: number;
+      outletsWithEpbCurr: number;
+      epbPrev: number;
+      epbCurr: number;
+      tokoGrowth: number;
+      tokoNew: number;
+      tokoStabil: number;
+      tokoDecline: number;
+    }>();
+
+    filteredItems.forEach(item => {
+      const name = item.salesmanName && item.salesmanName !== 'Unassigned' ? item.salesmanName : (item.salesmanId || 'Unassigned');
+      if (!map.has(name)) {
+        map.set(name, {
+          salesmanId: item.salesmanId || '',
+          salesmanName: name,
+          depo: item.depo || '-',
+          pma: item.pma || '-',
+          cabang: item.cabang || '-',
+          totalOutlets: 0,
+          outletsWithEpbPrev: 0,
+          outletsWithEpbCurr: 0,
+          epbPrev: 0,
+          epbCurr: 0,
+          tokoGrowth: 0,
+          tokoNew: 0,
+          tokoStabil: 0,
+          tokoDecline: 0,
+        });
+      }
+
+      const entry = map.get(name)!;
+      entry.totalOutlets += 1;
+      if (!entry.salesmanId && item.salesmanId) entry.salesmanId = item.salesmanId;
+      if (entry.depo === '-' && item.depo && item.depo !== '-') entry.depo = item.depo;
+      if (entry.pma === '-' && item.pma && item.pma !== '-') entry.pma = item.pma;
+      if (entry.cabang === '-' && item.cabang && item.cabang !== '-') entry.cabang = item.cabang;
+
+      entry.epbPrev += item.epbPrev;
+      entry.epbCurr += item.epbCurr;
+      if (item.epbPrev > 0) entry.outletsWithEpbPrev += 1;
+      if (item.epbCurr > 0) entry.outletsWithEpbCurr += 1;
+
+      if (item.status === 'GROWTH') entry.tokoGrowth += 1;
+      else if (item.status === 'NEW') entry.tokoNew += 1;
+      else if (item.status === 'STABIL') entry.tokoStabil += 1;
+      else if (item.status === 'DECLINE') entry.tokoDecline += 1;
+    });
+
+    const list = Array.from(map.values()).map(entry => {
+      const diff = entry.epbCurr - entry.epbPrev;
+      const growthPercent = entry.epbPrev > 0 
+        ? ((entry.epbCurr - entry.epbPrev) / entry.epbPrev) * 100 
+        : (entry.epbCurr > 0 ? 100 : 0);
+      const penetrationPrev = entry.totalOutlets > 0 ? (entry.outletsWithEpbPrev / entry.totalOutlets) * 100 : 0;
+      const penetrationCurr = entry.totalOutlets > 0 ? (entry.outletsWithEpbCurr / entry.totalOutlets) * 100 : 0;
+
+      return {
+        rank: 0,
+        salesmanId: entry.salesmanId,
+        salesmanName: entry.salesmanName,
+        depo: entry.depo,
+        pma: entry.pma,
+        cabang: entry.cabang,
+        totalOutlets: entry.totalOutlets,
+        outletsWithEpbPrev: entry.outletsWithEpbPrev,
+        outletsWithEpbCurr: entry.outletsWithEpbCurr,
+        penetrationPrev,
+        penetrationCurr,
+        epbPrev: entry.epbPrev,
+        epbCurr: entry.epbCurr,
+        diff,
+        growthPercent,
+        tokoGrowth: entry.tokoGrowth,
+        tokoNew: entry.tokoNew,
+        tokoStabil: entry.tokoStabil,
+        tokoDecline: entry.tokoDecline,
+      };
+    });
+
+    // Sort by EPB Bulan Ini descending, then diff descending
+    list.sort((a, b) => {
+      if (b.epbCurr !== a.epbCurr) return b.epbCurr - a.epbCurr;
+      return b.diff - a.diff;
+    });
+
+    return list.map((item, idx) => ({
+      ...item,
+      rank: idx + 1,
+    }));
+  }, [filteredItems]);
+
+  const depoRankMap = useMemo(() => {
+    const map = new Map<string, number>();
+    depoPmaEpbRankings.forEach(d => {
+      map.set(d.depoPmaName.toLowerCase(), d.rank);
+    });
+    return map;
+  }, [depoPmaEpbRankings]);
+
+  const salesmanRankMap = useMemo(() => {
+    const map = new Map<string, number>();
+    salesmanEpbRankings.forEach(s => {
+      map.set(s.salesmanName.toLowerCase(), s.rank);
+      if (s.salesmanId) map.set(s.salesmanId.toLowerCase(), s.rank);
+    });
+    return map;
+  }, [salesmanEpbRankings]);
+
+  // Re-number and rank filtered rows with EPB Rank, Depo Rank, and Salesman Rank
+  const numberedFilteredItems = useMemo<EbpOutletItem[]>(() => {
+    return filteredItems.map((item, idx) => {
+      const depoKey = item.pma && item.pma !== '-' ? item.pma : (item.depo && item.depo !== '-' ? item.depo : '');
+      const depoRank = depoKey ? depoRankMap.get(depoKey.toLowerCase()) : undefined;
+      const slsKey = item.salesmanName && item.salesmanName !== 'Unassigned' ? item.salesmanName : item.salesmanId;
+      const salesmanRank = slsKey ? salesmanRankMap.get(slsKey.toLowerCase()) : undefined;
+
+      return {
+        ...item,
+        no: idx + 1,
+        rank: idx + 1,
+        depoRank,
+        salesmanRank,
+      };
+    });
+  }, [filteredItems, depoRankMap, salesmanRankMap]);
 
   // 6. Calculate KPIs from filtered data
   const kpis = useMemo(() => {
@@ -638,7 +913,370 @@ export function EbpMonitoringView({
     selectedEpbPrevFilter !== 'ALL' ||
     hasActiveDashboardFilters;
 
-  // 10. Table Columns for DataTable
+  // ==========================================
+  // TABLE COLUMNS 1: RANKING EPB PER PMA / DEPO
+  // ==========================================
+  const depoPmaEpbColumns: VirtualizedColumnDef<DepoPmaEpbRankingItem>[] = [
+    {
+      key: 'rank',
+      header: 'Rank',
+      width: '65px',
+      align: 'center',
+      accessor: (row) => row.rank,
+      render: (row) => (
+        <span
+          className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold font-mono ${
+            row.rank === 1
+              ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm'
+              : row.rank === 2
+              ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40 shadow-sm'
+              : row.rank === 3
+              ? 'bg-amber-700/20 text-amber-400 border border-amber-700/40 shadow-sm'
+              : 'text-slate-400 bg-slate-900/60 border border-slate-800'
+          }`}
+        >
+          {row.rank === 1 ? '🥇 1' : row.rank === 2 ? '🥈 2' : row.rank === 3 ? '🥉 3' : row.rank}
+        </span>
+      ),
+    },
+    {
+      key: 'depoPmaName',
+      header: 'PMA / Depo',
+      width: '240px',
+      accessor: (row) => row.depoPmaName,
+      render: (row) => (
+        <div className="py-0.5">
+          <div className="font-bold text-slate-100 flex items-center gap-1.5 truncate" title={row.depoPmaName}>
+            <Building2 className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span className="truncate">{row.depoPmaName}</span>
+          </div>
+          <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5">
+            <span className="text-cyan-400">{row.salesmenCount} Salesman</span>
+            {row.cabang && row.cabang !== '-' && <span className="text-slate-500">&bull; {row.cabang}</span>}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedDepo(row.depoPmaName);
+                setActiveTableTab('detail_toko');
+              }}
+              className="ml-auto text-[10px] text-amber-400/80 hover:text-amber-300 hover:underline cursor-pointer"
+              title="Filter toko untuk PMA/Depo ini"
+            >
+              Filter Toko &rarr;
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'totalOutlets',
+      header: 'Toko Master CB',
+      width: '120px',
+      align: 'right',
+      accessor: (row) => row.totalOutlets,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-slate-200 font-semibold text-xs">{row.totalOutlets.toLocaleString('id-ID')}</span>
+          <div className="text-[10px] text-slate-500 font-mono">Toko</div>
+        </div>
+      ),
+    },
+    {
+      key: 'epbPrev',
+      header: `EPB Lalu (${prevLabel})`,
+      width: '130px',
+      align: 'right',
+      accessor: (row) => row.epbPrev,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-slate-300 font-semibold text-xs">{row.epbPrev.toLocaleString('id-ID')}</span>
+          <div className="text-[10px] text-indigo-400/80 font-mono">MARK NEW</div>
+        </div>
+      ),
+    },
+    {
+      key: 'epbCurr',
+      header: `EPB Ini (${currLabel})`,
+      width: '140px',
+      align: 'right',
+      accessor: (row) => row.epbCurr,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-amber-300 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+            {row.epbCurr.toLocaleString('id-ID')}
+          </span>
+          <div className="text-[10px] text-amber-400 font-mono mt-0.5">MARK NEW</div>
+        </div>
+      ),
+    },
+    {
+      key: 'diff',
+      header: 'Selisih',
+      width: '110px',
+      align: 'right',
+      accessor: (row) => row.diff,
+      render: (row) => {
+        const isPos = row.diff > 0;
+        const isNeg = row.diff < 0;
+        return (
+          <span className={`inline-flex items-center gap-0.5 font-mono text-xs font-bold ${isPos ? 'text-emerald-400' : isNeg ? 'text-rose-400' : 'text-slate-400'}`}>
+            {isPos ? <ArrowUpRight className="w-3.5 h-3.5" /> : isNeg ? <ArrowDownRight className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+            <span>{isPos ? `+${row.diff}` : row.diff}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'growthPercent',
+      header: 'Growth EPB %',
+      width: '130px',
+      align: 'right',
+      accessor: (row) => row.growthPercent,
+      render: (row) => {
+        const isPos = row.growthPercent > 0;
+        const isNeg = row.growthPercent < 0;
+        return (
+          <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
+            isPos ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : isNeg ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {isPos ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'penetrationCurr',
+      header: 'Penetrasi Toko Ber-EPB',
+      width: '170px',
+      align: 'right',
+      accessor: (row) => row.penetrationCurr,
+      render: (row) => (
+        <div className="text-right">
+          <div className="font-mono text-xs font-semibold text-cyan-300">
+            {row.outletsWithEpbCurr} / {row.totalOutlets} ({row.penetrationCurr.toFixed(1)}%)
+          </div>
+          <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden mt-1 flex">
+            <div className="bg-cyan-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, row.penetrationCurr))}%` }} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'statusSummary',
+      header: 'Status Toko',
+      width: '180px',
+      accessor: (row) => row.tokoGrowth,
+      render: (row) => (
+        <div className="flex items-center gap-1 font-mono text-[10px]">
+          <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" title={`Growth: ${row.tokoGrowth}`}>
+            ▲ {row.tokoGrowth}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300" title={`New: ${row.tokoNew}`}>
+            ★ {row.tokoNew}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300" title={`Stabil: ${row.tokoStabil}`}>
+            ● {row.tokoStabil}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300" title={`Decline: ${row.tokoDecline}`}>
+            ▼ {row.tokoDecline}
+          </span>
+        </div>
+      ),
+    },
+  ];
+
+  // ==========================================
+  // TABLE COLUMNS 2: RANKING EPB PER SALESMAN
+  // ==========================================
+  const salesmanEpbColumns: VirtualizedColumnDef<SalesmanEpbRankingItem>[] = [
+    {
+      key: 'rank',
+      header: 'Rank',
+      width: '65px',
+      align: 'center',
+      accessor: (row) => row.rank,
+      render: (row) => (
+        <span
+          className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-bold font-mono ${
+            row.rank === 1
+              ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40 shadow-sm'
+              : row.rank === 2
+              ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40 shadow-sm'
+              : row.rank === 3
+              ? 'bg-amber-700/20 text-amber-400 border border-amber-700/40 shadow-sm'
+              : 'text-slate-400 bg-slate-900/60 border border-slate-800'
+          }`}
+        >
+          {row.rank === 1 ? '🥇 1' : row.rank === 2 ? '🥈 2' : row.rank === 3 ? '🥉 3' : row.rank}
+        </span>
+      ),
+    },
+    {
+      key: 'salesmanName',
+      header: 'Nama Salesman',
+      width: '230px',
+      accessor: (row) => row.salesmanName,
+      render: (row) => (
+        <div className="py-0.5">
+          <div className="font-bold text-slate-100 flex items-center gap-1.5 truncate" title={row.salesmanName}>
+            <Users className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <span className="truncate">{row.salesmanName}</span>
+          </div>
+          <div className="text-[10px] text-slate-400 font-mono mt-0.5 flex items-center gap-1.5">
+            {row.salesmanId && (
+              <span className="text-cyan-400 bg-cyan-950/40 px-1 rounded border border-cyan-800/40">
+                {row.salesmanId}
+              </span>
+            )}
+            {row.depo && row.depo !== '-' && <span className="text-slate-500">&bull; {row.depo}</span>}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedSalesman(row.salesmanName);
+                setActiveTableTab('detail_toko');
+              }}
+              className="ml-auto text-[10px] text-amber-400/80 hover:text-amber-300 hover:underline cursor-pointer"
+              title="Filter toko untuk Salesman ini"
+            >
+              Filter Toko &rarr;
+            </button>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'depo',
+      header: 'Depo / PMA',
+      width: '160px',
+      accessor: (row) => row.depo,
+      render: (row) => (
+        <div className="py-0.5">
+          <span className="text-slate-200 text-xs font-medium truncate block" title={row.depo}>{row.depo}</span>
+          {row.cabang && row.cabang !== '-' && <span className="text-[10px] text-slate-500 font-mono block">{row.cabang}</span>}
+        </div>
+      ),
+    },
+    {
+      key: 'totalOutlets',
+      header: 'Toko Binaan',
+      width: '110px',
+      align: 'right',
+      accessor: (row) => row.totalOutlets,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-slate-200 font-semibold text-xs">{row.totalOutlets.toLocaleString('id-ID')}</span>
+          <div className="text-[10px] text-slate-500 font-mono">Toko</div>
+        </div>
+      ),
+    },
+    {
+      key: 'epbPrev',
+      header: `EPB Lalu (${prevLabel})`,
+      width: '120px',
+      align: 'right',
+      accessor: (row) => row.epbPrev,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-slate-300 font-semibold text-xs">{row.epbPrev.toLocaleString('id-ID')}</span>
+          <div className="text-[10px] text-indigo-400/80 font-mono">MARK NEW</div>
+        </div>
+      ),
+    },
+    {
+      key: 'epbCurr',
+      header: `EPB Ini (${currLabel})`,
+      width: '130px',
+      align: 'right',
+      accessor: (row) => row.epbCurr,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-amber-300 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+            {row.epbCurr.toLocaleString('id-ID')}
+          </span>
+          <div className="text-[10px] text-amber-400 font-mono mt-0.5">MARK NEW</div>
+        </div>
+      ),
+    },
+    {
+      key: 'diff',
+      header: 'Selisih',
+      width: '100px',
+      align: 'right',
+      accessor: (row) => row.diff,
+      render: (row) => {
+        const isPos = row.diff > 0;
+        const isNeg = row.diff < 0;
+        return (
+          <span className={`inline-flex items-center gap-0.5 font-mono text-xs font-bold ${isPos ? 'text-emerald-400' : isNeg ? 'text-rose-400' : 'text-slate-400'}`}>
+            {isPos ? <ArrowUpRight className="w-3.5 h-3.5" /> : isNeg ? <ArrowDownRight className="w-3.5 h-3.5" /> : <Minus className="w-3.5 h-3.5" />}
+            <span>{isPos ? `+${row.diff}` : row.diff}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: 'growthPercent',
+      header: 'Growth EPB %',
+      width: '120px',
+      align: 'right',
+      accessor: (row) => row.growthPercent,
+      render: (row) => {
+        const isPos = row.growthPercent > 0;
+        const isNeg = row.growthPercent < 0;
+        return (
+          <span className={`font-mono text-xs font-bold px-2 py-0.5 rounded ${
+            isPos ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' : isNeg ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' : 'bg-slate-800 text-slate-400'
+          }`}>
+            {isPos ? `+${row.growthPercent.toFixed(1)}%` : `${row.growthPercent.toFixed(1)}%`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'penetrationCurr',
+      header: 'Penetrasi Toko Ber-EPB',
+      width: '170px',
+      align: 'right',
+      accessor: (row) => row.penetrationCurr,
+      render: (row) => (
+        <div className="text-right">
+          <div className="font-mono text-xs font-semibold text-cyan-300">
+            {row.outletsWithEpbCurr} / {row.totalOutlets} ({row.penetrationCurr.toFixed(1)}%)
+          </div>
+          <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden mt-1 flex">
+            <div className="bg-cyan-500 h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, row.penetrationCurr))}%` }} />
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'statusSummary',
+      header: 'Status Toko',
+      width: '180px',
+      accessor: (row) => row.tokoGrowth,
+      render: (row) => (
+        <div className="flex items-center gap-1 font-mono text-[10px]">
+          <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300" title={`Growth: ${row.tokoGrowth}`}>
+            ▲ {row.tokoGrowth}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300" title={`New: ${row.tokoNew}`}>
+            ★ {row.tokoNew}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300" title={`Stabil: ${row.tokoStabil}`}>
+            ● {row.tokoStabil}
+          </span>
+          <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300" title={`Decline: ${row.tokoDecline}`}>
+            ▼ {row.tokoDecline}
+          </span>
+        </div>
+      ),
+    },
+  ];
+
+  // ==========================================
+  // TABLE COLUMNS 3: DETAIL TOKO (MASTER CB)
+  // Dilengkapi Kolom Ranking EPB, Ranking Depo & Ranking Salesman
+  // ==========================================
   const columns: ColumnDef<EbpOutletItem>[] = [
     {
       key: 'no',
@@ -648,6 +1286,31 @@ export function EbpMonitoringView({
       render: (row) => (
         <span className="font-mono text-slate-400 text-xs">{row.no}</span>
       ),
+    },
+    {
+      key: 'rank',
+      header: 'Rank EPB',
+      width: 'w-20',
+      align: 'center',
+      accessor: (row) => row.rank ?? row.no,
+      render: (row) => {
+        const r = row.rank ?? row.no;
+        return (
+          <span
+            className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-[11px] font-mono font-bold ${
+              r === 1
+                ? 'bg-amber-400/20 text-amber-300 border border-amber-400/40'
+                : r === 2
+                ? 'bg-slate-300/20 text-slate-200 border border-slate-300/40'
+                : r === 3
+                ? 'bg-amber-700/20 text-amber-400 border border-amber-700/40'
+                : 'text-slate-400 bg-slate-900/60'
+            }`}
+          >
+            {r === 1 ? '🥇 #1' : r === 2 ? '🥈 #2' : r === 3 ? '🥉 #3' : `#${r}`}
+          </span>
+        );
+      },
     },
     {
       key: 'outletName',
@@ -662,23 +1325,59 @@ export function EbpMonitoringView({
             <span className="text-cyan-400 font-semibold bg-cyan-950/40 px-1 rounded border border-cyan-800/40">
               {row.outletId}
             </span>
-            {row.salesmanName && row.salesmanName !== 'Unassigned' && (
-              <span className="text-slate-400 truncate max-w-[140px]" title={row.salesmanName}>
-                &bull; {row.salesmanName}
-              </span>
-            )}
-            {row.depo && row.depo !== '-' && (
-              <span className="text-slate-500">
-                &bull; {row.depo}
-              </span>
+            {row.channel && row.channel !== '-' && (
+              <span className="text-slate-500">&bull; {row.channel}</span>
             )}
           </div>
         </div>
       ),
     },
     {
+      key: 'depo',
+      header: 'PMA / Depo',
+      render: (row) => {
+        const depoDisplay = row.pma && row.pma !== '-' ? row.pma : (row.depo && row.depo !== '-' ? row.depo : '-');
+        return (
+          <div className="py-0.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+              <Building2 className="w-3 h-3 text-amber-400 shrink-0" />
+              <span className="truncate max-w-[140px]">{depoDisplay}</span>
+            </div>
+            {row.depoRank !== undefined && (
+              <div className="text-[10px] text-amber-400/90 font-mono mt-0.5 flex items-center gap-1">
+                <span className="px-1 py-0.2 rounded bg-amber-500/10 border border-amber-500/20">
+                  Rank #{row.depoRank} Depo
+                </span>
+                {row.cabang && row.cabang !== '-' && <span className="text-slate-500">&bull; {row.cabang}</span>}
+              </div>
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'salesmanName',
+      header: 'Salesman',
+      render: (row) => (
+        <div className="py-0.5">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+            <Users className="w-3 h-3 text-cyan-400 shrink-0" />
+            <span className="truncate max-w-[140px]">{row.salesmanName || 'Unassigned'}</span>
+          </div>
+          <div className="text-[10px] text-cyan-400 font-mono mt-0.5 flex items-center gap-1">
+            {row.salesmanRank !== undefined && (
+              <span className="px-1 py-0.2 rounded bg-cyan-500/10 border border-cyan-500/20">
+                Rank #{row.salesmanRank} Sales
+              </span>
+            )}
+            {row.salesmanId && <span className="text-slate-500">&bull; {row.salesmanId}</span>}
+          </div>
+        </div>
+      ),
+    },
+    {
       key: 'epbPrev',
-      header: `EPB Bulan Lalu (${prevLabel})`,
+      header: `EPB Lalu (${prevLabel})`,
       align: 'right',
       accessor: (row) => row.epbPrev,
       render: (row) => (
@@ -686,13 +1385,13 @@ export function EbpMonitoringView({
           <span className="font-mono text-slate-300 font-semibold text-xs">
             {row.epbPrev.toLocaleString('id-ID')}
           </span>
-          <div className="text-[10px] text-cyan-400 font-mono mt-0.5">Kolom MARK NEW</div>
+          <div className="text-[10px] text-cyan-400 font-mono mt-0.5">MARK NEW</div>
         </div>
       ),
     },
     {
       key: 'epbCurr',
-      header: `EPB Bulan Ini (${currLabel})`,
+      header: `EPB Ini (${currLabel})`,
       align: 'right',
       accessor: (row) => row.epbCurr,
       render: (row) => (
@@ -700,7 +1399,7 @@ export function EbpMonitoringView({
           <span className="font-mono text-amber-300 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
             {row.epbCurr.toLocaleString('id-ID')}
           </span>
-          <div className="text-[10px] text-amber-400 font-mono mt-0.5">Kolom MARK NEW</div>
+          <div className="text-[10px] text-amber-400 font-mono mt-0.5">MARK NEW</div>
         </div>
       ),
     },
@@ -1659,16 +2358,166 @@ export function EbpMonitoringView({
         </div>
       </div>
 
-      {/* 7. Monitoring Table (DataTable) */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
-        <DataTable<EbpOutletItem>
-          title="Tabel Monitoring EPB (Eceran Per Bulan)"
-          columns={columns}
-          data={numberedFilteredItems}
-          searchPlaceholder="Cari toko pada tabel..."
-          exportFileName={`EPB_Monitoring_Master_CB_${prevLabel}_vs_${currLabel}.xlsx`}
-          emptyMessage="Tidak ada toko yang cocok dengan kriteria filter."
-        />
+      {/* 7. EPB INTELLIGENCE TABLES & RANKINGS SECTION */}
+      <div id="epb-tables-section" className="space-y-4">
+        {/* Navigation Tab Header */}
+        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-sm backdrop-blur-md">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                  <span>Tabel Intelligence &amp; Ranking EPB</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    MARK NEW MoM
+                  </span>
+                </h2>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Peringkat realisasi Eceran Per Bulan (EPB) per PMA / Depo, per Salesman, dan detail toko Master CB.
+              </p>
+            </div>
+
+            {/* Tab Controls */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
+              <button
+                type="button"
+                onClick={() => setActiveTableTab('ranking_depo')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  activeTableTab === 'ranking_depo'
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Ranking EPB Per PMA/Depo</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  activeTableTab === 'ranking_depo' ? 'bg-slate-900/20 text-slate-950 font-bold' : 'bg-slate-800 text-amber-300'
+                }`}>
+                  {depoPmaEpbRankings.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTableTab('ranking_salesman')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  activeTableTab === 'ranking_salesman'
+                    ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Ranking EPB Per Salesman</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  activeTableTab === 'ranking_salesman' ? 'bg-slate-900/20 text-slate-950 font-bold' : 'bg-slate-800 text-cyan-300'
+                }`}>
+                  {salesmanEpbRankings.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTableTab('detail_toko')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                  activeTableTab === 'detail_toko'
+                    ? 'bg-emerald-500 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>Detail Toko (Master CB)</span>
+                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                  activeTableTab === 'detail_toko' ? 'bg-slate-900/20 text-slate-950 font-bold' : 'bg-slate-800 text-emerald-300'
+                }`}>
+                  {numberedFilteredItems.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTableTab('all_tables')}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                  activeTableTab === 'all_tables'
+                    ? 'bg-slate-800 text-amber-300 border border-amber-500/30'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+                title="Tampilkan semua tabel sekaligus pada satu halaman"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Semua Tabel</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab 1: Ranking EPB Per PMA / Depo */}
+        {(activeTableTab === 'ranking_depo' || activeTableTab === 'all_tables') && (
+          <div id="ranking-epb-depo-section">
+            <VirtualizedTable<DepoPmaEpbRankingItem>
+              columns={depoPmaEpbColumns}
+              data={depoPmaEpbRankings}
+              title="Ranking EPB Per PMA / Depo"
+              subtitle={`Urutan kontribusi PMA / Depo berdasarkan total EPB dari kolom MARK NEW periode ${currLabel} vs ${prevLabel}.`}
+              searchPlaceholder="Cari PMA / Depo / Cabang..."
+              exportFileName={`Ranking_EPB_Per_PMA_Depo_${currLabel.replace(/\s+/g, '_')}`}
+              emptyMessage="Belum ada data PMA / Depo yang cocok dengan kriteria filter."
+              viewportHeight={Math.min(460, Math.max(220, depoPmaEpbRankings.length * 46 + 60))}
+              rowHeight={46}
+              actionElement={
+                <div data-capture-ignore="true" className="flex items-center gap-2">
+                  <CaptureJpgButton
+                    targetId="ranking-epb-depo-section"
+                    fileName={`Ranking_EPB_Per_PMA_Depo_${currLabel.replace(/\s+/g, '_')}.jpg`}
+                    label="Capture JPG"
+                  />
+                </div>
+              }
+            />
+          </div>
+        )}
+
+        {/* Tab 2: Ranking EPB Per Salesman */}
+        {(activeTableTab === 'ranking_salesman' || activeTableTab === 'all_tables') && (
+          <div id="ranking-epb-salesman-section">
+            <VirtualizedTable<SalesmanEpbRankingItem>
+              columns={salesmanEpbColumns}
+              data={salesmanEpbRankings}
+              title="Ranking EPB Per Salesman"
+              subtitle={`Urutan kontribusi tenaga penjual (Salesman) berdasarkan total akumulasi EPB kolom MARK NEW periode ${currLabel} vs ${prevLabel}.`}
+              searchPlaceholder="Cari nama salesman / kode salesman / depo..."
+              exportFileName={`Ranking_EPB_Per_Salesman_${currLabel.replace(/\s+/g, '_')}`}
+              emptyMessage="Belum ada data Salesman yang cocok dengan kriteria filter."
+              viewportHeight={Math.min(500, Math.max(220, salesmanEpbRankings.length * 46 + 60))}
+              rowHeight={46}
+              actionElement={
+                <div data-capture-ignore="true" className="flex items-center gap-2">
+                  <CaptureJpgButton
+                    targetId="ranking-epb-salesman-section"
+                    fileName={`Ranking_EPB_Per_Salesman_${currLabel.replace(/\s+/g, '_')}.jpg`}
+                    label="Capture JPG"
+                  />
+                </div>
+              }
+            />
+          </div>
+        )}
+
+        {/* Tab 3: Detail Toko (Master CB) */}
+        {(activeTableTab === 'detail_toko' || activeTableTab === 'all_tables') && (
+          <div id="detail-epb-toko-section" className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <DataTable<EbpOutletItem>
+              title="Detail Monitoring EPB Toko (Master CB)"
+              columns={columns}
+              data={numberedFilteredItems}
+              searchPlaceholder="Cari toko pada tabel (nama, kode, salesman, depo)..."
+              exportFileName={`Detail_EPB_Monitoring_Master_CB_${prevLabel}_vs_${currLabel}.xlsx`}
+              emptyMessage="Tidak ada toko yang cocok dengan kriteria filter."
+            />
+          </div>
+        )}
       </div>
 
       {/* 8. Data Validation & Audit Note Footer */}
