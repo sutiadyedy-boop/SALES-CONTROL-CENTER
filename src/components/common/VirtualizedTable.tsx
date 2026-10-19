@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { ChevronDown, ChevronUp, Search, Download, Layers, FileSpreadsheet } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, Download, Layers, FileSpreadsheet, Columns, Check, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import { exportTableToExcel } from '../../services/exportEngine';
 import { CaptureJpgButton } from './CaptureJpgButton';
 
@@ -55,23 +55,85 @@ export function VirtualizedTable<T extends Record<string, any>>({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const tableCardRef = useRef<HTMLDivElement>(null);
+  const columnDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Column visibility state: array of keys of currently active/visible columns
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(() =>
+    columns.map(c => c.key)
+  );
+
+  // Sync visibleColumnKeys when columns definition changes (e.g. switching tabs)
+  useEffect(() => {
+    setVisibleColumnKeys(columns.map(c => c.key));
+  }, [columns]);
+
+  // Wrap text mode: true = wrap text completely without cut-offs, false = compact single line
+  const [isWrapText, setIsWrapText] = useState<boolean>(true);
+
+  // Dropdown open state for column picker
+  const [isColumnDropdownOpen, setIsColumnDropdownOpen] = useState(false);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (columnDropdownRef.current && !columnDropdownRef.current.contains(event.target as Node)) {
+        setIsColumnDropdownOpen(false);
+      }
+    };
+    if (isColumnDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isColumnDropdownOpen]);
+
+  // Filtered active columns based on user selection
+  const activeColumns = useMemo(() => {
+    const active = columns.filter(col => visibleColumnKeys.includes(col.key));
+    return active.length > 0 ? active : columns; // Fallback to all if somehow none selected
+  }, [columns, visibleColumnKeys]);
+
+  const toggleColumn = (key: string) => {
+    if (visibleColumnKeys.includes(key)) {
+      if (visibleColumnKeys.length > 1) {
+        setVisibleColumnKeys(prev => prev.filter(k => k !== key));
+      }
+    } else {
+      setVisibleColumnKeys(prev => [...prev, key]);
+    }
+  };
+
+  const showAllColumns = () => {
+    setVisibleColumnKeys(columns.map(c => c.key));
+  };
+
+  const resetColumns = () => {
+    setVisibleColumnKeys(columns.map(c => c.key));
+  };
+
+  // Compute table minimum width so columns are never squished
+  const tableMinWidth = useMemo(() => {
+    return activeColumns.reduce((sum, col) => {
+      const w = parseInt(col.width || '130', 10);
+      return sum + (isNaN(w) ? 130 : w);
+    }, 0);
+  }, [activeColumns]);
 
   // 1. Search filtering
   const filteredData = useMemo(() => {
     if (!searchTerm.trim()) return data;
     const q = searchTerm.toLowerCase();
     return data.filter(row => {
-      return columns.some(col => {
+      return activeColumns.some(col => {
         const val = col.accessor ? col.accessor(row) : row[col.key];
         return val !== null && val !== undefined && String(val).toLowerCase().includes(q);
       });
     });
-  }, [data, searchTerm, columns]);
+  }, [data, searchTerm, activeColumns]);
 
   // 2. Sorting
   const sortedData = useMemo(() => {
     if (!sortKey) return filteredData;
-    const col = columns.find(c => c.key === sortKey);
+    const col = activeColumns.find(c => c.key === sortKey);
     return [...filteredData].sort((a, b) => {
       const valA = col?.accessor ? col.accessor(a) : a[sortKey];
       const valB = col?.accessor ? col.accessor(b) : b[sortKey];
@@ -88,7 +150,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
       const strB = String(valB).toLowerCase();
       return sortDirection === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
     });
-  }, [filteredData, sortKey, sortDirection, columns]);
+  }, [filteredData, sortKey, sortDirection, activeColumns]);
 
   // Reset to first page when search, sort, or page size changes
   useEffect(() => {
@@ -150,7 +212,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
     if (sortedData.length === 0) return;
     const exportRows = sortedData.map(row => {
       const flat: Record<string, any> = {};
-      columns.forEach(col => {
+      activeColumns.forEach(col => {
         flat[col.header] = col.accessor ? col.accessor(row) : row[col.key];
       });
       return flat;
@@ -218,6 +280,101 @@ export function VirtualizedTable<T extends Record<string, any>>({
             </button>
           )}
 
+          {/* Atur Kolom (Column Customizer) Dropdown */}
+          <div className="relative" ref={columnDropdownRef} data-capture-ignore="true">
+            <button
+              type="button"
+              onClick={() => setIsColumnDropdownOpen(prev => !prev)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                visibleColumnKeys.length < columns.length
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm'
+                  : 'bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800 hover:text-cyan-300'
+              }`}
+              title="Pilih kolom yang ingin ditampilkan"
+            >
+              <Columns className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Kolom</span>
+              <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+                {visibleColumnKeys.length}/{columns.length}
+              </span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {isColumnDropdownOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-64 bg-slate-950 border border-slate-800 rounded-xl shadow-2xl p-3 z-50 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs">
+                  <span className="font-bold text-slate-200">Pilih Kolom Tampil</span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={showAllColumns}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-semibold cursor-pointer"
+                    >
+                      Pilih Semua
+                    </button>
+                    <span className="text-slate-600">·</span>
+                    <button
+                      type="button"
+                      onClick={resetColumns}
+                      className="text-[10px] text-slate-400 hover:text-slate-200 cursor-pointer"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-60 overflow-y-auto space-y-1 py-1">
+                  {columns.map(col => {
+                    const isChecked = visibleColumnKeys.includes(col.key);
+                    return (
+                      <label
+                        key={col.key}
+                        className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-slate-900 cursor-pointer text-xs transition-colors select-none"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => toggleColumn(col.key)}
+                          className="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer"
+                        />
+                        <span className={isChecked ? 'text-slate-200 font-medium' : 'text-slate-500 line-through'}>
+                          {col.header}
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-2 mt-2 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                  <span>{visibleColumnKeys.length} dari {columns.length} kolom aktif</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsColumnDropdownOpen(false)}
+                    className="px-2 py-0.5 rounded bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold cursor-pointer"
+                  >
+                    Selesai
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Wrap Text Toggle */}
+          <button
+            type="button"
+            onClick={() => setIsWrapText(prev => !prev)}
+            data-capture-ignore="true"
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+              isWrapText
+                ? 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30'
+                : 'bg-slate-950 hover:bg-slate-800 text-slate-400 border-slate-800'
+            }`}
+            title={isWrapText ? 'Mode Teks Lengkap Aktif (Teks utuh tanpa terpotong)' : 'Klik untuk menampilkan seluruh teks tanpa terpotong'}
+          >
+            <span className="text-[11px] font-mono font-bold">WRAP</span>
+            <span className="hidden xl:inline">{isWrapText ? 'Teks Lengkap' : 'Teks Kompak'}</span>
+          </button>
+
           {/* Quick Rows Selector in Toolbar */}
           <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-slate-800" data-capture-ignore="true">
             <span className="text-[11px] text-slate-400 font-sans">Tampil:</span>
@@ -268,10 +425,13 @@ export function VirtualizedTable<T extends Record<string, any>>({
             minHeight: isPaged && limit <= 10 ? 'auto' : '220px' 
           }}
         >
-          <table className="w-full text-left text-xs border-collapse table-fixed">
+          <table 
+            className="w-full text-left text-xs border-collapse"
+            style={{ minWidth: `${Math.max(tableMinWidth, 750)}px` }}
+          >
             <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 text-slate-400 font-semibold shadow-sm">
               <tr>
-                {columns.map(col => (
+                {activeColumns.map(col => (
                   <th
                     key={col.key}
                     style={{ width: col.width }}
@@ -300,7 +460,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
               {/* Top virtual spacer */}
               {topSpacerHeight > 0 && (
                 <tr style={{ height: `${topSpacerHeight}px` }}>
-                  <td colSpan={columns.length} />
+                  <td colSpan={activeColumns.length} />
                 </tr>
               )}
 
@@ -313,15 +473,18 @@ export function VirtualizedTable<T extends Record<string, any>>({
                     style={{ height: `${rowHeight}px` }}
                     className="border-b border-slate-800/60 hover:bg-slate-800/40 transition-colors"
                   >
-                    {columns.map(col => {
+                    {activeColumns.map(col => {
                       const value = col.accessor ? col.accessor(row) : row[col.key];
                       return (
                         <td
                           key={col.key}
                           style={{ width: col.width }}
-                          className={`py-2 px-3.5 ${
+                          className={`py-2 px-3.5 align-middle ${
+                            isWrapText ? 'break-words whitespace-normal' : 'truncate whitespace-nowrap'
+                          } ${
                             col.align === 'right' ? 'text-right font-mono' : col.align === 'center' ? 'text-center' : 'text-left'
                           }`}
+                          title={typeof value === 'string' || typeof value === 'number' ? String(value) : undefined}
                         >
                           {col.render ? col.render(row, actualIndex) : (value !== null && value !== undefined ? String(value) : '-')}
                         </td>
@@ -334,7 +497,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
               {/* Bottom virtual spacer */}
               {bottomSpacerHeight > 0 && (
                 <tr style={{ height: `${bottomSpacerHeight}px` }}>
-                  <td colSpan={columns.length} />
+                  <td colSpan={activeColumns.length} />
                 </tr>
               )}
             </tbody>
@@ -375,6 +538,20 @@ export function VirtualizedTable<T extends Record<string, any>>({
               })}
             </div>
           </div>
+
+          {/* Indikator Kolom Aktif di Footer */}
+          {visibleColumnKeys.length < columns.length && (
+            <div className="flex items-center gap-1.5 pl-3 border-l border-slate-800 text-[11px] text-amber-300 font-sans" data-capture-ignore="true">
+              <span>Kolom: {visibleColumnKeys.length}/{columns.length}</span>
+              <button
+                type="button"
+                onClick={showAllColumns}
+                className="text-[10px] underline hover:text-amber-200 cursor-pointer font-bold"
+              >
+                (Tampilkan Semua Kolom)
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Right: Pagination Navigation & Row Slice Details */}

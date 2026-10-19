@@ -78,12 +78,12 @@ export function ControlTowerTables({
     {
       key: 'depoPmaName',
       header: 'Depo / PMA',
-      width: '210px',
+      width: '230px',
       accessor: row => row.depoPmaName,
       render: row => (
-        <div>
-          <div className="font-bold text-amber-300 font-mono truncate">{row.depoPmaName}</div>
-          <div className="text-[10px] text-slate-500 font-mono">
+        <div className="py-0.5">
+          <div className="font-bold text-amber-300 font-mono break-words leading-tight" title={row.depoPmaName}>{row.depoPmaName}</div>
+          <div className="text-[10px] text-slate-500 font-mono mt-0.5">
             {row.salesmenCount} Salesman {row.cabang ? `· ${row.cabang}` : ''}
           </div>
         </div>
@@ -253,12 +253,12 @@ export function ControlTowerTables({
     {
       key: 'salesmanName',
       header: 'Salesman',
-      width: '200px',
+      width: '240px',
       accessor: row => row.salesmanName,
       render: row => (
-        <div>
-          <div className="font-semibold text-slate-200 truncate">{row.salesmanName}</div>
-          <div className="text-[10px] text-slate-500 font-mono">
+        <div className="py-0.5">
+          <div className="font-semibold text-slate-200 break-words leading-tight" title={row.salesmanName}>{row.salesmanName}</div>
+          <div className="text-[10px] text-slate-500 font-mono break-words leading-tight mt-0.5" title={`${row.salesmanId} · ${row.area || 'AREA'} ${row.rayon ? `· ${row.rayon}` : ''}`}>
             {row.salesmanId} · {row.area || 'AREA'} {row.rayon ? `· ${row.rayon}` : ''}
           </div>
         </div>
@@ -416,12 +416,12 @@ export function ControlTowerTables({
     {
       key: 'outletName',
       header: 'Nama Toko / Outlet',
-      width: '220px',
+      width: '230px',
       accessor: row => row.outletName,
       render: row => (
-        <div>
-          <div className="font-semibold text-slate-200 truncate">{row.outletName}</div>
-          <div className="text-[10px] text-slate-500">
+        <div className="py-0.5">
+          <div className="font-semibold text-slate-200 break-words leading-tight" title={row.outletName}>{row.outletName}</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">
             {row.channel || 'GENERAL'} {row.rayon ? `· ${row.rayon}` : ''}
           </div>
         </div>
@@ -430,12 +430,12 @@ export function ControlTowerTables({
     {
       key: 'salesmanName',
       header: 'Salesman Penanggung Jawab',
-      width: '180px',
+      width: '200px',
       accessor: row => row.salesmanName,
       render: row => (
-        <div>
-          <div className="text-slate-200 truncate">{row.salesmanName}</div>
-          <div className="text-[10px] text-slate-500 font-mono">{row.salesmanId}</div>
+        <div className="py-0.5">
+          <div className="text-slate-200 break-words leading-tight font-medium" title={row.salesmanName}>{row.salesmanName}</div>
+          <div className="text-[10px] text-slate-500 font-mono mt-0.5">{row.salesmanId}</div>
         </div>
       ),
     },
@@ -502,12 +502,12 @@ export function ControlTowerTables({
     {
       key: 'outletName',
       header: 'Nama Toko / Outlet',
-      width: '220px',
+      width: '230px',
       accessor: row => row.outletName,
       render: row => (
-        <div>
-          <div className="font-semibold text-slate-200 truncate">{row.outletName}</div>
-          <div className="text-[10px] text-slate-500">
+        <div className="py-0.5">
+          <div className="font-semibold text-slate-200 break-words leading-tight" title={row.outletName}>{row.outletName}</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">
             {row.channel || 'GENERAL'} {row.rayon ? `· ${row.rayon}` : ''}
           </div>
         </div>
@@ -516,12 +516,12 @@ export function ControlTowerTables({
     {
       key: 'salesmanName',
       header: 'Salesman Penanggung Jawab',
-      width: '180px',
+      width: '200px',
       accessor: row => row.salesmanName,
       render: row => (
-        <div>
-          <div className="text-slate-200 truncate">{row.salesmanName}</div>
-          <div className="text-[10px] text-slate-500 font-mono">{row.salesmanId}</div>
+        <div className="py-0.5">
+          <div className="text-slate-200 break-words leading-tight font-medium" title={row.salesmanName}>{row.salesmanName}</div>
+          <div className="text-[10px] text-slate-500 font-mono mt-0.5">{row.salesmanId}</div>
         </div>
       ),
     },
@@ -581,9 +581,9 @@ export function ControlTowerTables({
       width: '230px',
       accessor: row => row.outletName,
       render: row => (
-        <div>
-          <div className="font-semibold text-slate-200 truncate">{row.outletName}</div>
-          <div className="text-[10px] text-slate-500">
+        <div className="py-0.5">
+          <div className="font-semibold text-slate-200 break-words leading-tight" title={row.outletName}>{row.outletName}</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">
             Channel: {row.channel || 'GENERAL'} {row.rayon ? `· Rayon: ${row.rayon}` : ''}
           </div>
         </div>
@@ -592,12 +592,12 @@ export function ControlTowerTables({
     {
       key: 'salesmanName',
       header: 'Salesman',
-      width: '180px',
+      width: '200px',
       accessor: row => row.salesmanName,
       render: row => (
-        <div>
-          <div className="text-slate-200 truncate">{row.salesmanName}</div>
-          <div className="text-[10px] text-slate-500 font-mono">{row.salesmanId}</div>
+        <div className="py-0.5">
+          <div className="text-slate-200 break-words leading-tight font-medium" title={row.salesmanName}>{row.salesmanName}</div>
+          <div className="text-[10px] text-slate-500 font-mono mt-0.5">{row.salesmanId}</div>
         </div>
       ),
     },
