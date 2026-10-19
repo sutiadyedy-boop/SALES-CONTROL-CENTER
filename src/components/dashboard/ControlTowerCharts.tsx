@@ -29,9 +29,12 @@ export function ControlTowerCharts({
   const { salesmanPerformances, channelBreakdown, rayonBreakdown, kpis } = calculation;
   const [activeTab, setActiveTab] = useState<'all' | 'target_actual' | 'aug_sept' | 'ach_salesman' | 'growth_salesman' | 'ro_dist'>('all');
   const [hoveredItem, setHoveredItem] = useState<{ title: string; lines: string[] } | null>(null);
+  const [chartSalesmanLimit, setChartSalesmanLimit] = useState<number | 'all'>(8);
 
-  // Take top 8 salesmen for readability in charts
-  const topSalesmen = salesmanPerformances.slice(0, 8);
+  // Take top N salesmen for readability in charts
+  const topSalesmen = chartSalesmanLimit === 'all' 
+    ? salesmanPerformances 
+    : salesmanPerformances.slice(0, chartSalesmanLimit);
 
   const hasSalesmen = topSalesmen.length > 0;
   const maxSales = Math.max(
@@ -117,18 +120,42 @@ export function ControlTowerCharts({
           </button>
         </div>
 
-        {onHide && (
-          <button
-            type="button"
-            onClick={onHide}
-            data-capture-ignore="true"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
-            title="Sembunyikan bagian Visualisasi BI dari tampilan & tangkapan JPG"
-          >
-            <EyeOff className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Sembunyikan Grafik</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {/* Pilihan Jumlah Salesman di Grafik */}
+          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 bg-slate-950 rounded-lg border border-slate-800 text-xs" data-capture-ignore="true">
+            <span className="text-[11px] text-slate-400 font-sans">Tampil Salesman:</span>
+            <div className="inline-flex items-center gap-1 font-mono">
+              {([5, 8, 10, 15, 'all'] as const).map(lim => (
+                <button
+                  key={String(lim)}
+                  type="button"
+                  onClick={() => setChartSalesmanLimit(lim)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    chartSalesmanLimit === lim
+                      ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title={lim === 'all' ? 'Tampilkan Semua Salesman' : `Tampilkan Top ${lim} Salesman`}
+                >
+                  {lim === 'all' ? 'Semua' : lim}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              data-capture-ignore="true"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-amber-400 hover:bg-slate-950 border border-slate-800 hover:border-amber-400/30 transition-colors cursor-pointer"
+              title="Sembunyikan bagian Visualisasi BI dari tampilan & tangkapan JPG"
+            >
+              <EyeOff className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Sembunyikan Grafik</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Floating Hover Tooltip */}

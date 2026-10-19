@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   AlertOctagon, 
   ArrowRight, 
@@ -25,19 +25,21 @@ export function TopLeakageOutletsCard({
   onNavigate,
   onHide,
 }: TopLeakageOutletsCardProps) {
-  // Memoized top 10 drop outlets sorted strictly by lost sales descending (0ms compute)
-  const top10Leakage = useMemo(() => {
+  const [displayCount, setDisplayCount] = useState<number>(10);
+
+  // Memoized top drop outlets sorted strictly by lost sales descending (0ms compute)
+  const topLeakage = useMemo(() => {
     return [...dropOutlets]
       .sort((a, b) => b.salesPrevious - a.salesPrevious)
-      .slice(0, 10);
-  }, [dropOutlets]);
+      .slice(0, displayCount);
+  }, [dropOutlets, displayCount]);
 
-  const top10LostTotal = useMemo(() => {
-    return top10Leakage.reduce((sum, item) => sum + item.salesPrevious, 0);
-  }, [top10Leakage]);
+  const topLostTotal = useMemo(() => {
+    return topLeakage.reduce((sum, item) => sum + item.salesPrevious, 0);
+  }, [topLeakage]);
 
   const paretoPercentage = totalLostRevenue > 0 
-    ? Math.round((top10LostTotal / totalLostRevenue) * 100) 
+    ? Math.round((topLostTotal / totalLostRevenue) * 100) 
     : 0;
 
   if (dropOutlets.length === 0) return null;
@@ -53,19 +55,41 @@ export function TopLeakageOutletsCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-100">
-                Top 10 Leakage Outlets (Penyumbang Penurunan Terbesar)
+                Top {displayCount} Leakage Outlets (Penyumbang Penurunan Terbesar)
               </h3>
               <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30 font-bold">
                 Pareto {paretoPercentage}% Omset Hilang
               </span>
             </div>
             <p className="text-[11px] text-slate-400">
-              Fokus pemulihan 10 toko teratas ini menyumbang {formatRupiah(top10LostTotal)} dari total defisit drop outlet ({formatRupiah(totalLostRevenue)})
+              Fokus pemulihan {displayCount} toko teratas ini menyumbang {formatRupiah(topLostTotal)} dari total defisit drop outlet ({formatRupiah(totalLostRevenue)})
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Pilihan Jumlah Tampil */}
+          <div className="flex items-center gap-1.5" data-capture-ignore="true">
+            <span className="text-[11px] text-slate-400 font-sans font-medium">Tampil:</span>
+            <div className="inline-flex items-center rounded-lg bg-slate-950 p-0.5 border border-slate-800 text-[11px] font-mono">
+              {[5, 10, 15, 20].map(count => (
+                <button
+                  key={count}
+                  type="button"
+                  onClick={() => setDisplayCount(count)}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                    displayCount === count
+                      ? 'bg-rose-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                  }`}
+                  title={`Tampilkan ${count} Toko`}
+                >
+                  {count}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {onHide && (
             <button
               type="button"
@@ -105,7 +129,7 @@ export function TopLeakageOutletsCard({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/60 font-mono">
-            {top10Leakage.map((item, idx) => {
+            {topLeakage.map((item, idx) => {
               const contributionPct = totalLostRevenue > 0
                 ? ((item.salesPrevious / totalLostRevenue) * 100).toFixed(1)
                 : '0.0';

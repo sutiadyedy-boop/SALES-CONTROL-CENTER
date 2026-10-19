@@ -25,7 +25,11 @@ interface VirtualizedTableProps<T> {
   exportFileName?: string;
   emptyMessage?: string;
   actionElement?: React.ReactNode;
+  defaultPageSize?: number | 'all';
+  pageSizeOptions?: (number | 'all')[];
 }
+
+const DEFAULT_PAGE_SIZE_OPTIONS: (number | 'all')[] = [5, 10, 25, 50, 100, 'all'];
 
 export function VirtualizedTable<T extends Record<string, any>>({
   columns,
@@ -39,11 +43,15 @@ export function VirtualizedTable<T extends Record<string, any>>({
   exportFileName,
   emptyMessage = 'DATA BELUM TERSEDIA',
   actionElement,
+  defaultPageSize = 'all',
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
 }: VirtualizedTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [scrollTop, setScrollTop] = useState(0);
+  const [pageSize, setPageSize] = useState<number | 'all'>(defaultPageSize);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const tableCardRef = useRef<HTMLDivElement>(null);
@@ -82,19 +90,44 @@ export function VirtualizedTable<T extends Record<string, any>>({
     });
   }, [filteredData, sortKey, sortDirection, columns]);
 
-  // 3. Virtualization calculations
-  const totalCount = sortedData.length;
-  const totalContentHeight = totalCount * rowHeight;
+  // Reset to first page when search, sort, or page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortKey, sortDirection, pageSize]);
 
-  const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
-  const endIndex = Math.min(totalCount, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan);
+  // 3. Pagination & Virtualization calculations
+  const totalCount = sortedData.length;
+  const isPaged = pageSize !== 'all';
+  const limit = typeof pageSize === 'number' ? pageSize : totalCount;
+  const totalPages = isPaged ? Math.max(1, Math.ceil(totalCount / limit)) : 1;
+  const safePage = Math.min(Math.max(1, currentPage), totalPages);
+
+  // Sliced data for the active page (if paged)
+  const pageData = useMemo(() => {
+    if (!isPaged) return sortedData;
+    const start = (safePage - 1) * limit;
+    return sortedData.slice(start, start + limit);
+  }, [sortedData, isPaged, safePage, limit]);
+
+  // Virtualization is active when all rows are displayed and count > 50
+  const isVirtual = !isPaged && totalCount > 50;
+
+  const startIndex = isVirtual
+    ? Math.max(0, Math.floor(scrollTop / rowHeight) - overscan)
+    : 0;
+  const endIndex = isVirtual
+    ? Math.min(totalCount, Math.ceil((scrollTop + viewportHeight) / rowHeight) + overscan)
+    : pageData.length;
 
   const visibleRows = useMemo(() => {
-    return sortedData.slice(startIndex, endIndex);
-  }, [sortedData, startIndex, endIndex]);
+    if (isVirtual) {
+      return sortedData.slice(startIndex, endIndex);
+    }
+    return pageData;
+  }, [isVirtual, sortedData, pageData, startIndex, endIndex]);
 
-  const topSpacerHeight = startIndex * rowHeight;
-  const bottomSpacerHeight = Math.max(0, (totalCount - endIndex) * rowHeight);
+  const topSpacerHeight = isVirtual ? startIndex * rowHeight : 0;
+  const bottomSpacerHeight = isVirtual ? Math.max(0, (totalCount - endIndex) * rowHeight) : 0;
 
   const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
     setScrollTop(e.currentTarget.scrollTop);
@@ -185,14 +218,36 @@ export function VirtualizedTable<T extends Record<string, any>>({
             </button>
           )}
 
+          {/* Quick Rows Selector in Toolbar */}
+          <div className="hidden md:flex items-center gap-1.5 pl-2 border-l border-slate-800" data-capture-ignore="true">
+            <span className="text-[11px] text-slate-400 font-sans">Tampil:</span>
+            <div className="inline-flex items-center rounded-lg bg-slate-950 p-0.5 border border-slate-800 text-[11px]">
+              {pageSizeOptions.map((opt) => (
+                <button
+                  key={`top-${opt}`}
+                  type="button"
+                  onClick={() => setPageSize(opt)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                    pageSize === opt
+                      ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                  }`}
+                  title={opt === 'all' ? 'Tampilkan Semua Baris' : `Tampilkan ${opt} Baris`}
+                >
+                  {opt === 'all' ? 'Semua' : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Virtualization indicator */}
           <div 
             data-capture-ignore="true"
             className="flex items-center gap-1 text-[10px] text-slate-400 font-mono bg-slate-950/60 px-2 py-1 rounded border border-slate-800"
-            title="Tabel tervirtualisasi (hanya merender baris yang terlihat di layar)"
+            title={isPaged ? `Menampilkan ${limit} baris per halaman` : 'Tabel tervirtualisasi (hanya merender baris yang terlihat di layar)'}
           >
             <Layers className="w-3 h-3 text-cyan-400" />
-            <span>Virtual DOM</span>
+            <span>{isPaged ? `Halaman (${limit} / hal)` : 'Virtual DOM'}</span>
           </div>
         </div>
       </div>
@@ -208,7 +263,10 @@ export function VirtualizedTable<T extends Record<string, any>>({
           ref={containerRef}
           onScroll={handleScroll}
           className="overflow-auto relative"
-          style={{ maxHeight: `${viewportHeight}px`, minHeight: '220px' }}
+          style={{ 
+            maxHeight: isPaged && limit <= 25 ? 'none' : `${viewportHeight}px`, 
+            minHeight: isPaged && limit <= 10 ? 'auto' : '220px' 
+          }}
         >
           <table className="w-full text-left text-xs border-collapse table-fixed">
             <thead className="sticky top-0 z-10 bg-slate-950/95 backdrop-blur-sm border-b border-slate-800 text-slate-400 font-semibold shadow-sm">
@@ -248,7 +306,7 @@ export function VirtualizedTable<T extends Record<string, any>>({
 
               {/* Rendered visible slice */}
               {visibleRows.map((row, index) => {
-                const actualIndex = startIndex + index;
+                const actualIndex = isPaged ? (safePage - 1) * limit + index : startIndex + index;
                 return (
                   <tr
                     key={row.id || row.outletId || row.salesmanId || actualIndex}
@@ -284,14 +342,78 @@ export function VirtualizedTable<T extends Record<string, any>>({
         </div>
       )}
 
-      {/* Table Footer with Virtual Render Stats */}
-      <div className="px-5 py-2.5 border-t border-slate-800 text-[11px] text-slate-500 flex items-center justify-between bg-slate-900/60 font-mono">
-        <div>
-          Total: <span className="text-slate-300 font-semibold">{totalCount.toLocaleString('id-ID')}</span> baris
-          {searchTerm && <span> (terfilter dari {data.length.toLocaleString('id-ID')})</span>}
+      {/* Table Footer with Pilihan Jumlah yang Ingin Ditampilkan & Pagination */}
+      <div className="px-5 py-3 border-t border-slate-800 text-[11px] text-slate-400 flex flex-wrap items-center justify-between gap-3 bg-slate-900/90 font-mono">
+        {/* Left: Total baris & Pilihan Jumlah Tampil */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="text-slate-400">
+            Total: <span className="text-slate-200 font-bold">{totalCount.toLocaleString('id-ID')}</span> baris
+            {searchTerm && <span className="text-slate-500"> (dari {data.length.toLocaleString('id-ID')})</span>}
+          </div>
+
+          {/* Pilihan Jumlah yang ingin ditampilkan */}
+          <div className="flex items-center gap-1.5 pl-3 border-l border-slate-800" data-capture-ignore="true">
+            <span className="text-[11px] text-slate-400 font-sans font-semibold">Tampilkan:</span>
+            <div className="inline-flex items-center rounded-lg bg-slate-950 p-0.5 border border-slate-800">
+              {pageSizeOptions.map((opt) => {
+                const isSelected = pageSize === opt;
+                return (
+                  <button
+                    key={String(opt)}
+                    type="button"
+                    onClick={() => setPageSize(opt)}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-cyan-500 text-slate-950 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
+                    }`}
+                    title={opt === 'all' ? 'Tampilkan Semua Baris' : `Tampilkan ${opt} Baris per Halaman`}
+                  >
+                    {opt === 'all' ? 'Semua' : opt}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-        <div>
-          Rendered DOM slice: <span className="text-cyan-400 font-semibold">{Math.min(totalCount, endIndex - startIndex)}</span> / {totalCount} baris
+
+        {/* Right: Pagination Navigation & Row Slice Details */}
+        <div className="flex items-center gap-3">
+          {isPaged && totalPages > 1 && (
+            <div className="flex items-center gap-1.5" data-capture-ignore="true">
+              <span className="text-slate-400">
+                Hal <strong className="text-cyan-300 font-bold">{safePage}</strong> / {totalPages}
+              </span>
+              <div className="inline-flex items-center gap-1 ml-1">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 text-[11px] font-semibold transition-colors cursor-pointer"
+                  title="Halaman Sebelumnya"
+                >
+                  &larr; Prev
+                </button>
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="px-2 py-0.5 rounded bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed text-slate-300 border border-slate-800 text-[11px] font-semibold transition-colors cursor-pointer"
+                  title="Halaman Berikutnya"
+                >
+                  Next &rarr;
+                </button>
+              </div>
+            </div>
+          )}
+
+          <div className="text-[10px] text-slate-500 hidden sm:inline-block">
+            {isPaged ? (
+              <span>Menampilkan baris <strong className="text-cyan-400">{(safePage - 1) * limit + 1}–{Math.min(totalCount, safePage * limit)}</strong> dari {totalCount}</span>
+            ) : (
+              <span>Render DOM: <strong className="text-cyan-400">{Math.min(totalCount, endIndex - startIndex)}</strong> / {totalCount} baris</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
