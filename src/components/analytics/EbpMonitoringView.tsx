@@ -2000,198 +2000,7 @@ export function EbpMonitoringView({
         </div>
       </div>
 
-      {/* 4. Automated Insights Section (🔎 INSIGHT EPB) */}
-      <div id="ebp-insight-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
-              <Lightbulb className="w-4 h-4" />
-            </div>
-            <div>
-              <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider flex items-center gap-2">
-                <span>🔎 INSIGHT EPB</span>
-              </h2>
-              <p className="text-[11px] text-slate-400">
-                Analisa otomatis berbasis data aktual pergerakan EPB (kolom MARK NEW)
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              {numberedFilteredItems.length} Toko Dianalisis
-            </span>
-            <div data-capture-ignore="true">
-              <CaptureJpgButton
-                targetId="ebp-insight-card"
-                fileName={`Insight_EPB_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
-                label="Capture JPG Full HD"
-              />
-            </div>
-          </div>
-        </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card A: 🔴 Eceran yang Perlu Perhatian */}
-          <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-rose-400 font-bold text-xs mb-2">
-                <span className="w-2 h-2 rounded-full bg-rose-500" />
-                <span>🔴 Eceran Perlu Perhatian ({insights.totalDecline})</span>
-              </div>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Toko dengan penurunan EPB terbesar yang membutuhkan intervensi kunjungan.
-              </p>
-
-              {insights.declineItems.length === 0 ? (
-                <div className="text-xs text-slate-500 italic py-2">
-                  Tidak ada toko yang mengalami penurunan EPB.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {insights.declineItems.map(item => (
-                    <div key={item.outletId} className="p-2 rounded-lg bg-slate-950/60 border border-rose-500/20 text-xs">
-                      <div className="font-semibold text-slate-200 truncate">{item.outletName}</div>
-                      <div className="text-[11px] text-rose-300 mt-1 font-mono">
-                        {item.outletName} mengalami penurunan EPB dari{' '}
-                        <strong className="text-slate-200">{item.epbPrev}</strong> menjadi{' '}
-                        <strong className="text-rose-400">{item.epbCurr}</strong>, turun{' '}
-                        <strong className="text-rose-400">{Math.abs(item.diff)} EPB</strong> ({item.growthPercent.toFixed(1)}%).
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {insights.totalDecline > 5 && (
-              <button
-                onClick={() => setSelectedStatus('DECLINE')}
-                className="mt-3 text-[11px] text-rose-300 hover:text-rose-200 font-medium underline flex items-center gap-1"
-              >
-                <span>Lihat semua {insights.totalDecline} toko decline &rarr;</span>
-              </button>
-            )}
-          </div>
-
-          {/* Card B: 🟢 Eceran dengan Pertumbuhan Baik */}
-          <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs mb-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>🟢 Pertumbuhan Baik ({insights.totalGrowth})</span>
-              </div>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Toko dengan penambahan EPB paling signifikan dibanding bulan sebelumnya.
-              </p>
-
-              {insights.growthItems.length === 0 ? (
-                <div className="text-xs text-slate-500 italic py-2">
-                  Belum ada toko yang mengalami peningkatan EPB.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {insights.growthItems.map(item => (
-                    <div key={item.outletId} className="p-2 rounded-lg bg-slate-950/60 border border-emerald-500/20 text-xs">
-                      <div className="font-semibold text-slate-200 truncate">{item.outletName}</div>
-                      <div className="text-[11px] text-emerald-300 mt-1 font-mono">
-                        {item.outletName} meningkat dari{' '}
-                        <strong className="text-slate-200">{item.epbPrev}</strong> menjadi{' '}
-                        <strong className="text-emerald-400">{item.epbCurr} EPB</strong>, bertambah{' '}
-                        <strong className="text-emerald-400">{item.diff} EPB</strong> (+{item.growthPercent.toFixed(1)}%).
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {insights.totalGrowth > 5 && (
-              <button
-                onClick={() => setSelectedStatus('GROWTH')}
-                className="mt-3 text-[11px] text-emerald-300 hover:text-emerald-200 font-medium underline flex items-center gap-1"
-              >
-                <span>Lihat semua {insights.totalGrowth} toko growth &rarr;</span>
-              </button>
-            )}
-          </div>
-
-          {/* Card C: 🔵 Eceran Baru (NEW) */}
-          <div className="bg-cyan-950/20 border border-cyan-500/30 rounded-xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs mb-2">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>🔵 Eceran Baru / NEW ({insights.totalNew})</span>
-              </div>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Toko di Master CB yang bulan lalu EPB = 0 dan baru memiliki EPB bulan ini.
-              </p>
-
-              {insights.newItems.length === 0 ? (
-                <div className="text-xs text-slate-500 italic py-2">
-                  Tidak ada toko berstatus NEW pada periode ini.
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {insights.newItems.map(item => (
-                    <div key={item.outletId} className="p-2 rounded-lg bg-slate-950/60 border border-cyan-500/20 text-xs">
-                      <div className="font-semibold text-slate-200 truncate">{item.outletName}</div>
-                      <div className="text-[11px] text-cyan-300 mt-1 font-mono">
-                        {item.outletName} baru mulai bertransaksi eceran bulan ini dengan jumlah{' '}
-                        <strong className="text-cyan-300">{item.epbCurr} EPB</strong> (sebelumnya 0 EPB).
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {insights.totalNew > 5 && (
-              <button
-                onClick={() => setSelectedStatus('NEW')}
-                className="mt-3 text-[11px] text-cyan-300 hover:text-cyan-200 font-medium underline flex items-center gap-1"
-              >
-                <span>Lihat semua {insights.totalNew} toko new &rarr;</span>
-              </button>
-            )}
-          </div>
-
-          {/* Card D: 🟡 Eceran Stabil */}
-          <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs mb-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                <span>🟡 Eceran Stabil ({insights.totalStabil})</span>
-              </div>
-              <p className="text-[11px] text-slate-400 mb-3">
-                Toko dengan jumlah EPB identik antara bulan lalu dan bulan berjalan.
-              </p>
-
-              <div className="p-3 rounded-lg bg-slate-950/60 border border-amber-500/20 text-xs space-y-2">
-                <div className="flex items-center justify-between text-slate-300">
-                  <span>Konsisten Ber-EPB:</span>
-                  <span className="font-mono font-bold text-amber-300">{insights.stabilWithEpbCount} Toko</span>
-                </div>
-                <div className="flex items-center justify-between text-slate-400">
-                  <span>Belum Transaksi (EPB = 0):</span>
-                  <span className="font-mono font-bold text-slate-400">{insights.stabilZeroCount} Toko</span>
-                </div>
-                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
-                  Toko stabil yang aktif mempertahankan ritme belanja eceran secara reguler setiap bulannya.
-                </div>
-              </div>
-            </div>
-
-            {insights.totalStabil > 0 && (
-              <button
-                onClick={() => setSelectedStatus('STABIL')}
-                className="mt-3 text-[11px] text-amber-300 hover:text-amber-200 font-medium underline flex items-center gap-1"
-              >
-                <span>Lihat daftar {insights.totalStabil} toko stabil &rarr;</span>
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* 5. Filter Toolbar Section */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm space-y-3">
@@ -2520,7 +2329,200 @@ export function EbpMonitoringView({
         )}
       </div>
 
-      {/* 8. Data Validation & Audit Note Footer */}
+      {/* 8. Automated Insights Section (🔎 INSIGHT EPB - Paling Bawah) */}
+      <div id="ebp-insight-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-400">
+              <Lightbulb className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                <span>🔎 INSIGHT EPB</span>
+              </h2>
+              <p className="text-[11px] text-slate-400">
+                Analisa otomatis berbasis data aktual pergerakan EPB (kolom MARK NEW)
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-slate-400 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              {numberedFilteredItems.length} Toko Dianalisis
+            </span>
+            <div data-capture-ignore="true">
+              <CaptureJpgButton
+                targetId="ebp-insight-card"
+                fileName={`Insight_EPB_${prevLabel.replace(/\s+/g, '_')}_vs_${currLabel.replace(/\s+/g, '_')}_Full_HD.jpg`}
+                label="Capture JPG Full HD"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card A: 🔴 Eceran yang Perlu Perhatian */}
+          <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-rose-400 font-bold text-xs mb-2">
+                <span className="w-2 h-2 rounded-full bg-rose-500" />
+                <span>🔴 Eceran Perlu Perhatian ({insights.totalDecline})</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-3">
+                Toko dengan penurunan EPB terbesar yang membutuhkan intervensi kunjungan.
+              </p>
+
+              {insights.declineItems.length === 0 ? (
+                <div className="text-xs text-slate-500 italic py-2">
+                  Tidak ada toko yang mengalami penurunan EPB.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {insights.declineItems.map(item => (
+                    <div key={item.outletId} className="p-2 rounded-lg bg-slate-950/60 border border-rose-500/20 text-xs">
+                      <div className="font-semibold text-slate-200 truncate">{item.outletName}</div>
+                      <div className="text-[11px] text-rose-300 mt-1 font-mono">
+                        {item.outletName} mengalami penurunan EPB dari{' '}
+                        <strong className="text-slate-200">{item.epbPrev}</strong> menjadi{' '}
+                        <strong className="text-rose-400">{item.epbCurr}</strong>, turun{' '}
+                        <strong className="text-rose-400">{Math.abs(item.diff)} EPB</strong> ({item.growthPercent.toFixed(1)}%).
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {insights.totalDecline > 5 && (
+              <button
+                onClick={() => setSelectedStatus('DECLINE')}
+                className="mt-3 text-[11px] text-rose-300 hover:text-rose-200 font-medium underline flex items-center gap-1"
+              >
+                <span>Lihat semua {insights.totalDecline} toko decline &rarr;</span>
+              </button>
+            )}
+          </div>
+
+          {/* Card B: 🟢 Eceran dengan Pertumbuhan Baik */}
+          <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-emerald-400 font-bold text-xs mb-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span>🟢 Pertumbuhan Baik ({insights.totalGrowth})</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-3">
+                Toko dengan penambahan EPB paling signifikan dibanding bulan sebelumnya.
+              </p>
+
+              {insights.growthItems.length === 0 ? (
+                <div className="text-xs text-slate-500 italic py-2">
+                  Belum ada toko yang mengalami peningkatan EPB.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {insights.growthItems.map(item => (
+                    <div key={item.outletId} className="p-2 rounded-lg bg-slate-950/60 border border-emerald-500/20 text-xs">
+                      <div className="font-semibold text-slate-200 truncate">{item.outletName}</div>
+                      <div className="text-[11px] text-emerald-300 mt-1 font-mono">
+                        {item.outletName} meningkat dari{' '}
+                        <strong className="text-slate-200">{item.epbPrev}</strong> menjadi{' '}
+                        <strong className="text-emerald-400">{item.epbCurr} EPB</strong>, bertambah{' '}
+                        <strong className="text-emerald-400">{item.diff} EPB</strong> (+{item.growthPercent.toFixed(1)}%).
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {insights.totalGrowth > 5 && (
+              <button
+                onClick={() => setSelectedStatus('GROWTH')}
+                className="mt-3 text-[11px] text-emerald-300 hover:text-emerald-200 font-medium underline flex items-center gap-1"
+              >
+                <span>Lihat semua {insights.totalGrowth} toko growth &rarr;</span>
+              </button>
+            )}
+          </div>
+
+          {/* Card C: 🔵 Eceran Baru (NEW) */}
+          <div className="bg-cyan-950/20 border border-cyan-500/30 rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-cyan-400 font-bold text-xs mb-2">
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>🔵 Eceran Baru / NEW ({insights.totalNew})</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-3">
+                Toko di Master CB yang bulan lalu EPB = 0 dan baru memiliki EPB bulan ini.
+              </p>
+
+              {insights.newItems.length === 0 ? (
+                <div className="text-xs text-slate-500 italic py-2">
+                  Tidak ada toko berstatus NEW pada periode ini.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {insights.newItems.map(item => (
+                    <div key={item.outletId} className="p-2 rounded-lg bg-slate-950/60 border border-cyan-500/20 text-xs">
+                      <div className="font-semibold text-slate-200 truncate">{item.outletName}</div>
+                      <div className="text-[11px] text-cyan-300 mt-1 font-mono">
+                        {item.outletName} baru mulai bertransaksi eceran bulan ini dengan jumlah{' '}
+                        <strong className="text-cyan-300">{item.epbCurr} EPB</strong> (sebelumnya 0 EPB).
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {insights.totalNew > 5 && (
+              <button
+                onClick={() => setSelectedStatus('NEW')}
+                className="mt-3 text-[11px] text-cyan-300 hover:text-cyan-200 font-medium underline flex items-center gap-1"
+              >
+                <span>Lihat semua {insights.totalNew} toko new &rarr;</span>
+              </button>
+            )}
+          </div>
+
+          {/* Card D: 🟡 Eceran Stabil */}
+          <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-amber-400 font-bold text-xs mb-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400" />
+                <span>🟡 Eceran Stabil ({insights.totalStabil})</span>
+              </div>
+              <p className="text-[11px] text-slate-400 mb-3">
+                Toko dengan jumlah EPB identik antara bulan lalu dan bulan berjalan.
+              </p>
+
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-amber-500/20 text-xs space-y-2">
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Konsisten Ber-EPB:</span>
+                  <span className="font-mono font-bold text-amber-300">{insights.stabilWithEpbCount} Toko</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-400">
+                  <span>Belum Transaksi (EPB = 0):</span>
+                  <span className="font-mono font-bold text-slate-400">{insights.stabilZeroCount} Toko</span>
+                </div>
+                <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
+                  Toko stabil yang aktif mempertahankan ritme belanja eceran secara reguler setiap bulannya.
+                </div>
+              </div>
+            </div>
+
+            {insights.totalStabil > 0 && (
+              <button
+                onClick={() => setSelectedStatus('STABIL')}
+                className="mt-3 text-[11px] text-amber-300 hover:text-amber-200 font-medium underline flex items-center gap-1"
+              >
+                <span>Lihat daftar {insights.totalStabil} toko stabil &rarr;</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 9. Data Validation & Audit Note Footer */}
       <div className="p-4 rounded-xl bg-slate-900/70 border border-slate-800 flex items-start gap-3 text-xs text-slate-400">
         <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
         <div className="space-y-1">
