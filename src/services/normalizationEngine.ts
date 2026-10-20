@@ -347,21 +347,45 @@ export function normalizeTransactionRecords(
     const rayon = cleanString(row[mapping['rayon'] || ''] || row['RAYON'] || row['SEKTOR'] || '');
     const channel = cleanString(row[mapping['channel'] || ''] || row['CHANNEL'] || '');
     let rawMarkNew = cleanString(
+      row[mapping['mark_new'] || ''] ||
       row['MARK NEW'] || 
       row['MARK_NEW'] || 
       row['MARKNEW'] || 
-      row['MARK'] || 
-      row['MARKING'] || 
+      row['EPB'] || 
+      row['ECERAN PER BULAN'] || 
+      row['ECERAN_PER_BULAN'] || 
+      row['MARKING NEW'] || 
+      row['MARKING_NEW'] || 
+      row['EPB (MARK NEW)'] || 
+      row['MARK NEW / ECERAN'] || 
+      row['MARK NEW ECERAN'] || 
       row['BY ECERAN'] || 
       row['TIPE ECERAN'] || 
       row['KATEGORI ECERAN'] || 
-      row[mapping['mark_new'] || ''] || 
+      row['MARK'] || 
+      row['MARKING'] || 
+      row['STATUS ECERAN'] || 
+      row['FLAG ECERAN'] || 
       ''
     );
     if (!rawMarkNew) {
       for (const k of Object.keys(row)) {
         const cleanK = k.toUpperCase().trim().replace(/[\s_]+/g, ' ');
-        if (cleanK === 'MARK NEW' || cleanK === 'MARKNEW' || cleanK === 'MARK' || cleanK === 'MARKING' || cleanK === 'BY ECERAN' || cleanK === 'KATEGORI ECERAN') {
+        if (
+          cleanK === 'MARK NEW' || 
+          cleanK === 'MARKNEW' || 
+          cleanK === 'EPB' || 
+          cleanK === 'ECERAN PER BULAN' || 
+          cleanK === 'MARKING NEW' || 
+          cleanK === 'BY ECERAN' || 
+          cleanK === 'KATEGORI ECERAN' || 
+          cleanK === 'TIPE ECERAN' || 
+          cleanK === 'MARK' || 
+          cleanK === 'MARKING' ||
+          cleanK.includes('MARK NEW') ||
+          cleanK.includes('EPB') ||
+          cleanK.includes('ECERAN')
+        ) {
           rawMarkNew = cleanString(row[k]);
           if (rawMarkNew) break;
         }
@@ -592,6 +616,24 @@ export function normalizeMasterOutletRecords(
       ''
     );
 
+    let rawMasterMarkNew = cleanString(
+      row[mapping['mark_new'] || ''] ||
+      row['MARK NEW'] || 
+      row['MARK_NEW'] || 
+      row['EPB'] || 
+      row['ECERAN'] ||
+      ''
+    );
+    if (!rawMasterMarkNew) {
+      for (const k of Object.keys(row)) {
+        const cleanK = k.toUpperCase().trim().replace(/[\s_]+/g, ' ');
+        if (cleanK.includes('MARK NEW') || cleanK.includes('EPB') || cleanK.includes('ECERAN')) {
+          rawMasterMarkNew = cleanString(row[k]);
+          if (rawMasterMarkNew) break;
+        }
+      }
+    }
+
     // Deduplicate master by OUTLET_ID, updating if newer or keeping first
     if (!recordsMap.has(outletId)) {
       recordsMap.set(outletId, {
@@ -609,6 +651,7 @@ export function normalizeMasterOutletRecords(
         area,
         cabang,
         depo: depo || undefined,
+        markNew: rawMasterMarkNew || undefined,
         sourceFile: sourceFileName,
       });
     }

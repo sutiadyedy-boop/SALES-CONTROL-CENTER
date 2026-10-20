@@ -512,7 +512,7 @@ export function generateEbpMonitoring5W(
 
   // Compute product diversity / SKU metrics from transactions
   const uniqueSkus = new Set(currTransactions.map(t => t.productCode || t.productName || '').filter(Boolean));
-  const skuCount = uniqueSkus.size || 24;
+  const skuCount = uniqueSkus.size;
 
   // Outlets buying only 1 product
   const outletSkuMap = new Map<string, Set<string>>();

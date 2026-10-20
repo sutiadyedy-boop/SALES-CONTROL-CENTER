@@ -95,6 +95,7 @@ export interface MasterOutletRecord {
   area?: string;
   cabang?: string;
   depo?: string;
+  markNew?: string;
   sourceFile: string;
 }
 

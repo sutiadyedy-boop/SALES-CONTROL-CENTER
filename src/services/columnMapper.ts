@@ -111,8 +111,13 @@ export const MAPPING_DICTIONARY: Record<string, { label: string; aliases: string
     required: false,
   },
   mark_new: {
-    label: 'MARK NEW (By Eceran)',
-    aliases: ['MARK NEW', 'MARK_NEW', 'MARKNEW', 'MARK', 'MARKING', 'BY ECERAN', 'ECERAN', 'KATEGORI ECERAN', 'TIPE ECERAN'],
+    label: 'MARK NEW / EPB (Eceran Per Bulan)',
+    aliases: [
+      'MARK NEW', 'MARK_NEW', 'MARKNEW', 'EPB', 'ECERAN PER BULAN', 'ECERAN_PER_BULAN',
+      'MARKING NEW', 'MARKING_NEW', 'MARK NEW ECERAN', 'MARK NEW / ECERAN', 'EPB (MARK NEW)',
+      'MARK_NEW_ECERAN', 'BY ECERAN', 'BY_ECERAN', 'ECERAN', 'KATEGORI ECERAN', 'TIPE ECERAN',
+      'MARK', 'MARKING', 'FLAG ECERAN', 'STATUS ECERAN', 'QTY EPB', 'TOTAL EPB', 'NILAI EPB'
+    ],
     required: false,
   },
 };
@@ -128,7 +133,7 @@ const OPTIONAL_FIELDS_BY_CATEGORY: Record<DatabaseCategory, string[]> = {
   previous_month: ['outlet_name', 'salesman_name', 'qty', 'mark_new'],
   current_month: ['outlet_name', 'salesman_name', 'qty', 'mark_new'],
   target_salesman: ['salesman_name', 'area', 'salesman_status'],
-  master_cb: ['outlet_name', 'salesman_id', 'salesman_name', 'channel', 'rayon', 'area', 'fc', 'pma', 'sc', 'cabang'],
+  master_cb: ['outlet_name', 'salesman_id', 'salesman_name', 'channel', 'rayon', 'area', 'fc', 'pma', 'sc', 'cabang', 'mark_new'],
 };
 
 // String similarity metric
