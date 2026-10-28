@@ -8,6 +8,7 @@ import { MonthComparisonView } from './components/analytics/MonthComparisonView'
 import { RoMonitoringView } from './components/analytics/RoMonitoringView';
 import { EbpMonitoringView } from './components/analytics/EbpMonitoringView';
 import { MonitoringEcView } from './components/analytics/MonitoringEcView';
+import { MappingCoverageCbRoView } from './components/analytics/MappingCoverageCbRoView';
 import { LastTransactionOver7DaysView } from './components/analytics/LastTransactionOver7DaysView';
 import { DropOutletView } from './components/analytics/DropOutletView';
 import { NewOutletView } from './components/analytics/NewOutletView';
@@ -1307,6 +1308,14 @@ export default function App() {
                 settings={settings}
                 filters={filters}
                 onFilterChange={setFilters}
+                onNavigateToUpload={() => setCurrentTab('database')}
+                onLoadSampleData={populateSampleFiles}
+              />
+            )}
+
+            {currentTab === 'mapping_coverage' && (
+              <MappingCoverageCbRoView
+                masterOutlets={masterOutlets}
                 onNavigateToUpload={() => setCurrentTab('database')}
                 onLoadSampleData={populateSampleFiles}
               />

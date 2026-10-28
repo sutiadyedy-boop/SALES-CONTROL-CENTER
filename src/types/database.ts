@@ -95,6 +95,11 @@ export interface MasterOutletRecord {
   area?: string;
   cabang?: string;
   depo?: string;
+  kabupaten?: string;
+  kota?: string;
+  kecamatan?: string;
+  kelurahan?: string;
+  address?: string;
   markNew?: string;
   sourceFile: string;
 }

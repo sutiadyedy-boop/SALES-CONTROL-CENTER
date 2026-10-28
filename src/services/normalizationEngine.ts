@@ -549,6 +549,9 @@ export function normalizeMasterOutletRecords(
   const salesmanIdCol = mapping['salesman_id'] || 'KD_SLS';
   const salesmanNameCol = mapping['salesman_name'] || 'NAMA_SLS';
   const cabangCol = mapping['cabang'] || 'CABANG';
+  const kabupatenCol = mapping['kabupaten'] || 'KABUPATEN';
+  const kecamatanCol = mapping['kecamatan'] || 'KECAMATAN';
+  const addressCol = mapping['address'] || 'ALAMAT';
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -634,6 +637,30 @@ export function normalizeMasterOutletRecords(
       }
     }
 
+    let rawKabupaten = cleanString(
+      row[kabupatenCol] ||
+      row['KABUPATEN'] ||
+      row['KOTA'] ||
+      row['KAB/KOTA'] ||
+      row['KABUPATEN/KOTA'] ||
+      row['KODYA'] ||
+      ''
+    );
+    let rawKecamatan = cleanString(
+      row[kecamatanCol] ||
+      row['KECAMATAN'] ||
+      row['KEC'] ||
+      row['NAMA KECAMATAN'] ||
+      ''
+    );
+    let rawAddress = cleanString(
+      row[addressCol] ||
+      row['ALAMAT'] ||
+      row['ADDRESS'] ||
+      row['ALAMAT LENGKAP'] ||
+      ''
+    );
+
     // Deduplicate master by OUTLET_ID, updating if newer or keeping first
     if (!recordsMap.has(outletId)) {
       recordsMap.set(outletId, {
@@ -651,6 +678,9 @@ export function normalizeMasterOutletRecords(
         area,
         cabang,
         depo: depo || undefined,
+        kabupaten: rawKabupaten || undefined,
+        kecamatan: rawKecamatan || undefined,
+        address: rawAddress || undefined,
         markNew: rawMasterMarkNew || undefined,
         sourceFile: sourceFileName,
       });

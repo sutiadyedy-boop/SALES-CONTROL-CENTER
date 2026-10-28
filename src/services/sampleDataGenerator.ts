@@ -24,8 +24,29 @@ export function createAuthenticOfficeData() {
   const masterOutlets: MasterOutletRecord[] = [];
   const totalOutlets = 120;
 
+  // Sample locations in South Sulawesi
+  const sampleLocations = [
+    { kab: 'KABUPATEN BONE', kec: 'Tanete Riattang', addr: 'Jl. Ahmad Yani No. 14, Watampone' },
+    { kab: 'KABUPATEN BONE', kec: 'Tanete Riattang Barat', addr: 'Jl. Jendral Sudirman No. 88, Watampone' },
+    { kab: 'KABUPATEN BONE', kec: 'Tanete Riattang Timur', addr: 'Jl. Pelabuhan Bajoe No. 23' },
+    { kab: 'KABUPATEN BONE', kec: 'Palakka', addr: 'Jl. Poros Palakka KM 4' },
+    { kab: 'KABUPATEN BONE', kec: 'Awangpone', addr: 'Jl. Poros Bone - Wajo KM 12' },
+    { kab: 'KABUPATEN BONE', kec: 'Barebbo', addr: 'Jl. Poros Sinjai KM 8' },
+    { kab: 'KABUPATEN BONE', kec: 'Sibulue', addr: 'Jl. Pasar Sibulue No. 5' },
+    { kab: 'KABUPATEN BONE', kec: 'Tellu Siattinge', addr: 'Jl. Pasar Tokaseng No. 19' },
+    { kab: 'KABUPATEN BULUKUMBA', kec: 'Ujung Bulu', addr: 'Jl. Sam Ratulangi No. 45, Bulukumba' },
+    { kab: 'KABUPATEN BULUKUMBA', kec: 'Gantarang', addr: 'Jl. Poros Bulukumba - Bantaeng KM 5' },
+    { kab: 'KABUPATEN SINJAI', kec: 'Sinjai Utara', addr: 'Jl. Persatuan Raya No. 12, Sinjai' },
+    { kab: 'KABUPATEN SINJAI', kec: 'Sinjai Selatan', addr: 'Jl. Poros Bikeru No. 34' },
+    { kab: 'KABUPATEN WAJO', kec: 'Tempe', addr: 'Jl. Andi Malingkaan No. 8, Sengkang' },
+    { kab: 'KABUPATEN SOPPENG', kec: 'Lalabata', addr: 'Jl. Kemakmuran No. 17, Watansoppeng' },
+    { kab: 'KOTA MAKASSAR', kec: 'Panakkukang', addr: 'Jl. Pengayoman No. 77, Makassar' },
+    { kab: 'KABUPATEN GOWA', kec: 'Somba Opu', addr: 'Jl. Sultan Hasanuddin No. 52, Sungguminasa' },
+  ];
+
   for (let i = 1; i <= totalOutlets; i++) {
     const sls = salesmen[(i - 1) % salesmen.length];
+    const loc = sampleLocations[(i - 1) % sampleLocations.length];
     const outletCode = `BNE-${String(i).padStart(4, '0')}`;
     const channel = channels[i % channels.length];
     const rayon = rayons[i % rayons.length];
@@ -50,6 +71,9 @@ export function createAuthenticOfficeData() {
       area: sls.area,
       cabang: 'BONE',
       depo: 'DEPO BONE PUSAT',
+      kabupaten: loc.kab,
+      kecamatan: loc.kec,
+      address: loc.addr,
       sourceFile: '_Master_CB BLK.xlsx',
     });
   }

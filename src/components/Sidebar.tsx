@@ -31,7 +31,8 @@ import {
   LogOut,
   Cpu,
   Award,
-  CalendarClock
+  CalendarClock,
+  MapPin
 } from 'lucide-react';
 import { ControlTowerKPIs } from '../types/analytics';
 import { UserProfile } from '../types/database';
@@ -156,6 +157,13 @@ export function Sidebar({
       icon: Activity, 
       badge: 'PMA & Sales',
       badgeColor: 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono'
+    },
+    { 
+      id: 'mapping_coverage', 
+      label: 'Mapping CB Vs RO Industri', 
+      icon: MapPin, 
+      badge: 'BPS Sulsel',
+      badgeColor: 'bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono'
     },
     { 
       id: 'last_tx_over_7_days', 

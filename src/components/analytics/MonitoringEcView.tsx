@@ -22,7 +22,8 @@ import {
   CheckCircle2,
   AlertTriangle,
   LineChart,
-  Filter
+  Filter,
+  LayoutGrid
 } from 'lucide-react';
 import { MasterOutletRecord, TransactionRecord, AppSettings } from '../../types/database';
 import { GlobalFilterState } from '../../types/analytics';
@@ -70,7 +71,28 @@ export interface MonitoringEcViewProps {
   onLoadSampleData: () => void;
 }
 
-export type EcStatus = 'GROWTH' | 'STABIL' | 'DECLINE';
+export type MonitoringEcTab = 'pma' | 'sales' | 'daily_summary' | 'trend_chart' | 'detail_toko' | 'all';
+
+export type EcStatus = 'GROWTH' | 'STABIL' | 'DECLINE' | 'NEW' | 'DROP';
+
+export interface OutletEcDetailRow {
+  id: string;
+  no: number;
+  outletId: string;
+  outletName: string;
+  pma: string;
+  salesmanId: string;
+  salesmanName: string;
+  cabang?: string;
+  depo?: string;
+  area?: string;
+  channel?: string;
+  ecPrev: number;
+  ecCurr: number;
+  diff: number;
+  growthPercent: number | null;
+  status: EcStatus;
+}
 
 export interface DailyEcPmaRow {
   id: string;
@@ -205,15 +227,11 @@ export function MonitoringEcView({
   onNavigateToUpload,
   onLoadSampleData,
 }: MonitoringEcViewProps) {
-  const prevLabel = settings.previousMonthLabel && !settings.previousMonthLabel.toUpperCase().includes('AGUSTUS') 
-    ? settings.previousMonthLabel 
-    : 'SEPTEMBER 2026';
-  const currLabel = settings.currentMonthLabel && !settings.currentMonthLabel.toUpperCase().includes('AGUSTUS') && settings.currentMonthLabel !== prevLabel 
-    ? settings.currentMonthLabel 
-    : 'OKTOBER 2026';
+  const prevLabel = settings.previousMonthLabel || 'Bulan Lalu';
+  const currLabel = settings.currentMonthLabel || 'Bulan Ini';
 
   // Navigation tab within the Monitoring EC view (Default: PMA Monitoring)
-  const [activeTab, setActiveTab] = useState<'pma' | 'sales'>('pma');
+  const [activeTab, setActiveTab] = useState<MonitoringEcTab>('pma');
 
   // Interactive Filter States
   const [searchQuery, setSearchQuery] = useState('');
@@ -851,6 +869,154 @@ export function MonitoringEcView({
   }, [summaryPmaList, summarySalesList]);
 
   // =========================================================================
+  // 6B. STORE-LEVEL EC ANALYSIS (100% REAL DATA FROM TRANSACTIONS & MASTER CB)
+  // =========================================================================
+  const outletEcStats = useMemo(() => {
+    const prevDaysMap = new Map<string, Set<number>>();
+    const currDaysMap = new Map<string, Set<number>>();
+    const prevTxCount = new Map<string, number>();
+    const currTxCount = new Map<string, number>();
+
+    const recordTx = (t: any, isPrev: boolean) => {
+      const keys: string[] = [];
+      if (t.outletId) {
+        keys.push(t.outletId.trim());
+        keys.push(t.outletId.trim().toLowerCase());
+      }
+      if (t.outletName) {
+        keys.push(t.outletName.trim().toLowerCase());
+      }
+      const day = t.day;
+      const daysMap = isPrev ? prevDaysMap : currDaysMap;
+      const countMap = isPrev ? prevTxCount : currTxCount;
+
+      keys.forEach(k => {
+        if (!daysMap.has(k)) daysMap.set(k, new Set());
+        if (day) daysMap.get(k)!.add(day);
+        countMap.set(k, (countMap.get(k) || 0) + 1);
+      });
+    };
+
+    enrichedPrevTxs.forEach(t => recordTx(t, true));
+    enrichedCurrTxs.forEach(t => recordTx(t, false));
+
+    return {
+      getEc: (id?: string, name?: string) => {
+        let ecPrev = 0;
+        let ecCurr = 0;
+        const checkKeys: string[] = [];
+        if (id) {
+          checkKeys.push(id.trim());
+          checkKeys.push(id.trim().toLowerCase());
+        }
+        if (name) {
+          checkKeys.push(name.trim().toLowerCase());
+        }
+        for (const k of checkKeys) {
+          if (prevDaysMap.has(k)) {
+            const set = prevDaysMap.get(k)!;
+            ecPrev = Math.max(ecPrev, set.size > 0 ? set.size : (prevTxCount.get(k) || 0));
+          }
+          if (currDaysMap.has(k)) {
+            const set = currDaysMap.get(k)!;
+            ecCurr = Math.max(ecCurr, set.size > 0 ? set.size : (currTxCount.get(k) || 0));
+          }
+        }
+        return { ecPrev, ecCurr };
+      }
+    };
+  }, [enrichedPrevTxs, enrichedCurrTxs]);
+
+  const allOutletEcItems = useMemo<OutletEcDetailRow[]>(() => {
+    const baseList = masterOutlets.length > 0 ? masterOutlets : [];
+    const rows: OutletEcDetailRow[] = [];
+
+    baseList.forEach((m) => {
+      if (!matchesFilter(m)) return;
+      const { ecPrev, ecCurr } = outletEcStats.getEc(m.outletId, m.outletName);
+      const diff = ecCurr - ecPrev;
+      const growthPercent = ecPrev > 0 ? (diff / ecPrev) * 100 : (ecCurr > 0 ? null : 0);
+
+      let status: EcStatus = 'STABIL';
+      if (ecPrev === 0 && ecCurr > 0) {
+        status = 'NEW';
+      } else if (ecCurr > ecPrev) {
+        status = 'GROWTH';
+      } else if (ecCurr < ecPrev && ecCurr > 0) {
+        status = 'DECLINE';
+      } else if (ecCurr === 0 && ecPrev > 0) {
+        status = 'DROP';
+      } else if (ecCurr === 0 && ecPrev === 0) {
+        status = 'STABIL';
+      }
+
+      rows.push({
+        id: `outlet_ec_${m.outletId || m.outletName}`,
+        no: 0,
+        outletId: m.outletId || '-',
+        outletName: m.outletName || '-',
+        pma: (m.pma || m.area || 'PMA REGULER').trim().toUpperCase(),
+        salesmanId: m.salesmanId || '-',
+        salesmanName: m.salesmanName || m.salesmanId || 'Salesman Unassigned',
+        cabang: m.cabang,
+        depo: m.depo,
+        area: m.area,
+        channel: m.channel,
+        ecPrev,
+        ecCurr,
+        diff,
+        growthPercent,
+        status,
+      });
+    });
+
+    rows.sort((a, b) => b.ecCurr - a.ecCurr || b.diff - a.diff || a.outletName.localeCompare(b.outletName));
+    rows.forEach((r, idx) => { r.no = idx + 1; });
+    return rows;
+  }, [masterOutlets, matchesFilter, outletEcStats]);
+
+  // Status Counts derived strictly from authentic data
+  const outletStatusCounts = useMemo(() => {
+    let growth = 0;
+    let decline = 0;
+    let stabil = 0;
+    let newEc = 0;
+    let drop = 0;
+    allOutletEcItems.forEach(item => {
+      if (item.status === 'GROWTH') growth++;
+      else if (item.status === 'DECLINE') decline++;
+      else if (item.status === 'NEW') newEc++;
+      else if (item.status === 'DROP') drop++;
+      else if (item.status === 'STABIL' && (item.ecCurr > 0 || item.ecPrev > 0)) stabil++;
+    });
+    return { growth, decline, stabil, newEc, drop };
+  }, [allOutletEcItems]);
+
+  const filteredOutletEcList = useMemo(() => {
+    return allOutletEcItems.filter(item => {
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const match =
+          item.outletId.toLowerCase().includes(q) ||
+          item.outletName.toLowerCase().includes(q) ||
+          item.salesmanName.toLowerCase().includes(q) ||
+          item.pma.toLowerCase().includes(q);
+        if (!match) return false;
+      }
+      if (selectedPma !== 'ALL' && item.pma !== selectedPma) return false;
+      if (selectedSalesman !== 'ALL' && item.salesmanId !== selectedSalesman) return false;
+      if (selectedStatus !== 'ALL') {
+        if (selectedStatus === 'DROP') {
+          if (item.status !== 'DROP') return false;
+        } else if (item.status !== selectedStatus) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allOutletEcItems, searchQuery, selectedPma, selectedSalesman, selectedStatus]);
+
+  // =========================================================================
   // 7. FILTERED LISTS
   // =========================================================================
   const filteredDailySummary = useMemo(() => {
@@ -872,10 +1038,20 @@ export function MonitoringEcView({
         if (!item.pma.toLowerCase().includes(q)) return false;
       }
       if (selectedPma !== 'ALL' && item.pma !== selectedPma) return false;
-      if (selectedStatus !== 'ALL' && item.status !== selectedStatus) return false;
+      if (selectedStatus !== 'ALL') {
+        if (selectedStatus === 'NEW') {
+          const hasNew = allOutletEcItems.some(o => o.pma === item.pma && o.status === 'NEW');
+          if (!hasNew) return false;
+        } else if (selectedStatus === 'DROP') {
+          const hasDrop = allOutletEcItems.some(o => o.pma === item.pma && o.status === 'DROP');
+          if (!hasDrop) return false;
+        } else if (item.status !== selectedStatus) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [summaryPmaList, searchQuery, selectedPma, selectedStatus]);
+  }, [summaryPmaList, searchQuery, selectedPma, selectedStatus, allOutletEcItems]);
 
   const filteredDailyPma = useMemo(() => {
     return dailyPmaList.filter(item => {
@@ -902,10 +1078,20 @@ export function MonitoringEcView({
       }
       if (selectedPma !== 'ALL' && item.pma !== selectedPma) return false;
       if (selectedSalesman !== 'ALL' && item.salesmanId !== selectedSalesman) return false;
-      if (selectedStatus !== 'ALL' && item.status !== selectedStatus) return false;
+      if (selectedStatus !== 'ALL') {
+        if (selectedStatus === 'NEW') {
+          const hasNew = allOutletEcItems.some(o => (o.salesmanId === item.salesmanId || o.salesmanName === item.salesmanName) && o.status === 'NEW');
+          if (!hasNew) return false;
+        } else if (selectedStatus === 'DROP') {
+          const hasDrop = allOutletEcItems.some(o => (o.salesmanId === item.salesmanId || o.salesmanName === item.salesmanName) && o.status === 'DROP');
+          if (!hasDrop) return false;
+        } else if (item.status !== selectedStatus) {
+          return false;
+        }
+      }
       return true;
     });
-  }, [summarySalesList, searchQuery, selectedPma, selectedSalesman, selectedStatus]);
+  }, [summarySalesList, searchQuery, selectedPma, selectedSalesman, selectedStatus, allOutletEcItems]);
 
   const filteredDailySales = useMemo(() => {
     return dailySalesList.filter(item => {
@@ -1506,6 +1692,161 @@ export function MonitoringEcView({
     },
   ];
 
+  // Columns for Store-Level EC Analysis (Master CB)
+  const outletEcColumns: ColumnDef<OutletEcDetailRow>[] = [
+    {
+      key: 'no',
+      header: 'No',
+      accessor: (row) => row.no,
+      render: (row) => (
+        <span className="font-mono text-xs text-slate-400 font-semibold">
+          #{row.no}
+        </span>
+      ),
+    },
+    {
+      key: 'outletId',
+      header: 'Kode Toko',
+      accessor: (row) => row.outletId,
+      render: (row) => (
+        <span className="font-mono text-xs font-bold text-cyan-300">
+          {row.outletId}
+        </span>
+      ),
+    },
+    {
+      key: 'outletName',
+      header: 'Nama Toko (Master CB)',
+      accessor: (row) => row.outletName,
+      render: (row) => (
+        <div>
+          <div className="font-bold text-slate-100 text-xs">
+            {row.outletName}
+          </div>
+          <div className="text-[10px] text-slate-500 font-mono">
+            {row.pma} &bull; {row.channel || 'GENERAL'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'pma',
+      header: 'PMA / Wilayah',
+      accessor: (row) => row.pma,
+      render: (row) => (
+        <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-800/40 font-semibold">
+          {row.pma}
+        </span>
+      ),
+    },
+    {
+      key: 'salesmanName',
+      header: 'Salesman',
+      accessor: (row) => row.salesmanName,
+      render: (row) => (
+        <div>
+          <div className="text-xs text-slate-200 font-medium">
+            {row.salesmanName}
+          </div>
+          {row.salesmanId && row.salesmanId !== '-' && (
+            <div className="text-[10px] text-slate-500 font-mono">
+              ID: {row.salesmanId}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'ecPrev',
+      header: `EC Hari (${prevLabel})`,
+      align: 'right',
+      accessor: (row) => row.ecPrev,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-xs font-semibold text-slate-300">
+            {row.ecPrev} Hari
+          </span>
+          <div className="text-[10px] text-slate-500">{prevLabel}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'ecCurr',
+      header: `EC Hari (${currLabel})`,
+      align: 'right',
+      accessor: (row) => row.ecCurr,
+      render: (row) => (
+        <div className="text-right">
+          <span className="font-mono text-xs font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+            {row.ecCurr} Hari
+          </span>
+          <div className="text-[10px] text-amber-400/80 font-mono mt-0.5">{currLabel}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'diff',
+      header: 'Selisih',
+      align: 'right',
+      accessor: (row) => row.diff,
+      render: (row) => (
+        <span className={`font-mono text-xs font-bold inline-flex items-center gap-0.5 ${
+          row.diff > 0 ? 'text-emerald-400' : row.diff < 0 ? 'text-rose-400' : 'text-slate-400'
+        }`}>
+          {row.diff > 0 && <ArrowUpRight className="w-3 h-3" />}
+          {row.diff < 0 && <ArrowDownRight className="w-3 h-3" />}
+          {!row.diff && <Minus className="w-3 h-3" />}
+          <span>{row.diff > 0 ? `+${row.diff}` : row.diff}</span>
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status EC',
+      accessor: (row) => row.status,
+      render: (row) => {
+        switch (row.status) {
+          case 'GROWTH':
+            return (
+              <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                <span>GROWTH</span>
+              </span>
+            );
+          case 'DECLINE':
+            return (
+              <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+                <span>DECLINE</span>
+              </span>
+            );
+          case 'NEW':
+            return (
+              <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 inline-flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-cyan-400" />
+                <span>NEW</span>
+              </span>
+            );
+          case 'DROP':
+            return (
+              <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-slate-800 text-rose-300 border border-rose-800/40 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                <span>DROP / BELUM TRANSAKSI</span>
+              </span>
+            );
+          case 'STABIL':
+          default:
+            return (
+              <span className="px-2 py-0.5 rounded-lg text-[11px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                <span>STABIL</span>
+              </span>
+            );
+        }
+      },
+    },
+  ];
+
   const fiveWReport = useMemo(() => {
     return generateMonitoringEc5W(masterOutlets, currTransactions, prevTransactions, settings);
   }, [masterOutlets, currTransactions, prevTransactions, settings]);
@@ -1618,66 +1959,172 @@ export function MonitoringEcView({
         </div>
       )}
 
-      {/* 2. KPI Cards Utama (7 Key Metrics) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-3">
-        {/* KPI 1: HARI KERJA BERJALAN (Interactive Config) */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-cyan-500/40 transition-all border-l-2 border-l-cyan-500">
+      {/* 2. TOP NAVIGATION PILIHAN TAB (SIMPAN PALING ATAS) */}
+      <div id="monitoring-ec-tab-navigation" className="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-sm backdrop-blur-md">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                <LayoutGrid className="w-4 h-4" />
+              </div>
+              <h2 className="text-sm font-extrabold text-slate-100 uppercase tracking-wider flex items-center gap-2">
+                <span>Pilihan Tampilan Monitoring EC</span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  {currLabel} vs {prevLabel}
+                </span>
+              </h2>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Pilih analisa transaksi toko efektif (EC): per PMA, per Salesman, rekap harian vertikal, grafik tren, atau detail toko Master CB.
+            </p>
+          </div>
+
+          {/* Navigation Controls */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
+            <button
+              type="button"
+              onClick={() => setActiveTab('pma')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeTab === 'pma'
+                  ? 'bg-cyan-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              <span>Monitoring EC Per PMA</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                activeTab === 'pma' ? 'bg-slate-900/20 text-slate-950 font-bold' : 'bg-slate-800 text-cyan-300'
+              }`}>
+                {filteredSummaryPma.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('sales')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeTab === 'sales'
+                  ? 'bg-amber-400 text-slate-950 shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Monitoring EC Per Sales</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                activeTab === 'sales' ? 'bg-slate-900/20 text-slate-950 font-bold' : 'bg-slate-800 text-amber-300'
+              }`}>
+                {filteredSummarySales.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('daily_summary')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeTab === 'daily_summary'
+                  ? 'bg-indigo-500 text-white shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Rekap Harian (Vertikal)</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                activeTab === 'daily_summary' ? 'bg-slate-900/20 text-white font-bold' : 'bg-slate-800 text-indigo-300'
+              }`}>
+                31 Tgl
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('trend_chart')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeTab === 'trend_chart'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <LineChart className="w-3.5 h-3.5" />
+              <span>Grafik Tren EC</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('detail_toko')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all cursor-pointer ${
+                activeTab === 'detail_toko'
+                  ? 'bg-purple-500 text-white shadow-sm font-bold'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              <span>Detail Toko (Master CB)</span>
+              <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                activeTab === 'detail_toko' ? 'bg-slate-900/20 text-white font-bold' : 'bg-slate-800 text-purple-300'
+              }`}>
+                {filteredOutletEcList.length}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('all')}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg font-medium transition-all cursor-pointer ${
+                activeTab === 'all'
+                  ? 'bg-slate-800 text-cyan-300 border border-cyan-500/30'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+              title="Tampilkan semua bagian sekaligus pada satu halaman"
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Semua Bagian</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. KPI Cards & Pilihan Status Toko EC (9 Key Metrics - 100% Real Data) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
+        {/* KPI 1: TOTAL TOKO */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span className="text-cyan-300 font-semibold">HARI KERJA</span>
-            <Calendar className="w-3.5 h-3.5 text-cyan-400" />
+            <span>TOTAL TOKO</span>
+            <Store className="w-3.5 h-3.5 text-cyan-400" />
           </div>
-          <div className="flex items-baseline justify-between mt-1.5">
-            <div className="text-lg font-bold font-mono text-cyan-300">
-              {hariKerjaBerjalan} <span className="text-xs font-normal text-slate-400">Hari</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => handleUpdateHariKerja(hariKerjaBerjalan - 1)}
-                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center border border-slate-700 font-mono"
-                title="Kurangi 1 hari kerja"
-              >
-                -
-              </button>
-              <button
-                onClick={() => handleUpdateHariKerja(hariKerjaBerjalan + 1)}
-                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center border border-slate-700 font-mono"
-                title="Tambah 1 hari kerja"
-              >
-                +
-              </button>
-            </div>
+          <div className="text-lg font-bold font-mono text-slate-100 mt-1.5">
+            {allOutletEcItems.length.toLocaleString('id-ID')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">Hari Kerja Berjalan</div>
+          <div className="text-[10px] text-slate-500 mt-0.5 truncate">Daftar Master CB</div>
         </div>
 
         {/* KPI 2: TOTAL EC BULAN LALU */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>EC BLN LALU</span>
+            <span>EC {prevLabel}</span>
             <Layers className="w-3.5 h-3.5 text-indigo-400" />
           </div>
           <div className="text-lg font-bold font-mono text-slate-200 mt-1.5">
             {totalEcBulanLalu.toLocaleString('id-ID')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">{prevLabel}</div>
+          <div className="text-[10px] text-cyan-400 font-mono mt-0.5 truncate">Real Transaksi Lalu</div>
         </div>
 
         {/* KPI 3: TOTAL EC BULAN INI */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-amber-500/40 transition-all border-l-2 border-l-amber-500">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span className="text-amber-300 font-semibold">EC BLN INI</span>
-            <Store className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-amber-300 font-semibold">EC {currLabel}</span>
+            <Activity className="w-3.5 h-3.5 text-amber-400" />
           </div>
           <div className="text-lg font-bold font-mono text-amber-300 mt-1.5">
             {totalEcBulanIni.toLocaleString('id-ID')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">{currLabel}</div>
+          <div className="text-[10px] text-amber-400 font-mono mt-0.5 truncate">Real Transaksi Berjalan</div>
         </div>
 
-        {/* KPI 4: GROWTH EC */}
+        {/* KPI 4: PERUBAHAN EC */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
           <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>GROWTH EC</span>
+            <span>PERUBAHAN</span>
             {selisihEc >= 0 ? (
               <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
             ) : (
@@ -1687,54 +2134,186 @@ export function MonitoringEcView({
           <div className={`text-lg font-bold font-mono mt-1.5 ${
             selisihEc > 0 ? 'text-emerald-400' : selisihEc < 0 ? 'text-rose-400' : 'text-slate-300'
           }`}>
-            {growthEcPercent >= 0 ? `+${growthEcPercent.toFixed(1)}%` : `${growthEcPercent.toFixed(1)}%`}
+            {selisihEc > 0 ? `+${selisihEc}` : selisihEc}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
-            Selisih: {selisihEc >= 0 ? `+${selisihEc}` : selisihEc} EC
+          <div className="text-[10px] text-slate-500 mt-0.5 truncate">Selisih Total EC</div>
+        </div>
+
+        {/* KPI 5: GROWTH EC % */}
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
+          <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
+            <span>GROWTH %</span>
+            <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400" />
+          </div>
+          <div className={`text-lg font-bold font-mono mt-1.5 ${
+            growthEcPercent > 0 ? 'text-emerald-400' : growthEcPercent < 0 ? 'text-rose-400' : 'text-slate-300'
+          }`}>
+            {growthEcPercent > 0 ? `+${growthEcPercent.toFixed(1)}%` : `${growthEcPercent.toFixed(1)}%`}
+          </div>
+          <div className="text-[10px] text-slate-500 mt-0.5 truncate">Pertumbuhan EC MoM</div>
+        </div>
+
+        {/* KPI 6: TOKO GROWTH (Interactive Pilihan Filter) */}
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === 'GROWTH' ? 'ALL' : 'GROWTH')}
+          className={`rounded-xl p-3 shadow-sm cursor-pointer transition-all border ${
+            selectedStatus === 'GROWTH'
+              ? 'bg-emerald-950/50 border-emerald-500/70 ring-1 ring-emerald-500/40 shadow-emerald-950/50'
+              : 'bg-slate-900 border-slate-800 hover:border-emerald-500/40'
+          }`}
+          title="Klik untuk filter hanya Toko EC Growth (Naik)"
+        >
+          <div className="text-[11px] text-emerald-300 font-medium flex items-center justify-between">
+            <span>TOKO GROWTH</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          </div>
+          <div className="text-lg font-bold font-mono text-emerald-300 mt-1.5">
+            {outletStatusCounts.growth.toLocaleString('id-ID')}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5 truncate flex items-center justify-between">
+            <span>EC Naik &uarr;</span>
+            {selectedStatus === 'GROWTH' && <span className="text-[9px] text-emerald-400 font-bold">AKTIF</span>}
           </div>
         </div>
 
-        {/* KPI 5: RATA-RATA EC HARIAN */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
-          <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>RATA-RATA EC</span>
-            <Activity className="w-3.5 h-3.5 text-cyan-400" />
+        {/* KPI 7: TOKO DECLINE (Interactive Pilihan Filter) */}
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === 'DECLINE' ? 'ALL' : 'DECLINE')}
+          className={`rounded-xl p-3 shadow-sm cursor-pointer transition-all border ${
+            selectedStatus === 'DECLINE'
+              ? 'bg-rose-950/50 border-rose-500/70 ring-1 ring-rose-500/40 shadow-rose-950/50'
+              : 'bg-slate-900 border-slate-800 hover:border-rose-500/40'
+          }`}
+          title="Klik untuk filter hanya Toko EC Decline (Turun)"
+        >
+          <div className="text-[11px] text-rose-300 font-medium flex items-center justify-between">
+            <span>TOKO DECLINE</span>
+            <span className="w-2 h-2 rounded-full bg-rose-400" />
+          </div>
+          <div className="text-lg font-bold font-mono text-rose-300 mt-1.5">
+            {outletStatusCounts.decline.toLocaleString('id-ID')}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5 truncate flex items-center justify-between">
+            <span>EC Turun &darr;</span>
+            {selectedStatus === 'DECLINE' && <span className="text-[9px] text-rose-400 font-bold">AKTIF</span>}
+          </div>
+        </div>
+
+        {/* KPI 8: TOKO STABIL (Interactive Pilihan Filter) */}
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === 'STABIL' ? 'ALL' : 'STABIL')}
+          className={`rounded-xl p-3 shadow-sm cursor-pointer transition-all border ${
+            selectedStatus === 'STABIL'
+              ? 'bg-amber-950/50 border-amber-500/70 ring-1 ring-amber-500/40 shadow-amber-950/50'
+              : 'bg-slate-900 border-slate-800 hover:border-amber-500/40'
+          }`}
+          title="Klik untuk filter hanya Toko EC Stabil"
+        >
+          <div className="text-[11px] text-amber-300 font-medium flex items-center justify-between">
+            <span>TOKO STABIL</span>
+            <span className="w-2 h-2 rounded-full bg-amber-400" />
+          </div>
+          <div className="text-lg font-bold font-mono text-amber-300 mt-1.5">
+            {outletStatusCounts.stabil.toLocaleString('id-ID')}
+          </div>
+          <div className="text-[10px] text-slate-400 mt-0.5 truncate flex items-center justify-between">
+            <span>EC Tetap &rarr;</span>
+            {selectedStatus === 'STABIL' && <span className="text-[9px] text-amber-400 font-bold">AKTIF</span>}
+          </div>
+        </div>
+
+        {/* KPI 9: TOKO NEW EC (Interactive Pilihan Filter) */}
+        <div
+          onClick={() => setSelectedStatus(selectedStatus === 'NEW' ? 'ALL' : 'NEW')}
+          className={`rounded-xl p-3 shadow-sm cursor-pointer transition-all border ${
+            selectedStatus === 'NEW'
+              ? 'bg-cyan-950/50 border-cyan-500/70 ring-1 ring-cyan-500/40 shadow-cyan-950/50'
+              : 'bg-slate-900 border-slate-800 hover:border-cyan-500/40'
+          }`}
+          title="Klik untuk filter hanya Toko New EC (Baru Pertama Transaksi Bulan Ini)"
+        >
+          <div className="text-[11px] text-cyan-300 font-medium flex items-center justify-between">
+            <span>TOKO NEW EC</span>
+            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
           </div>
           <div className="text-lg font-bold font-mono text-cyan-300 mt-1.5">
-            {avgEcHarian} <span className="text-xs font-normal text-slate-400">/ Hari</span>
+            {outletStatusCounts.newEc.toLocaleString('id-ID')}
           </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">
-            Total EC / {hariKerjaBerjalan} HK
+          <div className="text-[10px] text-slate-400 mt-0.5 truncate flex items-center justify-between">
+            <span>Baru Ada EC &rarr;</span>
+            {selectedStatus === 'NEW' && <span className="text-[9px] text-cyan-400 font-bold">AKTIF</span>}
           </div>
-        </div>
-
-        {/* KPI 6: TOTAL SALES */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
-          <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>TOTAL SALES</span>
-            <Users className="w-3.5 h-3.5 text-indigo-400" />
-          </div>
-          <div className="text-lg font-bold font-mono text-slate-200 mt-1.5">
-            {totalSalesActive}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">Sales Aktif Ber-EC</div>
-        </div>
-
-        {/* KPI 7: TOTAL PMA */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 shadow-sm hover:border-slate-700 transition-all">
-          <div className="text-[11px] text-slate-400 font-medium flex items-center justify-between">
-            <span>TOTAL PMA</span>
-            <Building2 className="w-3.5 h-3.5 text-amber-400" />
-          </div>
-          <div className="text-lg font-bold font-mono text-slate-200 mt-1.5">
-            {totalPmaActive}
-          </div>
-          <div className="text-[10px] text-slate-500 mt-0.5 truncate">PMA Aktif Ber-EC</div>
         </div>
       </div>
 
-      {/* 3. Trend EC Harian Chart Visual (Grafik Line) */}
-      <div id="monitoring-ec-trend-chart-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
+      {/* Sub-Bar: Hari Kerja & Rata-rata EC Harian */}
+      <div className="flex flex-wrap items-center justify-between p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-xs gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-cyan-400" />
+            <span className="text-slate-300 font-medium">Hari Kerja Berjalan:</span>
+            <strong className="text-cyan-300 font-mono">{hariKerjaBerjalan} Hari</strong>
+            <div className="flex items-center gap-1 ml-1">
+              <button
+                type="button"
+                onClick={() => handleUpdateHariKerja(hariKerjaBerjalan - 1)}
+                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center border border-slate-700 font-mono cursor-pointer"
+                title="Kurangi 1 hari kerja"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                onClick={() => handleUpdateHariKerja(hariKerjaBerjalan + 1)}
+                className="w-5 h-5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs flex items-center justify-center border border-slate-700 font-mono cursor-pointer"
+                title="Tambah 1 hari kerja"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <span>Rata-rata EC/Hari:</span>
+            <strong className="text-amber-300 font-mono">{avgEcHarian} EC/Hari</strong>
+          </div>
+
+          <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <span>PMA Aktif:</span>
+            <strong className="text-slate-200 font-mono">{totalPmaActive} PMA</strong>
+          </div>
+
+          <div className="h-4 w-px bg-slate-800 hidden sm:block" />
+
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <span>Sales Aktif:</span>
+            <strong className="text-slate-200 font-mono">{totalSalesActive} Sales</strong>
+          </div>
+        </div>
+
+        {selectedStatus !== 'ALL' && (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-semibold text-cyan-300">
+              Filter Status Aktif: <span className="font-mono underline">{selectedStatus}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('ALL')}
+              className="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-mono border border-slate-700 cursor-pointer"
+            >
+              Reset Status
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* 4. Trend EC Harian Chart Visual (Grafik Line & Batang) */}
+      {(activeTab === 'trend_chart' || activeTab === 'all') && (
+        <div id="monitoring-ec-trend-chart-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-2">
             <div className="p-1.5 rounded-lg bg-cyan-500/10 text-cyan-400">
@@ -2181,6 +2760,7 @@ export function MonitoringEcView({
           </div>
         )}
       </div>
+      )}
 
       {/* 4. Automated Insights Section (🔎 INSIGHT MONITORING EC) */}
       <div id="monitoring-ec-insight-card" className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-sm">
@@ -2400,41 +2980,95 @@ export function MonitoringEcView({
                 <option value="GROWTH">🟢 GROWTH</option>
                 <option value="STABIL">🟡 STABIL</option>
                 <option value="DECLINE">🔴 DECLINE</option>
+                <option value="NEW">🔵 NEW EC</option>
+                <option value="DROP">⚪ DROP / BELUM TRANSAKSI</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Tab Selection */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-800 overflow-x-auto">
+        {/* Quick Filter Status Badges */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-800/80">
+          <span className="text-[11px] text-slate-400 mr-1">Quick Filter Status Toko:</span>
           <button
-            onClick={() => setActiveTab('pma')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'pma'
-                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            type="button"
+            onClick={() => setSelectedStatus('ALL')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+              selectedStatus === 'ALL'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
-            <Building2 className="w-3.5 h-3.5" />
-            <span>🏪 Bagian 1: Monitoring EC Per PMA</span>
+            Semua ({allOutletEcItems.length})
           </button>
-
           <button
-            onClick={() => setActiveTab('sales')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'sales'
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+            type="button"
+            onClick={() => setSelectedStatus('GROWTH')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedStatus === 'GROWTH'
+                ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
             }`}
           >
-            <Users className="w-3.5 h-3.5" />
-            <span>👤 Bagian 2: Monitoring EC Per Sales</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>Growth ({outletStatusCounts.growth})</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatus('DECLINE')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedStatus === 'DECLINE'
+                ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+            <span>Decline ({outletStatusCounts.decline})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatus('STABIL')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedStatus === 'STABIL'
+                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            <span>Stabil ({outletStatusCounts.stabil})</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedStatus('NEW')}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+              selectedStatus === 'NEW'
+                ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+            }`}
+          >
+            <Sparkles className="w-3 h-3 text-cyan-400" />
+            <span>New EC ({outletStatusCounts.newEc})</span>
+          </button>
+          {outletStatusCounts.drop > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelectedStatus('DROP')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedStatus === 'DROP'
+                  ? 'bg-rose-950/40 text-rose-300 border border-rose-700/60 font-bold'
+                  : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800'
+              }`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+              <span>Belum Transaksi ({outletStatusCounts.drop})</span>
+            </button>
+          )}
         </div>
       </div>
 
       {/* 6. Main Tables Viewport */}
-      {activeTab === 'pma' && (
+      {/* PMA Section */}
+      {(activeTab === 'pma' || activeTab === 'all') && (
         <div className="space-y-6">
           {/* Table A: Ringkasan EC Per PMA */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -2447,10 +3081,23 @@ export function MonitoringEcView({
               emptyMessage="Tidak ada data PMA yang sesuai filter."
             />
           </div>
+
+          {/* Table B: EC Per Hari Per PMA */}
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+            <DataTable<DailyEcPmaRow>
+              title="EC / Toko Transaksi Per Hari Per PMA (Detail Tanggal)"
+              columns={dailyPmaColumns}
+              data={filteredDailyPma}
+              searchPlaceholder="Cari tanggal atau PMA..."
+              exportFileName={`EC_Harian_Per_PMA_${prevLabel}_vs_${currLabel}.xlsx`}
+              emptyMessage="Tidak ada data transaksi harian PMA yang sesuai filter."
+            />
+          </div>
         </div>
       )}
 
-      {activeTab === 'sales' && (
+      {/* Sales Section */}
+      {(activeTab === 'sales' || activeTab === 'all') && (
         <div className="space-y-6">
           {/* Table A: Ringkasan EC Per Sales */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
@@ -2475,6 +3122,34 @@ export function MonitoringEcView({
               emptyMessage="Tidak ada data transaksi harian Salesman yang sesuai filter."
             />
           </div>
+        </div>
+      )}
+
+      {/* Daily Summary (Vertical) Section */}
+      {(activeTab === 'daily_summary' || activeTab === 'all') && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <DataTable<DailyEcSummaryRow>
+            title="Ringkasan Performa EC / Toko Transaksi Per Tanggal (Vertikal Tgl 01 s/d 31)"
+            columns={dailySummaryColumns}
+            data={filteredDailySummary}
+            searchPlaceholder="Cari tanggal..."
+            exportFileName={`Rekap_EC_Harian_Vertikal_${prevLabel}_vs_${currLabel}.xlsx`}
+            emptyMessage="Tidak ada data tanggal yang sesuai filter."
+          />
+        </div>
+      )}
+
+      {/* Detail Toko (Master CB) Section */}
+      {(activeTab === 'detail_toko' || activeTab === 'all') && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm">
+          <DataTable<OutletEcDetailRow>
+            title="Detail Toko Bertransaksi EC (Master CB - Toko Unik Transaksi)"
+            columns={outletEcColumns}
+            data={filteredOutletEcList}
+            searchPlaceholder="Cari kode/nama toko, salesman, atau PMA..."
+            exportFileName={`Detail_Toko_EC_Master_CB_${prevLabel}_vs_${currLabel}.xlsx`}
+            emptyMessage="Tidak ada data toko yang sesuai filter."
+          />
         </div>
       )}
 

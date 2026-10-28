@@ -110,6 +110,21 @@ export const MAPPING_DICTIONARY: Record<string, { label: string; aliases: string
     aliases: ['CABANG', 'DEPO', 'BRANCH', 'KODE CABANG'],
     required: false,
   },
+  kabupaten: {
+    label: 'Kabupaten / Kota',
+    aliases: ['KABUPATEN', 'KOTA', 'KAB/KOTA', 'KABUPATEN/KOTA', 'KODYA', 'DAERAH', 'KAB'],
+    required: false,
+  },
+  kecamatan: {
+    label: 'Kecamatan',
+    aliases: ['KECAMATAN', 'KEC', 'NAMA KECAMATAN', 'DISTRIK'],
+    required: false,
+  },
+  address: {
+    label: 'Alamat Outlet',
+    aliases: ['ALAMAT', 'ADDRESS', 'ALAMAT OUTLET', 'LOKASI', 'ALAMAT LENGKAP'],
+    required: false,
+  },
   mark_new: {
     label: 'MARK NEW / EPB (Eceran Per Bulan)',
     aliases: [
@@ -133,7 +148,7 @@ const OPTIONAL_FIELDS_BY_CATEGORY: Record<DatabaseCategory, string[]> = {
   previous_month: ['outlet_name', 'salesman_name', 'qty', 'mark_new'],
   current_month: ['outlet_name', 'salesman_name', 'qty', 'mark_new'],
   target_salesman: ['salesman_name', 'area', 'salesman_status'],
-  master_cb: ['outlet_name', 'salesman_id', 'salesman_name', 'channel', 'rayon', 'area', 'fc', 'pma', 'sc', 'cabang', 'mark_new'],
+  master_cb: ['outlet_name', 'salesman_id', 'salesman_name', 'channel', 'rayon', 'area', 'fc', 'pma', 'sc', 'cabang', 'kabupaten', 'kecamatan', 'address', 'mark_new'],
 };
 
 // String similarity metric
