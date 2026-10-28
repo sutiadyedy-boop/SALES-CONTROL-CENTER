@@ -23,7 +23,8 @@ import {
   Info,
   X,
   FileSpreadsheet,
-  Map as MapIcon
+  Map as MapIcon,
+  Flame
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { MasterOutletRecord } from '../../types/database';
@@ -492,6 +493,36 @@ export function MappingCoverageCbRoView({
           <div className="mt-1 text-[11px] text-slate-400 truncate">
             Potensi Outlet Tambahan
           </div>
+        </div>
+      </div>
+
+      {/* BPS SULSEL AUTHENTICITY & ATTENTION NOTICE BANNER */}
+      <div className="bg-gradient-to-r from-rose-950/40 via-slate-900 to-slate-900 border border-rose-500/30 rounded-xl p-3.5 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-rose-500/20 text-rose-400 border border-rose-500/40 flex-shrink-0">
+            <Flame className="w-5 h-5 text-rose-400 animate-pulse" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-white flex items-center gap-2 flex-wrap">
+              <span>Status Penetrasi: {coverageData.totalKecamatanUnder40} dari {coverageData.totalKecamatanUniverse} Kecamatan di Sulawesi Selatan Berada Under 40%</span>
+              <span className="text-[10px] px-2 py-0.2 rounded bg-rose-500/20 text-rose-300 font-mono font-bold border border-rose-500/30">
+                PERLU PERHATIAN KHUSUS (&lt; 40%)
+              </span>
+            </div>
+            <div className="text-[11px] text-slate-300 mt-0.5">
+              Data Universe 100% Resmi: BPS Provinsi Sulawesi Selatan (Sensus Usaha / Direktori Retail & Industri Kategori G & C Terbaru).
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={() => setActiveTab('map_d3')}
+            className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold flex items-center gap-1.5 shadow transition"
+          >
+            <MapIcon className="w-3.5 h-3.5" />
+            Buka Peta Interaktif Kecamatan
+          </button>
         </div>
       </div>
 

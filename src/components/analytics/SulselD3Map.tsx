@@ -14,13 +14,20 @@ import {
   Info,
   CheckCircle2,
   ChevronRight,
+  ArrowLeft,
+  AlertTriangle,
+  Flame,
+  Filter,
+  Eye,
   X
 } from 'lucide-react';
 import { SULSEL_GEOJSON, SulselGeoFeature, SULSEL_KABUPATEN_COORDINATES } from '../../data/sulselGeoJson';
-import { KabupatenCoverageSummary, CoverageStatus } from '../../services/coverageMatchingService';
+import { generateKecamatanFeatures, KecamatanGeoFeature } from '../../data/sulselKecamatanSpatial';
+import { KabupatenCoverageSummary, KecamatanCoverageSummary, CoverageStatus } from '../../services/coverageMatchingService';
 import { MasterOutletRecord } from '../../types/database';
 
 export type MapDisplayMode = 'choropleth' | 'dual_bubble' | 'gap_heatmap';
+export type MapViewLevel = 'PROVINSI' | 'KABUPATEN_DETAIL';
 
 interface SulselD3MapProps {
   kabupatenSummaries: KabupatenCoverageSummary[];
@@ -44,17 +51,24 @@ export function SulselD3Map({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // Map settings state
+  // Map view level: Provinsi vs Kabupaten Detail
+  const [viewLevel, setViewLevel] = useState<MapViewLevel>('KABUPATEN_DETAIL');
+  const [selectedKabupatenCode, setSelectedKabupatenCode] = useState<string>('7308'); // default Kabupaten Bone (7308)
   const [displayMode, setDisplayMode] = useState<MapDisplayMode>('choropleth');
-  const [selectedKabupatenCode, setSelectedKabupatenCode] = useState<string | null>('7308'); // default Bone or null
+  
+  // Highlighting filter for < 40%
+  const [filterOnlyUnder40, setFilterOnlyUnder40] = useState<boolean>(false);
+
+  // Hover states
   const [hoveredKabupaten, setHoveredKabupaten] = useState<KabupatenCoverageSummary | null>(null);
+  const [hoveredKecamatan, setHoveredKecamatan] = useState<KecamatanCoverageSummary | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
 
   // Map dimensions
-  const width = 800;
-  const height = 650;
+  const width = 850;
+  const height = 640;
 
-  // Create quick lookup map for data
+  // Quick lookup map for Kabupaten
   const dataByBpsCode = useMemo(() => {
     const map = new Map<string, KabupatenCoverageSummary>();
     for (const item of kabupatenSummaries) {
@@ -65,25 +79,59 @@ export function SulselD3Map({
 
   // Selected kabupaten object
   const selectedKabupaten = useMemo(() => {
-    if (!selectedKabupatenCode) return null;
-    return dataByBpsCode.get(selectedKabupatenCode) || null;
-  }, [selectedKabupatenCode, dataByBpsCode]);
+    return dataByBpsCode.get(selectedKabupatenCode) || kabupatenSummaries[0] || null;
+  }, [selectedKabupatenCode, dataByBpsCode, kabupatenSummaries]);
 
-  // D3 Projection and Path Generator
-  const { projection, pathGenerator } = useMemo(() => {
-    // Mercator projection centered on Sulawesi Selatan
-    const proj = d3.geoMercator()
-      .center([120.2, -4.2]) // center of Sulsel
-      .scale(5400) // zoom level fitted to 800x650
-      .translate([width / 2, height / 2]);
+  // Quick lookup map for Kecamatan within selected Kabupaten
+  const kecamatanDataMap = useMemo(() => {
+    const map = new Map<string, KecamatanCoverageSummary>();
+    if (selectedKabupaten) {
+      for (const kc of selectedKabupaten.kecamatanSummaries) {
+        map.set(kc.kodeBps, kc);
+      }
+    }
+    return map;
+  }, [selectedKabupaten]);
 
-    const path = d3.geoPath().projection(proj);
-    return { projection: proj, pathGenerator: path };
-  }, [width, height]);
+  // Generated spatial features for constituent kecamatans
+  const kecamatanGeoFeatures: KecamatanGeoFeature[] = useMemo(() => {
+    if (!selectedKabupatenCode) return [];
+    return generateKecamatanFeatures(selectedKabupatenCode);
+  }, [selectedKabupatenCode]);
 
   // Zoom behavior handler ref
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const gRef = useRef<SVGGElement | null>(null);
+
+  // D3 Projection and Path Generator (Adapts to viewLevel)
+  const { projection, pathGenerator } = useMemo(() => {
+    let proj: d3.GeoProjection;
+
+    if (viewLevel === 'PROVINSI') {
+      // Province-level Mercator
+      proj = d3.geoMercator()
+        .center([120.2, -4.2])
+        .scale(5400)
+        .translate([width / 2, height / 2]);
+    } else {
+      // Kabupaten-level zoom: Center on the selected Kabupaten's centroid
+      const coordConfig = SULSEL_KABUPATEN_COORDINATES[selectedKabupatenCode];
+      const centroid = coordConfig?.centroid || [120.12, -4.68];
+      
+      // Auto scale based on size of kabupaten
+      const scale = selectedKabupatenCode === '7371' || selectedKabupatenCode === '7372' || selectedKabupatenCode === '7373' 
+        ? 38000 // Kota (denser)
+        : 18000; // Kabupaten (larger area)
+
+      proj = d3.geoMercator()
+        .center(centroid)
+        .scale(scale)
+        .translate([width / 2, height / 2]);
+    }
+
+    const path = d3.geoPath().projection(proj);
+    return { projection: proj, pathGenerator: path };
+  }, [viewLevel, selectedKabupatenCode, width, height]);
 
   // Initialize D3 Zoom and SVG
   useEffect(() => {
@@ -93,7 +141,7 @@ export function SulselD3Map({
     const g = d3.select(gRef.current);
 
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.8, 8])
+      .scaleExtent([0.6, 12])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
@@ -101,20 +149,23 @@ export function SulselD3Map({
     zoomBehaviorRef.current = zoom;
     svg.call(zoom);
 
+    // Reset zoom when switching view level or kabupaten
+    svg.transition().duration(400).call(zoom.transform, d3.zoomIdentity);
+
     return () => {
       svg.on('.zoom', null);
     };
-  }, []);
+  }, [viewLevel, selectedKabupatenCode]);
 
   const handleZoomIn = () => {
     if (svgRef.current && zoomBehaviorRef.current) {
-      d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 1.3);
+      d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 1.35);
     }
   };
 
   const handleZoomOut = () => {
     if (svgRef.current && zoomBehaviorRef.current) {
-      d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 0.77);
+      d3.select(svgRef.current).transition().duration(300).call(zoomBehaviorRef.current.scaleBy, 0.75);
     }
   };
 
@@ -128,89 +179,140 @@ export function SulselD3Map({
   };
 
   // Color functions
-  const getChoroplethColor = (summary?: KabupatenCoverageSummary) => {
-    if (!summary || summary.masterCbTotal === 0) {
-      return '#1e293b'; // slate-800 blank
-    }
+  const getKabupatenChoroplethColor = (summary?: KabupatenCoverageSummary) => {
+    if (!summary || summary.masterCbTotal === 0) return '#1e293b'; // slate-800 blank
     const ratio = summary.coverageRatio;
-    if (ratio >= 70) return '#059669'; // emerald-600
-    if (ratio >= 40) return '#d97706'; // amber-600
-    if (ratio >= 15) return '#0284c7'; // sky-600
-    return '#0d9488'; // teal-600
+    if (ratio < 40) return '#ef4444'; // Mencolok Red Under 40%
+    if (ratio >= 70) return '#059669'; // Emerald-600
+    return '#d97706'; // Amber-600 (40-69%)
   };
 
-  const getGapHeatmapColor = (summary?: KabupatenCoverageSummary) => {
+  // CRITICAL: Striking distinctive color for Kecamatans Under 40% (< 40% CB vs RO BPS)
+  const getKecamatanColor = (summary?: KecamatanCoverageSummary) => {
     if (!summary) return '#1e293b';
-    const gap = summary.gapOutlets;
-    // Scale gap from 0 to 20,000
-    if (gap > 15000) return '#e11d48'; // rose-600
-    if (gap > 10000) return '#ea580c'; // orange-600
-    if (gap > 6000) return '#d97706'; // amber-600
-    return '#475569'; // slate-600
+
+    // Blank Spot (0% coveran) -> Dark Crimson Alert
+    if (summary.masterCbTotal === 0) {
+      return '#be123c'; // rose-700
+    }
+
+    // UNDER 40% -> STRIKING VIBRANT NEON FLAME RED / CRIMSON (PERLU PERHATIAN KHUSUS)
+    if (summary.coverageRatio < 40) {
+      return '#f43f5e'; // rose-500 vivid striking
+    }
+
+    // MODERAT (40% - 69.9%) -> Amber-Gold
+    if (summary.coverageRatio < 70) {
+      return '#d97706'; // amber-600
+    }
+
+    // OPTIMAL (>= 70%) -> Emerald Green
+    return '#059669'; // emerald-600
   };
 
   // Calculate bubble sizes for Dual Bubble mode
   const maxRo = Math.max(...kabupatenSummaries.map(k => k.roIndustriBps), 1);
   const maxCb = Math.max(...kabupatenSummaries.map(k => k.masterCbTotal), 1);
 
-  const roScale = d3.scaleSqrt().domain([0, maxRo]).range([6, 32]);
-  const cbScale = d3.scaleSqrt().domain([0, maxCb]).range([3, 26]);
+  const roScale = d3.scaleSqrt().domain([0, maxRo]).range([8, 36]);
+  const cbScale = d3.scaleSqrt().domain([0, maxCb]).range([4, 28]);
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl text-slate-100">
+    <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-2xl text-slate-100">
       {/* MAP TOP BAR / CONTROLS */}
-      <div className="p-4 bg-slate-900/95 border-b border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400">
+      <div className="p-4 bg-slate-900/95 border-b border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 shadow-inner">
             <MapPin className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              Peta Distribusi Geografis: Master CB vs RO Industri BPS
-              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono">
-                D3.js Interactive
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-sm font-bold text-white flex items-center gap-1.5">
+                Peta Distribusi Geografis: Master CB vs RO Industri BPS
+              </h3>
+              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono font-semibold border border-cyan-500/30">
+                BPS SULSEL RESMI (KATEGORI G & C)
               </span>
-            </h3>
-            <p className="text-xs text-slate-400">
-              Sorot atau klik kabupaten untuk membandingkan basis outlet terdaftar dengan universe BPS
+              {viewLevel === 'KABUPATEN_DETAIL' && (
+                <span className="text-[10px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 font-mono font-semibold border border-rose-500/30 flex items-center gap-1">
+                  <Flame className="w-3 h-3 text-rose-400 animate-pulse" />
+                  PERHATIAN KHUSUS: KECAMATAN &lt; 40%
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {viewLevel === 'PROVINSI'
+                ? 'Klik kabupaten untuk membuka peta geografis detail beserta seluruh batas kecamatannya'
+                : `Menampilkan seluruh ${selectedKabupaten?.jumlahKecamatan || 0} kecamatan di ${selectedKabupaten?.namaKabupaten}. Kecamatan dengan coveran < 40% ditandai warna mencolok.`}
             </p>
           </div>
         </div>
 
-        {/* Display Mode Switcher */}
-        <div className="flex flex-wrap items-center gap-2">
+        {/* CONTROLS & LEVEL SWITCHERS */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Level Switcher (Provinsi vs Kabupaten) */}
           <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
             <button
-              onClick={() => setDisplayMode('choropleth')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                displayMode === 'choropleth'
+              onClick={() => setViewLevel('PROVINSI')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+                viewLevel === 'PROVINSI'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Choropleth Coverage (%)
+              <Building2 className="w-3.5 h-3.5" />
+              Peta Provinsi (24 Kab/Kota)
             </button>
             <button
-              onClick={() => setDisplayMode('dual_bubble')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                displayMode === 'dual_bubble'
+              onClick={() => setViewLevel('KABUPATEN_DETAIL')}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition flex items-center gap-1.5 ${
+                viewLevel === 'KABUPATEN_DETAIL'
                   ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shadow-sm'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Dual Bubble (CB vs RO)
-            </button>
-            <button
-              onClick={() => setDisplayMode('gap_heatmap')}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
-                displayMode === 'gap_heatmap'
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30 shadow-sm'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Gap Potensi Pasar
+              <Target className="w-3.5 h-3.5 text-rose-400" />
+              Detail Per Kecamatan
             </button>
           </div>
+
+          {/* Kabupaten Selector Dropdown (When in KABUPATEN_DETAIL) */}
+          {viewLevel === 'KABUPATEN_DETAIL' && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-slate-400 font-medium">Kabupaten:</span>
+              <select
+                value={selectedKabupatenCode}
+                onChange={(e) => {
+                  setSelectedKabupatenCode(e.target.value);
+                  const selected = dataByBpsCode.get(e.target.value);
+                  if (selected && onSelectKabupaten) onSelectKabupaten(selected);
+                }}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-medium focus:outline-none focus:border-cyan-500 transition max-w-[210px] truncate"
+              >
+                {kabupatenSummaries.map((kab) => (
+                  <option key={kab.kodeBps} value={kab.kodeBps}>
+                    {kab.namaKabupaten} ({kab.under40KecamatanCount}/{kab.jumlahKecamatan} Kec &lt; 40%)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Special Attention Filter Toggle */}
+          {viewLevel === 'KABUPATEN_DETAIL' && (
+            <button
+              onClick={() => setFilterOnlyUnder40(!filterOnlyUnder40)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition flex items-center gap-1.5 border shadow-sm ${
+                filterOnlyUnder40
+                  ? 'bg-rose-600 text-white border-rose-500 shadow-rose-500/20'
+                  : 'bg-slate-950 text-rose-300 border-rose-500/40 hover:bg-rose-950/30'
+              }`}
+              title="Isolasi tampilan hanya pada kecamatan yang memiliki rasio coveran di bawah 40%"
+            >
+              <Flame className="w-3.5 h-3.5 text-rose-300" />
+              <span>{filterOnlyUnder40 ? 'Tampilkan Semua Kecamatan' : '⚡ Sorot Khusus Under 40%'}</span>
+            </button>
+          )}
 
           {/* Zoom Buttons */}
           <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
@@ -240,137 +342,142 @@ export function SulselD3Map({
       </div>
 
       {/* MAP BODY WITH INTERACTIVE SVG & SIDE DETAILS */}
-      <div className="relative flex flex-col lg:flex-row min-h-[580px]">
+      <div className="relative flex flex-col lg:flex-row min-h-[600px]">
         {/* SVG Canvas Area */}
-        <div ref={containerRef} className="relative flex-1 bg-slate-950/70 overflow-hidden flex items-center justify-center">
+        <div ref={containerRef} className="relative flex-1 bg-slate-950/80 overflow-hidden flex items-center justify-center">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${width} ${height}`}
-            className="w-full h-[580px] cursor-grab active:cursor-grabbing select-none"
+            className="w-full h-[600px] cursor-grab active:cursor-grabbing select-none"
           >
-            {/* Background pattern */}
+            {/* Background patterns and gradients */}
             <defs>
-              <pattern id="grid" width="30" height="30" patternUnits="userSpaceOnUse">
-                <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#1e293b" strokeWidth="0.5" strokeOpacity="0.6" />
+              <pattern id="grid-pattern" width="28" height="28" patternUnits="userSpaceOnUse">
+                <path d="M 28 0 L 0 0 0 28" fill="none" stroke="#1e293b" strokeWidth="0.5" strokeOpacity="0.5" />
               </pattern>
-              <linearGradient id="emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#10b981" />
-                <stop offset="100%" stopColor="#047857" />
-              </linearGradient>
-              <linearGradient id="indigoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity="0.75" />
-                <stop offset="100%" stopColor="#4338ca" stopOpacity="0.9" />
-              </linearGradient>
-              <linearGradient id="amberGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#f59e0b" />
-                <stop offset="100%" stopColor="#b45309" />
-              </linearGradient>
+              
+              {/* Alert under 40% striping for blank spot */}
+              <pattern id="diagonal-alert-stripes" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                <line x1="0" y1="0" x2="0" y2="10" stroke="#ff0055" strokeWidth="3" strokeOpacity="0.7" />
+                <line x1="0" y1="0" x2="0" y2="10" stroke="#0f172a" strokeWidth="7" strokeOpacity="0.8" />
+              </pattern>
+
+              {/* Glowing filters for Under 40% Alert */}
+              <filter id="alert-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feComposite in="SourceGraphic" in2="blur" operator="over" />
+              </filter>
             </defs>
 
             {/* Grid background */}
-            <rect width={width} height={height} fill="url(#grid)" />
+            <rect width={width} height={height} fill="url(#grid-pattern)" />
 
-            {/* Zoomable Group */}
+            {/* Zoomable Canvas Group */}
             <g ref={gRef}>
-              {/* Kabupaten Polygons */}
-              <g className="kabupaten-polygons">
-                {SULSEL_GEOJSON.features.map((feature) => {
-                  const kodeBps = feature.properties.kodeBps;
-                  const summary = dataByBpsCode.get(kodeBps);
-                  const isSelected = selectedKabupatenCode === kodeBps;
-                  const isHovered = hoveredKabupaten?.kodeBps === kodeBps;
-                  const pathString = pathGenerator(feature as any) || '';
-
-                  let fillColor = '#1e293b';
-                  if (displayMode === 'choropleth') {
-                    fillColor = getChoroplethColor(summary);
-                  } else if (displayMode === 'gap_heatmap') {
-                    fillColor = getGapHeatmapColor(summary);
-                  } else {
-                    // dual bubble mode: neutral dark background
-                    fillColor = isSelected ? '#1e293b' : '#0f172a';
-                  }
-
-                  return (
-                    <path
-                      key={kodeBps}
-                      d={pathString}
-                      fill={fillColor}
-                      fillOpacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.7}
-                      stroke={isSelected ? '#38bdf8' : isHovered ? '#22d3ee' : '#334155'}
-                      strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1}
-                      strokeDasharray={summary?.masterCbTotal === 0 ? '3 3' : 'none'}
-                      className="transition-all duration-200 cursor-pointer"
-                      onClick={() => {
-                        setSelectedKabupatenCode(kodeBps);
-                        if (summary && onSelectKabupaten) {
-                          onSelectKabupaten(summary);
-                        }
-                      }}
-                      onMouseEnter={(e) => {
-                        if (summary) setHoveredKabupaten(summary);
-                        const rect = containerRef.current?.getBoundingClientRect();
-                        if (rect) {
-                          setTooltipPos({
-                            x: e.clientX - rect.left,
-                            y: e.clientY - rect.top,
-                          });
-                        }
-                      }}
-                      onMouseMove={(e) => {
-                        const rect = containerRef.current?.getBoundingClientRect();
-                        if (rect) {
-                          setTooltipPos({
-                            x: e.clientX - rect.left,
-                            y: e.clientY - rect.top,
-                          });
-                        }
-                      }}
-                      onMouseLeave={() => {
-                        setHoveredKabupaten(null);
-                        setTooltipPos(null);
-                      }}
-                    />
-                  );
-                })}
-              </g>
-
-              {/* Dual Bubble Mode Visual Elements */}
-              {displayMode === 'dual_bubble' && (
-                <g className="dual-bubbles pointer-events-none">
+              {/* ========================================================= */}
+              {/* VIEW 1: PROVINSI SULSEL (24 KABUPATEN / KOTA)             */}
+              {/* ========================================================= */}
+              {viewLevel === 'PROVINSI' && (
+                <g className="provinsi-view">
                   {SULSEL_GEOJSON.features.map((feature) => {
                     const kodeBps = feature.properties.kodeBps;
                     const summary = dataByBpsCode.get(kodeBps);
-                    if (!summary) return null;
+                    const isSelected = selectedKabupatenCode === kodeBps;
+                    const isHovered = hoveredKabupaten?.kodeBps === kodeBps;
+                    const pathString = pathGenerator(feature as any) || '';
 
+                    const hasUnder40 = summary ? summary.under40KecamatanCount > 0 : false;
+                    const fillColor = getKabupatenChoroplethColor(summary);
+
+                    return (
+                      <path
+                        key={`prov-${kodeBps}`}
+                        d={pathString}
+                        fill={fillColor}
+                        fillOpacity={isSelected ? 0.95 : isHovered ? 0.85 : 0.75}
+                        stroke={hasUnder40 && summary?.masterCbTotal === 0 ? '#ff0055' : isSelected ? '#38bdf8' : isHovered ? '#22d3ee' : '#334155'}
+                        strokeWidth={isSelected ? 2.5 : isHovered ? 2 : 1}
+                        strokeDasharray={summary?.masterCbTotal === 0 ? '4 3' : 'none'}
+                        className="transition-all duration-200 cursor-pointer"
+                        onClick={() => {
+                          setSelectedKabupatenCode(kodeBps);
+                          setViewLevel('KABUPATEN_DETAIL');
+                          if (summary && onSelectKabupaten) {
+                            onSelectKabupaten(summary);
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          if (summary) setHoveredKabupaten(summary);
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top,
+                            });
+                          }
+                        }}
+                        onMouseMove={(e) => {
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top,
+                            });
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredKabupaten(null);
+                          setTooltipPos(null);
+                        }}
+                      />
+                    );
+                  })}
+
+                  {/* Centroid Labels for Province Level */}
+                  {SULSEL_GEOJSON.features.map((feature) => {
+                    const kodeBps = feature.properties.kodeBps;
+                    const summary = dataByBpsCode.get(kodeBps);
                     const coordConfig = SULSEL_KABUPATEN_COORDINATES[kodeBps];
                     const centroid = coordConfig?.centroid || feature.properties.centroid;
                     const projected = projection(centroid);
                     if (!projected) return null;
 
-                    const [cx, cy] = projected;
-                    const roRadius = roScale(summary.roIndustriBps);
-                    const cbRadius = summary.masterCbTotal > 0 ? cbScale(summary.masterCbTotal) : 0;
+                    let [cx, cy] = projected;
+                    if (coordConfig?.labelOffset) {
+                      cx += coordConfig.labelOffset[0];
+                      cy += coordConfig.labelOffset[1];
+                    }
+
+                    const isUnder40Kab = summary ? summary.coverageRatio < 40 : false;
 
                     return (
-                      <g key={`bubble-${kodeBps}`} transform={`translate(${cx}, ${cy})`}>
-                        {/* Outer Bubble: RO Industri BPS (Universe) */}
-                        <circle
-                          r={roRadius}
-                          fill="url(#indigoGrad)"
-                          stroke="#818cf8"
-                          strokeWidth="1.2"
-                          strokeOpacity="0.8"
-                        />
-                        {/* Inner Bubble: Master CB */}
-                        {cbRadius > 0 && (
-                          <circle
-                            r={cbRadius}
-                            fill="#10b981"
-                            fillOpacity="0.9"
-                            stroke="#34d399"
-                            strokeWidth="1.5"
-                          />
+                      <g key={`prov-label-${kodeBps}`} transform={`translate(${cx}, ${cy})`} className="pointer-events-none select-none">
+                        <text
+                          textAnchor="middle"
+                          dy="-4"
+                          fontSize="8.5"
+                          fontWeight="bold"
+                          fill="#f8fafc"
+                          stroke="#020617"
+                          strokeWidth="2.5"
+                          paintOrder="stroke"
+                        >
+                          {feature.properties.namaSingkat}
+                        </text>
+                        {summary && (
+                          <text
+                            textAnchor="middle"
+                            dy="8"
+                            fontSize="7.5"
+                            fontWeight="bold"
+                            fill={isUnder40Kab ? '#f43f5e' : '#34d399'}
+                            stroke="#020617"
+                            strokeWidth="2"
+                            paintOrder="stroke"
+                            className="font-mono"
+                          >
+                            {summary.coverageRatio.toFixed(1)}% ({summary.under40KecamatanCount} Kec &lt; 40%)
+                          </text>
                         )}
                       </g>
                     );
@@ -378,184 +485,298 @@ export function SulselD3Map({
                 </g>
               )}
 
-              {/* Centroid Labels */}
-              <g className="centroid-labels pointer-events-none">
-                {SULSEL_GEOJSON.features.map((feature) => {
-                  const kodeBps = feature.properties.kodeBps;
-                  const summary = dataByBpsCode.get(kodeBps);
-                  const coordConfig = SULSEL_KABUPATEN_COORDINATES[kodeBps];
-                  const centroid = coordConfig?.centroid || feature.properties.centroid;
-                  const projected = projection(centroid);
-                  if (!projected) return null;
+              {/* ========================================================= */}
+              {/* VIEW 2: KABUPATEN LENGKAP DENGAN SELURUH KECAMATANNYA    */}
+              {/* ========================================================= */}
+              {viewLevel === 'KABUPATEN_DETAIL' && (
+                <g className="kabupaten-detail-view">
+                  {/* Outer Kabupaten boundary outline */}
+                  {(() => {
+                    const kabFeature = SULSEL_GEOJSON.features.find(f => f.properties.kodeBps === selectedKabupatenCode);
+                    if (!kabFeature) return null;
+                    const boundaryPath = pathGenerator(kabFeature as any) || '';
+                    return (
+                      <path
+                        d={boundaryPath}
+                        fill="none"
+                        stroke="#0ea5e9"
+                        strokeWidth="3"
+                        strokeDasharray="6 4"
+                        strokeOpacity="0.4"
+                      />
+                    );
+                  })()}
 
-                  let [cx, cy] = projected;
-                  if (coordConfig?.labelOffset) {
-                    cx += coordConfig.labelOffset[0];
-                    cy += coordConfig.labelOffset[1];
-                  }
+                  {/* Kecamatan Polygons */}
+                  {kecamatanGeoFeatures.map((feature) => {
+                    const kodeBps = feature.properties.kodeBps;
+                    const summary = kecamatanDataMap.get(kodeBps);
+                    const isHovered = hoveredKecamatan?.kodeBps === kodeBps;
+                    const pathString = pathGenerator(feature as any) || '';
 
-                  const isSelected = selectedKabupatenCode === kodeBps;
+                    const isUnder40 = summary ? summary.isUnder40 : true;
+                    
+                    // Dim non-under40 kecamatans if filterOnlyUnder40 is active
+                    if (filterOnlyUnder40 && !isUnder40) {
+                      return (
+                        <path
+                          key={`kec-${kodeBps}`}
+                          d={pathString}
+                          fill="#0f172a"
+                          fillOpacity={0.25}
+                          stroke="#1e293b"
+                          strokeWidth={0.5}
+                        />
+                      );
+                    }
 
-                  return (
-                    <g key={`label-${kodeBps}`} transform={`translate(${cx}, ${cy})`}>
-                      <text
-                        textAnchor="middle"
-                        dy="-4"
-                        fontSize={isSelected ? '10' : '8.5'}
-                        fontWeight={isSelected ? 'bold' : '600'}
-                        fill={isSelected ? '#38bdf8' : '#f8fafc'}
-                        stroke="#020617"
-                        strokeWidth="2.5"
-                        paintOrder="stroke"
-                        className="select-none font-sans"
-                      >
-                        {feature.properties.namaSingkat}
-                      </text>
-                      {summary && (
+                    const fillColor = getKecamatanColor(summary);
+
+                    return (
+                      <path
+                        key={`kec-${kodeBps}`}
+                        d={pathString}
+                        fill={summary?.masterCbTotal === 0 ? 'url(#diagonal-alert-stripes)' : fillColor}
+                        fillOpacity={isUnder40 ? 0.92 : isHovered ? 0.85 : 0.75}
+                        stroke={isUnder40 ? '#ff0055' : isHovered ? '#38bdf8' : '#334155'}
+                        strokeWidth={isUnder40 ? 2.5 : isHovered ? 2 : 1}
+                        filter={isUnder40 ? 'url(#alert-glow)' : 'none'}
+                        className="transition-all duration-200 cursor-pointer"
+                        onClick={() => {
+                          if (summary && summary.masterCbTotal > 0 && onInspectOutlets) {
+                            onInspectOutlets({
+                              title: `Kecamatan ${summary.namaKecamatan} (${summary.namaKabupaten})`,
+                              type: 'KECAMATAN',
+                              bpsRo: summary.roIndustriBps,
+                              cbTotal: summary.masterCbTotal,
+                              cbActive: summary.masterCbActive,
+                              coverageRatio: summary.coverageRatio,
+                              outlets: summary.outletList,
+                            });
+                          }
+                        }}
+                        onMouseEnter={(e) => {
+                          if (summary) setHoveredKecamatan(summary);
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top,
+                            });
+                          }
+                        }}
+                        onMouseMove={(e) => {
+                          const rect = containerRef.current?.getBoundingClientRect();
+                          if (rect) {
+                            setTooltipPos({
+                              x: e.clientX - rect.left,
+                              y: e.clientY - rect.top,
+                            });
+                          }
+                        }}
+                        onMouseLeave={() => {
+                          setHoveredKecamatan(null);
+                          setTooltipPos(null);
+                        }}
+                      />
+                    );
+                  })}
+
+                  {/* Kecamatan Centroid Labels & Alert Badges */}
+                  {kecamatanGeoFeatures.map((feature) => {
+                    const kodeBps = feature.properties.kodeBps;
+                    const summary = kecamatanDataMap.get(kodeBps);
+                    const centroid = feature.properties.centroid;
+                    const projected = projection(centroid);
+                    if (!projected) return null;
+
+                    const [cx, cy] = projected;
+                    const isUnder40 = summary ? summary.isUnder40 : true;
+
+                    if (filterOnlyUnder40 && !isUnder40) return null;
+
+                    return (
+                      <g key={`kec-label-${kodeBps}`} transform={`translate(${cx}, ${cy})`} className="pointer-events-none select-none">
+                        {/* Under 40% Warning Beacon Pin */}
+                        {isUnder40 && (
+                          <g transform="translate(0, -18)">
+                            <circle r="4" fill="#ff0055" className="animate-ping" opacity="0.7" />
+                            <circle r="3.5" fill="#ff0055" stroke="#ffffff" strokeWidth="1" />
+                          </g>
+                        )}
+
                         <text
                           textAnchor="middle"
-                          dy="7"
-                          fontSize="7.5"
+                          dy="-2"
+                          fontSize="9"
                           fontWeight="bold"
-                          fill={
-                            summary.masterCbTotal > 0 ? '#34d399' : '#94a3b8'
-                          }
+                          fill="#ffffff"
                           stroke="#020617"
-                          strokeWidth="2"
+                          strokeWidth="2.5"
                           paintOrder="stroke"
-                          className="font-mono select-none"
+                          className="font-sans"
                         >
-                          {displayMode === 'dual_bubble'
-                            ? `${summary.masterCbTotal} / ${summary.roIndustriBps}`
-                            : displayMode === 'gap_heatmap'
-                            ? `Gap: ${summary.gapOutlets}`
-                            : `${summary.coverageRatio.toFixed(1)}%`}
+                          {feature.properties.namaKecamatan}
                         </text>
-                      )}
-                    </g>
-                  );
-                })}
-              </g>
+                        {summary && (
+                          <text
+                            textAnchor="middle"
+                            dy="10"
+                            fontSize="8"
+                            fontWeight="bold"
+                            fill={isUnder40 ? '#f43f5e' : '#34d399'}
+                            stroke="#020617"
+                            strokeWidth="2"
+                            paintOrder="stroke"
+                            className="font-mono"
+                          >
+                            {isUnder40 ? `⚠️ ${summary.coverageRatio.toFixed(1)}%` : `${summary.coverageRatio.toFixed(1)}%`}
+                          </text>
+                        )}
+                      </g>
+                    );
+                  })}
+                </g>
+              )}
             </g>
           </svg>
 
           {/* FLOATING HOVER TOOLTIP */}
-          {hoveredKabupaten && tooltipPos && (
+          {tooltipPos && (hoveredKecamatan || hoveredKabupaten) && (
             <div
-              className="absolute pointer-events-none z-30 bg-slate-900/95 border border-slate-700/80 rounded-xl p-3 shadow-2xl backdrop-blur-md min-w-[220px] text-xs transition-all"
+              className="absolute pointer-events-none z-30 bg-slate-900/95 border border-slate-700/90 rounded-xl p-3.5 shadow-2xl backdrop-blur-md min-w-[250px] text-xs transition-all"
               style={{
-                left: Math.min(tooltipPos.x + 15, width - 240),
-                top: Math.max(tooltipPos.y - 100, 10),
+                left: Math.min(tooltipPos.x + 15, width - 270),
+                top: Math.max(tooltipPos.y - 120, 10),
               }}
             >
-              <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5 mb-2">
-                <span className="font-bold text-white text-sm">
-                  {hoveredKabupaten.namaKabupaten}
-                </span>
-                <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-cyan-300 font-mono">
-                  {hoveredKabupaten.kodeBps}
-                </span>
-              </div>
+              {hoveredKecamatan ? (
+                <>
+                  <div className="flex items-start justify-between gap-2 border-b border-slate-800 pb-2 mb-2">
+                    <div>
+                      <div className="font-bold text-white text-sm">
+                        Kecamatan {hoveredKecamatan.namaKecamatan}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {hoveredKecamatan.namaKabupaten} • Sentra: {hoveredKecamatan.deskripsiSentra || hoveredKecamatan.kategoriWilayah}
+                      </div>
+                    </div>
+                    {hoveredKecamatan.isUnder40 ? (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40 uppercase whitespace-nowrap">
+                        ⚠️ Under 40%
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase whitespace-nowrap">
+                        ✓ Optimal
+                      </span>
+                    )}
+                  </div>
 
-              <div className="space-y-1.5 font-mono text-[11px]">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Master CB Terdaftar:</span>
-                  <strong className="text-white">{hoveredKabupaten.masterCbTotal.toLocaleString('id-ID')} Toko</strong>
-                </div>
-                <div className="flex justify-between text-[10px]">
-                  <span className="text-emerald-400">├ Aktif (OK):</span>
-                  <span className="text-emerald-400 font-bold">{hoveredKabupaten.masterCbActive}</span>
-                </div>
-                <div className="flex justify-between text-[10px]">
-                  <span className="text-rose-400">└ Non-Aktif:</span>
-                  <span className="text-rose-400 font-bold">{hoveredKabupaten.masterCbInactive}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">RO Industri BPS:</span>
-                  <strong className="text-indigo-300">{hoveredKabupaten.roIndustriBps.toLocaleString('id-ID')}</strong>
-                </div>
-                <div className="flex justify-between pt-1 border-t border-slate-800">
-                  <span className="text-slate-400">Coverage Ratio:</span>
-                  <strong className="text-teal-300 font-bold">{hoveredKabupaten.coverageRatio.toFixed(2)}%</strong>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Gap Peluang:</span>
-                  <strong className="text-rose-400">+{hoveredKabupaten.gapOutlets.toLocaleString('id-ID')} Toko</strong>
-                </div>
-              </div>
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Master CB Toko:</span>
+                      <strong className="text-white">{hoveredKecamatan.masterCbTotal} Toko</strong>
+                    </div>
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-emerald-400">├ Aktif:</span>
+                      <span className="text-emerald-400 font-bold">{hoveredKecamatan.masterCbActive}</span>
+                    </div>
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-rose-400">└ Non-Aktif:</span>
+                      <span className="text-rose-400 font-bold">{hoveredKecamatan.masterCbInactive}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">RO Industri BPS:</span>
+                      <strong className="text-indigo-300">{hoveredKecamatan.roIndustriBps} Toko</strong>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-slate-800">
+                      <span className="text-slate-400">Coverage Ratio:</span>
+                      <strong className={`font-bold ${hoveredKecamatan.isUnder40 ? 'text-rose-400' : 'text-teal-300'}`}>
+                        {hoveredKecamatan.coverageRatio.toFixed(2)}%
+                      </strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Gap Belum Tercover:</span>
+                      <strong className="text-rose-400">+{hoveredKecamatan.gapOutlets} Toko</strong>
+                    </div>
+
+                    {hoveredKecamatan.isUnder40 && (
+                      <div className="mt-2 p-1.5 rounded bg-rose-500/15 border border-rose-500/30 text-[10px] text-rose-200">
+                        🚨 <strong>Perlu Perhatian Khusus:</strong> Coveran di bawah 40%, perlu penambahan rute kunjungan salesman atau pembukaan toko baru.
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : hoveredKabupaten ? (
+                <>
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-1.5 mb-2">
+                    <span className="font-bold text-white text-sm">
+                      {hoveredKabupaten.namaKabupaten}
+                    </span>
+                    <span className="text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-cyan-300 font-mono">
+                      {hoveredKabupaten.kodeBps}
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 font-mono text-[11px]">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Master CB Terdaftar:</span>
+                      <strong className="text-white">{hoveredKabupaten.masterCbTotal.toLocaleString('id-ID')} Toko</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">RO Industri BPS Sulsel:</span>
+                      <strong className="text-indigo-300">{hoveredKabupaten.roIndustriBps.toLocaleString('id-ID')}</strong>
+                    </div>
+                    <div className="flex justify-between pt-1 border-t border-slate-800">
+                      <span className="text-slate-400">Coverage Ratio:</span>
+                      <strong className="text-teal-300 font-bold">{hoveredKabupaten.coverageRatio.toFixed(2)}%</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Kecamatan Under 40%:</span>
+                      <strong className="text-rose-400 font-bold">
+                        {hoveredKabupaten.under40KecamatanCount} / {hoveredKabupaten.jumlahKecamatan} Kec
+                      </strong>
+                    </div>
+                  </div>
+                </>
+              ) : null}
             </div>
           )}
 
           {/* D3 MAP LEGEND OVERLAY */}
-          <div className="absolute bottom-3 left-3 z-10 bg-slate-900/90 border border-slate-800 rounded-lg p-2.5 shadow-lg backdrop-blur text-[11px] space-y-1.5 max-w-xs">
+          <div className="absolute bottom-3 left-3 z-10 bg-slate-900/95 border border-slate-800 rounded-lg p-3 shadow-xl backdrop-blur text-[11px] space-y-2 max-w-xs">
             <div className="font-bold text-white flex items-center gap-1.5 text-xs">
               <Layers className="w-3.5 h-3.5 text-cyan-400" />
-              {displayMode === 'choropleth'
-                ? 'Legenda Penetrasi Coverage'
-                : displayMode === 'dual_bubble'
-                ? 'Legenda Dual Bubble'
-                : 'Legenda Gap Potensi Pasar'}
+              <span>Legenda Penetrasi Wilayah</span>
             </div>
 
-            {displayMode === 'choropleth' && (
-              <div className="grid grid-cols-2 gap-1.5 font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-emerald-600"></span>
-                  <span className="text-slate-300">≥ 70% (Optimal)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-amber-600"></span>
-                  <span className="text-slate-300">40 - 69% (Moderat)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-sky-600"></span>
-                  <span className="text-slate-300">1 - 39% (Rendah)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-slate-800 border border-dashed border-rose-500/50"></span>
-                  <span className="text-slate-300">0% (Blank Spot)</span>
-                </div>
+            <div className="space-y-1.5 font-medium">
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-rose-500 shadow-sm shadow-rose-500/50 flex items-center justify-center text-[9px] text-white font-bold">!</span>
+                <span className="text-rose-300 font-semibold">&lt; 40% (PERLU PERHATIAN KHUSUS)</span>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-amber-600"></span>
+                <span className="text-slate-300">40% - 69% (Moderat)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-emerald-600"></span>
+                <span className="text-slate-300">≥ 70% (Optimal)</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="w-3.5 h-3.5 rounded bg-rose-800 border border-dashed border-rose-400"></span>
+                <span className="text-slate-300">0% (Blank Spot / Belum Ada Toko)</span>
+              </div>
+            </div>
 
-            {displayMode === 'dual_bubble' && (
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-indigo-500/60 border border-indigo-400"></span>
-                  <span className="text-slate-300">Lingkaran Ungu: Universe RO BPS</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500 border border-emerald-400"></span>
-                  <span className="text-slate-300">Lingkaran Hijau: Master CB Toko</span>
-                </div>
-              </div>
-            )}
-
-            {displayMode === 'gap_heatmap' && (
-              <div className="grid grid-cols-2 gap-1.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-rose-600"></span>
-                  <span className="text-slate-300">&gt; 15.000 Gap</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-orange-600"></span>
-                  <span className="text-slate-300">10k - 15k Gap</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-amber-600"></span>
-                  <span className="text-slate-300">6k - 10k Gap</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-slate-600"></span>
-                  <span className="text-slate-300">&lt; 6.000 Gap</span>
-                </div>
-              </div>
-            )}
+            <div className="text-[10px] text-slate-400 pt-1.5 border-t border-slate-800">
+              Data RO Industri Resmi: BPS Sulsel Sensus Usaha Terbaru
+            </div>
           </div>
         </div>
 
-        {/* SIDE DETAIL PANEL: SELECTED KABUPATEN BREAKDOWN */}
-        <div className="w-full lg:w-80 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 flex flex-col justify-between">
+        {/* SIDE DETAIL PANEL: SELECTED KABUPATEN & KECAMATAN DETAILS */}
+        <div className="w-full lg:w-84 bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-800 p-4 flex flex-col justify-between">
           {selectedKabupaten ? (
             <div className="space-y-4">
               {/* Header */}
@@ -569,8 +790,16 @@ export function SulselD3Map({
                       {selectedKabupaten.namaKabupaten}
                     </h4>
                     <div className="text-xs text-slate-400">
-                      Ibukota: {selectedKabupaten.ibukota}
+                      Ibukota: {selectedKabupaten.ibukota} • {selectedKabupaten.jumlahKecamatan} Kecamatan
                     </div>
+                  </div>
+                </div>
+
+                {/* Status Alert Badge */}
+                <div className="mt-2.5 p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 flex items-center gap-2">
+                  <Flame className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                  <div className="text-[11px] text-rose-300 font-medium">
+                    <strong>{selectedKabupaten.under40KecamatanCount} dari {selectedKabupaten.jumlahKecamatan} Kecamatan</strong> berada di bawah 40% (Perlu Perhatian Khusus).
                   </div>
                 </div>
               </div>
@@ -589,7 +818,9 @@ export function SulselD3Map({
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
                   <div className="text-[10px] text-slate-400">Coverage Ratio</div>
-                  <div className="text-sm font-bold text-teal-300">{selectedKabupaten.coverageRatio.toFixed(2)}%</div>
+                  <div className={`text-sm font-bold ${selectedKabupaten.coverageRatio < 40 ? 'text-rose-400' : 'text-teal-300'}`}>
+                    {selectedKabupaten.coverageRatio.toFixed(2)}%
+                  </div>
                   <div className="text-[9px] text-slate-400 mt-0.5">Penetrasi Wilayah</div>
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded-lg border border-slate-800">
@@ -599,44 +830,73 @@ export function SulselD3Map({
                 </div>
               </div>
 
-              {/* Kecamatan Coverage Progress */}
-              <div className="p-3 bg-slate-950 rounded-lg border border-slate-800 space-y-1.5">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Kecamatan Tercover:</span>
-                  <span className="font-bold text-white font-mono">
-                    {selectedKabupaten.kecamatanCoveredCount} / {selectedKabupaten.jumlahKecamatan} ({selectedKabupaten.kecamatanCoverageRate.toFixed(0)}%)
-                  </span>
-                </div>
-                <div className="w-full bg-slate-800 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className="bg-emerald-500 h-full rounded-full"
-                    style={{ width: `${selectedKabupaten.kecamatanCoverageRate}%` }}
-                  />
-                </div>
-              </div>
-
-              {/* Kecamatan List (Mini Accordion) */}
-              <div className="space-y-1.5">
+              {/* Kecamatan List with Under 40% Highlight */}
+              <div className="space-y-2">
                 <div className="text-xs font-bold text-white flex items-center justify-between">
                   <span>Daftar Kecamatan ({selectedKabupaten.kecamatanSummaries.length}):</span>
+                  <span className="text-[10px] text-rose-400 font-mono">
+                    {selectedKabupaten.under40KecamatanCount} Under 40%
+                  </span>
                 </div>
 
-                <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
-                  {selectedKabupaten.kecamatanSummaries.map(kc => (
-                    <div 
-                      key={kc.kodeBps}
-                      className="p-2 rounded bg-slate-950/70 border border-slate-800/80 flex items-center justify-between text-xs hover:border-slate-700 transition"
-                    >
-                      <div>
-                        <div className="font-medium text-white text-[11px]">{kc.namaKecamatan}</div>
-                        <div className="text-[9px] text-slate-400">{kc.kategoriWilayah}</div>
-                      </div>
-                      <div className="text-right font-mono">
-                        <div className="text-[10px] text-teal-300 font-bold">{kc.coverageRatio.toFixed(1)}%</div>
-                        <div className="text-[9px] text-slate-400">{kc.masterCbTotal} / {kc.roIndustriBps}</div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1">
+                  {selectedKabupaten.kecamatanSummaries
+                    .filter(kc => !filterOnlyUnder40 || kc.isUnder40)
+                    .map((kc) => {
+                      return (
+                        <div 
+                          key={kc.kodeBps}
+                          className={`p-2 rounded-lg border text-xs transition flex items-center justify-between ${
+                            kc.isUnder40 
+                              ? 'bg-rose-950/20 border-rose-500/40 hover:border-rose-500' 
+                              : 'bg-slate-950/70 border-slate-800/80 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            {kc.isUnder40 ? (
+                              <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                            ) : (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            )}
+                            <div>
+                              <div className="font-semibold text-white text-[11px] flex items-center gap-1.5">
+                                <span>{kc.namaKecamatan}</span>
+                                {kc.isUnder40 && (
+                                  <span className="text-[8px] px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 font-mono font-bold">
+                                    UNDER 40%
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[9px] text-slate-400">
+                                BPS: {kc.roIndustriBps} RO • CB: {kc.masterCbTotal}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="text-right font-mono">
+                            <div className={`text-[11px] font-bold ${kc.isUnder40 ? 'text-rose-400' : 'text-teal-300'}`}>
+                              {kc.coverageRatio.toFixed(1)}%
+                            </div>
+                            {kc.masterCbTotal > 0 && onInspectOutlets && (
+                              <button
+                                onClick={() => onInspectOutlets({
+                                  title: `Kecamatan ${kc.namaKecamatan} (${selectedKabupaten.namaKabupaten})`,
+                                  type: 'KECAMATAN',
+                                  bpsRo: kc.roIndustriBps,
+                                  cbTotal: kc.masterCbTotal,
+                                  cbActive: kc.masterCbActive,
+                                  coverageRatio: kc.coverageRatio,
+                                  outlets: kc.outletList
+                                })}
+                                className="text-[9px] text-cyan-400 hover:underline"
+                              >
+                                Lihat Toko
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
 
@@ -655,7 +915,7 @@ export function SulselD3Map({
                   className="w-full py-2 px-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-md transition"
                 >
                   <Store className="w-4 h-4" />
-                  Lihat {selectedKabupaten.masterCbTotal} Toko Terdaftar
+                  Lihat Seluruh {selectedKabupaten.masterCbTotal} Toko di {selectedKabupaten.namaSingkat}
                 </button>
               )}
             </div>

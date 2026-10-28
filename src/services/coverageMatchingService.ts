@@ -25,6 +25,7 @@ export interface KecamatanCoverageSummary {
   activeCoverageRatio: number;
   gapOutlets: number; // unserved potential
   coverageStatus: CoverageStatus;
+  isUnder40: boolean; // Flagged when CB vs RO BPS < 40% (Perlu Perhatian Khusus)
   outletList: MasterOutletRecord[];
 }
 
@@ -46,6 +47,7 @@ export interface KabupatenCoverageSummary {
   kecamatanCoveredCount: number;
   kecamatanTotalCount: number;
   kecamatanCoverageRate: number; // percentage of kecamatans with at least 1 outlet
+  under40KecamatanCount: number; // Number of kecamatans in this kabupaten with coverage < 40%
   kecamatanSummaries: KecamatanCoverageSummary[];
   outletList: MasterOutletRecord[];
 }
@@ -61,6 +63,7 @@ export interface SulselCoverageDashboardData {
   totalKabupatenUniverse: number;
   totalKecamatanCovered: number;
   totalKecamatanUniverse: number;
+  totalKecamatanUnder40: number;
   kabupatenSummaries: KabupatenCoverageSummary[];
   allKecamatanSummaries: KecamatanCoverageSummary[];
   unmatchedOutletsCount: number;
@@ -299,6 +302,7 @@ export function calculateSulselCoverage(
         activeCoverageRatio: kActiveRatio,
         gapOutlets: kGap,
         coverageStatus: kStatus,
+        isUnder40: kRatio < 40,
         outletList: kOutlets,
       };
 
@@ -309,6 +313,8 @@ export function calculateSulselCoverage(
     const kecamatanCoverageRate = kab.jumlahKecamatan > 0 
       ? (kecamatanCoveredCount / kab.jumlahKecamatan) * 100 
       : 0;
+
+    const under40KecamatanCount = kecamatanSummaries.filter(k => k.isUnder40).length;
 
     return {
       kodeBps: kab.kodeBps,
@@ -328,6 +334,7 @@ export function calculateSulselCoverage(
       kecamatanCoveredCount,
       kecamatanTotalCount: kab.jumlahKecamatan,
       kecamatanCoverageRate,
+      under40KecamatanCount,
       kecamatanSummaries,
       outletList: outlets,
     };
@@ -342,6 +349,7 @@ export function calculateSulselCoverage(
 
   const totalKabupatenCovered = kabupatenSummaries.filter(k => k.masterCbTotal > 0).length;
   const totalKecamatanCovered = allKecamatanSummaries.filter(k => k.masterCbTotal > 0).length;
+  const totalKecamatanUnder40 = allKecamatanSummaries.filter(k => k.isUnder40).length;
 
   return {
     totalMasterCb,
@@ -354,6 +362,7 @@ export function calculateSulselCoverage(
     totalKabupatenUniverse: kabupatenList.length,
     totalKecamatanCovered,
     totalKecamatanUniverse: TOTAL_SULSEL_KECAMATAN,
+    totalKecamatanUnder40,
     kabupatenSummaries,
     allKecamatanSummaries,
     unmatchedOutletsCount: unmatchedOutlets.length,
