@@ -18,7 +18,7 @@ import {
   AlertTriangle,
   Flame,
   Filter,
-  Eye,
+  SlidersHorizontal,
   X
 } from 'lucide-react';
 import { SULSEL_GEOJSON, SulselGeoFeature, SULSEL_KABUPATEN_COORDINATES } from '../../data/sulselGeoJson';
@@ -41,12 +41,24 @@ interface SulselD3MapProps {
     coverageRatio: number;
     outlets: MasterOutletRecord[];
   }) => void;
+  availablePmas?: string[];
+  availableDepos?: string[];
+  selectedPma?: string;
+  selectedDepo?: string;
+  onPmaChange?: (pma: string) => void;
+  onDepoChange?: (depo: string) => void;
 }
 
 export function SulselD3Map({
   kabupatenSummaries,
   onSelectKabupaten,
   onInspectOutlets,
+  availablePmas,
+  availableDepos,
+  selectedPma = 'ALL',
+  selectedDepo = 'ALL',
+  onPmaChange,
+  onDepoChange,
 }: SulselD3MapProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -337,6 +349,79 @@ export function SulselD3Map({
             >
               <RotateCcw className="w-4 h-4" />
             </button>
+          </div>
+        </div>
+
+        {/* PMA & DEPO FILTER ROW (BY AREA) */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5 pt-3 border-t border-slate-800/80 bg-slate-950/60 p-2.5 rounded-lg">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-300">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Filter By Area:</span>
+            </div>
+
+            {/* PMA Dropdown */}
+            {availablePmas && availablePmas.length > 0 && onPmaChange && (
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+                <span className="text-cyan-400 font-semibold text-[11px]">PMA:</span>
+                <select
+                  value={selectedPma}
+                  onChange={(e) => onPmaChange(e.target.value)}
+                  className="bg-transparent text-white font-medium focus:outline-none cursor-pointer max-w-[130px] truncate"
+                >
+                  <option value="ALL" className="bg-slate-900 text-slate-300">Semua PMA ({availablePmas.length})</option>
+                  {availablePmas.map(p => (
+                    <option key={p} value={p} className="bg-slate-900 text-white">{p}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Depo / Area Dropdown */}
+            {availableDepos && availableDepos.length > 0 && onDepoChange && (
+              <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs">
+                <span className="text-teal-400 font-semibold text-[11px]">Depo / Area:</span>
+                <select
+                  value={selectedDepo}
+                  onChange={(e) => onDepoChange(e.target.value)}
+                  className="bg-transparent text-white font-medium focus:outline-none cursor-pointer max-w-[150px] truncate"
+                >
+                  <option value="ALL" className="bg-slate-900 text-slate-300">Semua Depo / Area ({availableDepos.length})</option>
+                  {availableDepos.map(d => (
+                    <option key={d} value={d} className="bg-slate-900 text-white">{d}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Reset Filter Button if active */}
+            {((selectedPma && selectedPma !== 'ALL') || (selectedDepo && selectedDepo !== 'ALL')) && (
+              <button
+                onClick={() => {
+                  if (onPmaChange) onPmaChange('ALL');
+                  if (onDepoChange) onDepoChange('ALL');
+                }}
+                className="px-2.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-semibold flex items-center gap-1 transition"
+                title="Reset filter PMA dan Depo"
+              >
+                <X className="w-3.5 h-3.5" />
+                Reset Filter Area
+              </button>
+            )}
+          </div>
+
+          {/* Active Area Indicator Info */}
+          <div className="text-[11px] text-slate-400 flex items-center gap-2">
+            {((selectedPma && selectedPma !== 'ALL') || (selectedDepo && selectedDepo !== 'ALL')) ? (
+              <span className="text-cyan-300 font-mono font-medium flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                Filter Aktif: {selectedPma !== 'ALL' ? `PMA: ${selectedPma}` : ''} {selectedDepo !== 'ALL' ? `• Depo: ${selectedDepo}` : ''}
+              </span>
+            ) : (
+              <span className="text-slate-500 font-mono text-[10px]">
+                Menampilkan Seluruh Depo & PMA (Distributor Wide)
+              </span>
+            )}
           </div>
         </div>
       </div>

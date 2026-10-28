@@ -64,6 +64,8 @@ export function MappingCoverageCbRoView({
   const [selectedKabupatenFilter, setSelectedKabupatenFilter] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
   const [selectedKategoriWilayahFilter, setSelectedKategoriWilayahFilter] = useState<string>('ALL');
+  const [selectedPmaFilter, setSelectedPmaFilter] = useState<string>('ALL');
+  const [selectedDepoFilter, setSelectedDepoFilter] = useState<string>('ALL');
 
   // Outlet inspection modal
   const [inspectedRegion, setInspectedRegion] = useState<{
@@ -89,10 +91,46 @@ export function MappingCoverageCbRoView({
   // Inline map toggle on table view
   const [showInlineMap, setShowInlineMap] = useState<boolean>(false);
 
-  // Main Coverage Calculation
-  const coverageData = useMemo(() => {
-    return calculateSulselCoverage(masterOutlets, BPS_SULAWESI_SELATAN_DATA);
+  // Extract available PMA options from Master CB
+  const availablePmas = useMemo(() => {
+    const set = new Set<string>();
+    for (const o of masterOutlets) {
+      if (o.pma && o.pma.trim()) set.add(o.pma.trim().toUpperCase());
+    }
+    return Array.from(set).sort();
   }, [masterOutlets]);
+
+  // Extract available Depo / Area options from Master CB
+  const availableDepos = useMemo(() => {
+    const set = new Set<string>();
+    for (const o of masterOutlets) {
+      const val = (o.depo || o.cabang || o.area || '').trim();
+      if (val) set.add(val.toUpperCase());
+    }
+    return Array.from(set).sort();
+  }, [masterOutlets]);
+
+  // Filtered Master Outlets based on PMA & Depo selection
+  const filteredMasterOutlets = useMemo(() => {
+    if (selectedPmaFilter === 'ALL' && selectedDepoFilter === 'ALL') {
+      return masterOutlets;
+    }
+    return masterOutlets.filter(o => {
+      if (selectedPmaFilter !== 'ALL' && (o.pma || '').trim().toUpperCase() !== selectedPmaFilter) {
+        return false;
+      }
+      if (selectedDepoFilter !== 'ALL') {
+        const val = (o.depo || o.cabang || o.area || '').trim().toUpperCase();
+        if (val !== selectedDepoFilter) return false;
+      }
+      return true;
+    });
+  }, [masterOutlets, selectedPmaFilter, selectedDepoFilter]);
+
+  // Main Coverage Calculation using filtered outlets
+  const coverageData = useMemo(() => {
+    return calculateSulselCoverage(filteredMasterOutlets, BPS_SULAWESI_SELATAN_DATA);
+  }, [filteredMasterOutlets]);
 
   // Filtered Kabupaten list
   const filteredKabupatens = useMemo(() => {
@@ -587,6 +625,40 @@ export function MappingCoverageCbRoView({
             </div>
           )}
 
+          {/* Filter PMA */}
+          {availablePmas.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-cyan-400 font-semibold">PMA:</span>
+              <select
+                value={selectedPmaFilter}
+                onChange={(e) => setSelectedPmaFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 transition max-w-[130px] truncate"
+              >
+                <option value="ALL">Semua PMA ({availablePmas.length})</option>
+                {availablePmas.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Filter Depo / Area */}
+          {availableDepos.length > 0 && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] text-teal-400 font-semibold">Depo:</span>
+              <select
+                value={selectedDepoFilter}
+                onChange={(e) => setSelectedDepoFilter(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-teal-500 transition max-w-[150px] truncate"
+              >
+                <option value="ALL">Semua Depo ({availableDepos.length})</option>
+                {availableDepos.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] text-slate-400 font-medium">Status Penetrasi:</span>
             <select
@@ -601,6 +673,21 @@ export function MappingCoverageCbRoView({
               <option value="BLANK_SPOT">Blank Spot (0%)</option>
             </select>
           </div>
+
+          {/* Reset button if PMA or Depo active */}
+          {(selectedPmaFilter !== 'ALL' || selectedDepoFilter !== 'ALL') && (
+            <button
+              onClick={() => {
+                setSelectedPmaFilter('ALL');
+                setSelectedDepoFilter('ALL');
+              }}
+              className="px-2.5 py-1.5 bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 rounded-lg text-xs font-semibold flex items-center gap-1 transition"
+              title="Reset Filter PMA dan Depo"
+            >
+              <X className="w-3.5 h-3.5" />
+              Reset Area
+            </button>
+          )}
         </div>
       </div>
 
@@ -610,6 +697,12 @@ export function MappingCoverageCbRoView({
           <SulselD3Map
             kabupatenSummaries={coverageData.kabupatenSummaries}
             onInspectOutlets={setInspectedRegion}
+            availablePmas={availablePmas}
+            availableDepos={availableDepos}
+            selectedPma={selectedPmaFilter}
+            selectedDepo={selectedDepoFilter}
+            onPmaChange={setSelectedPmaFilter}
+            onDepoChange={setSelectedDepoFilter}
             onSelectKabupaten={(kab) => {
               // Automatically highlights and populates details in side panel
             }}
@@ -689,6 +782,12 @@ export function MappingCoverageCbRoView({
             <SulselD3Map
               kabupatenSummaries={coverageData.kabupatenSummaries}
               onInspectOutlets={setInspectedRegion}
+              availablePmas={availablePmas}
+              availableDepos={availableDepos}
+              selectedPma={selectedPmaFilter}
+              selectedDepo={selectedDepoFilter}
+              onPmaChange={setSelectedPmaFilter}
+              onDepoChange={setSelectedDepoFilter}
             />
           )}
 
@@ -1323,6 +1422,8 @@ export function MappingCoverageCbRoView({
                     <th className="py-2.5 px-3 w-10 text-center">No</th>
                     <th className="py-2.5 px-3 font-mono">Kode Outlet</th>
                     <th className="py-2.5 px-3">Nama Outlet</th>
+                    <th className="py-2.5 px-3">PMA</th>
+                    <th className="py-2.5 px-3">Depo / Area</th>
                     <th className="py-2.5 px-3">Channel</th>
                     <th className="py-2.5 px-3">Salesman</th>
                     <th className="py-2.5 px-3">Status</th>
@@ -1340,6 +1441,14 @@ export function MappingCoverageCbRoView({
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-white">
                         {o.outletName}
+                      </td>
+                      <td className="py-2.5 px-3">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                          {o.pma || '-'}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-300 text-[11px] font-mono">
+                        {o.depo || o.cabang || o.area || '-'}
                       </td>
                       <td className="py-2.5 px-3">
                         <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-300">
